@@ -67,8 +67,6 @@ void Application::Initialize() {
     // Setup the display
     auto display = board.GetDisplay();
     display->SetupUI();
-    // Print board name/version info
-    display->SetChatMessage("system", SystemInfo::GetUserAgent().c_str());
 
     // Setup the audio service
     auto codec = board.GetAudioCodec();
@@ -158,12 +156,25 @@ void Application::Initialize() {
         }
     });
 
-    // Start network asynchronously
-    board.StartNetwork();
+    // Start the local smart-home task layer before network bring-up so UI pages
+    // remain responsive even when the ESP-Hosted WiFi slave is slow or absent.
     SmartHomeTasksStart();
 
     // Update the status bar immediately to show the network state
     display->UpdateStatusBar(true);
+
+    BaseType_t network_task_ret = xTaskCreate([](void* arg) {
+        (void)arg;
+        ESP_LOGI(TAG, "Network start task started");
+        Board::GetInstance().StartNetwork();
+        ESP_LOGI(TAG, "Network start task finished");
+        vTaskDelete(NULL);
+    }, "network_start", 8192, nullptr, 5, nullptr);
+
+    if (network_task_ret != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create network_start task");
+        xEventGroupSetBits(event_group_, MAIN_EVENT_ERROR);
+    }
 }
 
 void Application::Run() {

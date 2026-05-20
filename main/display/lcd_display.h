@@ -35,6 +35,7 @@ protected:
     lv_obj_t* shell_control_label_ = nullptr;
     lv_obj_t* shell_settings_label_ = nullptr;
     bool smart_home_ui_initialized_ = false;
+    int64_t shell_created_at_us_ = 0;
     lv_obj_t* bottom_bar_ = nullptr;
     lv_obj_t* preview_image_ = nullptr;
     lv_obj_t* emoji_label_ = nullptr;

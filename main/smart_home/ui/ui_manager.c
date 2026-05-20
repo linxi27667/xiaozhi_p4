@@ -197,8 +197,8 @@ static void create_content_area(lv_obj_t *scr)
     lv_obj_set_style_bg_color(content, UI_COLOR_BG, 0);
     lv_obj_set_style_bg_opa(content, LV_OPA_COVER, 0);
     lv_obj_set_style_pad_all(content, 0, 0);
-    lv_obj_add_flag(content, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_scroll_dir(content, LV_DIR_VER);
+    lv_obj_clear_flag(content, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(content, LV_SCROLLBAR_MODE_OFF);
     s_app_ctx.content_parent = content;
 }
 
@@ -206,12 +206,16 @@ static void create_embedded_content_area(lv_obj_t *scr)
 {
     lv_obj_t *content = lv_obj_create(scr);
     lv_obj_remove_style_all(content);
-    lv_obj_set_size(content, lv_pct(100), lv_pct(100));
+    int32_t width = lv_obj_get_width(scr);
+    int32_t height = lv_obj_get_height(scr);
+    if (width <= 1) width = LV_HOR_RES;
+    if (height <= 1) height = LV_VER_RES;
+    lv_obj_set_size(content, width, height);
     lv_obj_set_style_bg_color(content, UI_COLOR_BG, 0);
     lv_obj_set_style_bg_opa(content, LV_OPA_COVER, 0);
     lv_obj_set_style_pad_all(content, 0, 0);
-    lv_obj_add_flag(content, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_scroll_dir(content, LV_DIR_VER);
+    lv_obj_clear_flag(content, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(content, LV_SCROLLBAR_MODE_OFF);
     s_app_ctx.content_parent = content;
 }
 

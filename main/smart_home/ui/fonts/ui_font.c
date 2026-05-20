@@ -2,9 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-LV_FONT_DECLARE(font_puhui_basic_16_4);
-LV_FONT_DECLARE(font_puhui_basic_20_4);
-LV_FONT_DECLARE(font_puhui_basic_30_4);
+LV_FONT_DECLARE(ui_font_cn_16);
+LV_FONT_DECLARE(ui_font_cn_20);
+LV_FONT_DECLARE(ui_font_cn_30);
 LV_FONT_DECLARE(font_awesome_16_4);
 LV_FONT_DECLARE(font_awesome_20_4);
 LV_FONT_DECLARE(font_awesome_30_4);
@@ -56,9 +56,9 @@ void ui_font_init(void)
 
 const lv_font_t *ui_font_cn(uint8_t size)
 {
-    if (size <= 18) return &font_puhui_basic_16_4;
-    if (size <= 24) return &font_puhui_basic_20_4;
-    return &font_puhui_basic_30_4;
+    if (size <= 18) return &ui_font_cn_16;
+    if (size <= 24) return &ui_font_cn_20;
+    return &ui_font_cn_30;
 }
 
 const lv_font_t *ui_font_icon(uint8_t size)
@@ -77,9 +77,9 @@ void ui_font_init(void) {}
 
 const lv_font_t *ui_font_cn(uint8_t size)
 {
-    if (size <= 18) return &font_puhui_basic_16_4;
-    if (size <= 24) return &font_puhui_basic_20_4;
-    return &font_puhui_basic_30_4;
+    if (size <= 18) return &ui_font_cn_16;
+    if (size <= 24) return &ui_font_cn_20;
+    return &ui_font_cn_30;
 }
 
 const lv_font_t *ui_font_icon(uint8_t size)

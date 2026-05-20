@@ -10,13 +10,13 @@
 #include <font_awesome.h>
 #include <esp_log.h>
 #include <esp_err.h>
+#include <esp_timer.h>
 #include <esp_lvgl_port.h>
 #include <esp_psram.h>
 #include <cstring>
 #include <src/misc/cache/lv_cache.h>
 
 #include "board.h"
-#include "application.h"
 
 extern "C" {
 #include "ui_manager.h"
@@ -27,10 +27,13 @@ extern "C" {
 static constexpr int kShellSidebarWidth = 112;
 static constexpr int kShellButtonWidth = 96;
 static constexpr int kShellButtonHeight = 84;
+static constexpr int kShellStartupTouchGuardMs = 1000;
 
 LV_FONT_DECLARE(BUILTIN_TEXT_FONT);
 LV_FONT_DECLARE(BUILTIN_ICON_FONT);
+LV_FONT_DECLARE(font_awesome_20_4);
 LV_FONT_DECLARE(font_awesome_30_4);
+LV_FONT_DECLARE(ui_font_cn_20);
 
 void LcdDisplay::InitializeLcdThemes() {
     auto text_font = std::make_shared<LvglBuiltInFont>(&BUILTIN_TEXT_FONT);
@@ -366,7 +369,7 @@ void LcdDisplay::OnShellNavClicked(lv_event_t* e) {
         return;
     }
 
-    lv_obj_t* target = lv_event_get_target_obj(e);
+    lv_obj_t* target = lv_event_get_current_target_obj(e);
     ShellPage page = ShellPage::Chat;
     if (target == display->shell_chat_btn_) {
         page = ShellPage::Chat;
@@ -380,10 +383,11 @@ void LcdDisplay::OnShellNavClicked(lv_event_t* e) {
         return;
     }
 
-    if (page != ShellPage::Chat) {
-        DeviceState state = Application::GetInstance().GetDeviceState();
-        if (state != kDeviceStateIdle && state != kDeviceStateListening && state != kDeviceStateSpeaking) {
-            ESP_LOGW(TAG, "Ignore smart-home shell touch before app is ready, state=%d", state);
+    if (page != ShellPage::Chat && display->shell_created_at_us_ > 0) {
+        int64_t elapsed_us = esp_timer_get_time() - display->shell_created_at_us_;
+        if (elapsed_us < kShellStartupTouchGuardMs * 1000) {
+            ESP_LOGW(TAG, "Ignore smart-home shell touch during startup guard, elapsed=%d ms",
+                     static_cast<int>(elapsed_us / 1000));
             return;
         }
     }
@@ -415,8 +419,10 @@ void LcdDisplay::RefreshShellNav(ShellPage page) {
         lv_obj_set_style_border_width(item.btn, active ? 0 : 1, 0);
         lv_obj_set_style_border_color(item.btn, lv_color_hex(0x334155), 0);
         lv_obj_set_style_text_color(item.btn, active ? lv_color_hex(0xFFFFFF) : lv_color_hex(0xCBD5E1), 0);
-        if (item.label) {
-            lv_obj_set_style_text_color(item.label, active ? lv_color_hex(0xFFFFFF) : lv_color_hex(0xCBD5E1), 0);
+        const lv_color_t text_color = active ? lv_color_hex(0xFFFFFF) : lv_color_hex(0xCBD5E1);
+        uint32_t child_count = lv_obj_get_child_count(item.btn);
+        for (uint32_t child_index = 0; child_index < child_count; child_index++) {
+            lv_obj_set_style_text_color(lv_obj_get_child(item.btn, child_index), text_color, 0);
         }
     }
 }
@@ -468,6 +474,10 @@ void LcdDisplay::SwitchShellPage(ShellPage page) {
     }
 
     if (smart_home) {
+        lv_obj_remove_flag(smart_home_page_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_pos(smart_home_page_, kShellSidebarWidth, 0);
+        lv_obj_set_size(smart_home_page_, LV_HOR_RES - kShellSidebarWidth, LV_VER_RES);
+        lv_obj_update_layout(smart_home_page_);
         EnsureSmartHomeUi();
         switch (page) {
             case ShellPage::Overview:
@@ -483,7 +493,7 @@ void LcdDisplay::SwitchShellPage(ShellPage page) {
             default:
                 break;
         }
-        lv_obj_remove_flag(smart_home_page_, LV_OBJ_FLAG_HIDDEN);
+        UI_Manager_Poll();
         lv_obj_move_foreground(smart_home_page_);
         lv_obj_move_foreground(side_bar_);
     } else {
@@ -496,6 +506,7 @@ void LcdDisplay::SwitchShellPage(ShellPage page) {
 
 void LcdDisplay::CreateSmartHomeShell() {
     auto screen = lv_screen_active();
+    shell_created_at_us_ = esp_timer_get_time();
 
     const int content_width = LV_HOR_RES - kShellSidebarWidth;
 
@@ -550,36 +561,47 @@ void LcdDisplay::CreateSmartHomeShell() {
     lv_obj_set_flex_align(side_bar_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_clear_flag(side_bar_, LV_OBJ_FLAG_SCROLLABLE);
 
-    auto create_btn = [this](const char* text) {
+    auto create_btn = [this](const char* icon, const char* text) {
         lv_obj_t* btn = lv_button_create(side_bar_);
         lv_obj_remove_style_all(btn);
         lv_obj_set_size(btn, kShellButtonWidth, kShellButtonHeight);
         lv_obj_set_style_radius(btn, 8, 0);
         lv_obj_set_style_bg_color(btn, lv_color_hex(0x2563EB), 0);
         lv_obj_set_style_pad_all(btn, 0, 0);
-        lv_obj_set_style_text_font(btn, &BUILTIN_TEXT_FONT, 0);
         lv_obj_set_style_text_align(btn, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_set_layout(btn, LV_LAYOUT_FLEX);
+        lv_obj_set_flex_flow(btn, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_flex_align(btn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_row(btn, 4, 0);
         lv_obj_add_event_cb(btn, OnShellNavClicked, LV_EVENT_CLICKED, this);
+
+        lv_obj_t* icon_label = lv_label_create(btn);
+        lv_label_set_text(icon_label, icon);
+        lv_obj_set_style_text_font(icon_label, &font_awesome_20_4, 0);
+        lv_obj_set_style_text_align(icon_label, LV_TEXT_ALIGN_CENTER, 0);
 
         lv_obj_t* label = lv_label_create(btn);
         lv_label_set_text(label, text);
-        lv_obj_center(label);
+        lv_obj_set_width(label, kShellButtonWidth - 10);
+        lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
+        lv_obj_set_style_text_font(label, &ui_font_cn_20, 0);
+        lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
         return std::pair<lv_obj_t*, lv_obj_t*>(btn, label);
     };
 
-    auto chat = create_btn("聊天");
+    auto chat = create_btn(FONT_AWESOME_COMMENT, "聊天");
     shell_chat_btn_ = chat.first;
     shell_chat_label_ = chat.second;
 
-    auto overview = create_btn("总览");
+    auto overview = create_btn(FONT_AWESOME_HOUSE, "总览");
     shell_overview_btn_ = overview.first;
     shell_overview_label_ = overview.second;
 
-    auto control = create_btn("控制");
+    auto control = create_btn(FONT_AWESOME_POWER_OFF, "控制");
     shell_control_btn_ = control.first;
     shell_control_label_ = control.second;
 
-    auto settings = create_btn("设置");
+    auto settings = create_btn(FONT_AWESOME_GEAR, "设置");
     shell_settings_btn_ = settings.first;
     shell_settings_label_ = settings.second;
 
@@ -1333,6 +1355,14 @@ void LcdDisplay::SetEmotion(const char* emotion) {
         if (setup_ui_called_) {
             ESP_LOGW(TAG, "SetEmotion('%s') failed: emoji_image_ is nullptr (SetupUI() was called but emoji image not created)", emotion);
         }
+        return;
+    }
+
+    if (strcmp(emotion, "microchip_ai") == 0 && emoji_label_ != nullptr) {
+        DisplayLockGuard lock(this);
+        lv_label_set_text(emoji_label_, FONT_AWESOME_MICROCHIP_AI);
+        lv_obj_add_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(emoji_label_, LV_OBJ_FLAG_HIDDEN);
         return;
     }
 

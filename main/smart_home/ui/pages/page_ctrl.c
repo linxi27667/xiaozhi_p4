@@ -11,6 +11,12 @@
 #include <string.h>
 
 static const char *TAG = "PAGE_CTRL";
+static int32_t s_x_scale = 256;
+
+static int sx(int value)
+{
+    return (int)(((int64_t)value * s_x_scale + 128) / 256);
+}
 
 typedef struct {
     lv_obj_t *grid;
@@ -30,9 +36,9 @@ static lv_obj_t *cn_label(lv_obj_t *parent, const char *text, int size, lv_color
     lv_label_set_text(lbl, text ? text : "");
     lv_obj_set_style_text_font(lbl, ui_font_cn((uint8_t)size), 0);
     lv_obj_set_style_text_color(lbl, color, 0);
-    lv_obj_set_pos(lbl, x, y);
+    lv_obj_set_pos(lbl, sx(x), y);
     if (w > 0) {
-        lv_obj_set_width(lbl, w);
+        lv_obj_set_width(lbl, sx(w));
         lv_label_set_long_mode(lbl, LV_LABEL_LONG_CLIP);
     }
     return lbl;
@@ -42,15 +48,15 @@ static void icon_text(lv_obj_t *parent, const char *icon, lv_color_t color,
     int x, int y, int icon_size)
 {
     lv_obj_t *lbl = ui_create_icon(parent, icon, ui_font_icon((uint8_t)icon_size), color);
-    lv_obj_set_pos(lbl, x, y);
+    lv_obj_set_pos(lbl, sx(x), y);
 }
 
 static lv_obj_t *panel(lv_obj_t *parent, int x, int y, int w, int h)
 {
     lv_obj_t *obj = lv_obj_create(parent);
     lv_obj_remove_style_all(obj);
-    lv_obj_set_pos(obj, x, y);
-    lv_obj_set_size(obj, w, h);
+    lv_obj_set_pos(obj, sx(x), y);
+    lv_obj_set_size(obj, sx(w), h);
     lv_obj_set_style_bg_color(obj, UI_COLOR_CARD, 0);
     lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
     lv_obj_set_style_radius(obj, 16, 0);
@@ -248,13 +254,18 @@ lv_obj_t *page_ctrl_create(lv_obj_t *parent)
     lv_obj_set_style_bg_color(page, UI_COLOR_BG, 0);
     lv_obj_set_style_bg_opa(page, LV_OPA_COVER, 0);
     lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(page, LV_SCROLLBAR_MODE_OFF);
     lv_obj_add_event_cb(page, page_ctrl_delete, LV_EVENT_DELETE, ctx);
+    int32_t parent_w = lv_obj_get_width(parent);
+    if (parent_w <= 1) parent_w = LV_HOR_RES;
+    s_x_scale = parent_w < 960 ? (int32_t)((int64_t)parent_w * 256 / 960) : 256;
 
     ctx->grid = lv_obj_create(page);
     lv_obj_remove_style_all(ctx->grid);
     lv_obj_set_pos(ctx->grid, 0, 0);
     lv_obj_set_size(ctx->grid, lv_pct(100), lv_pct(100));
     lv_obj_clear_flag(ctx->grid, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(ctx->grid, LV_SCROLLBAR_MODE_OFF);
 
     ui_event_subscribe(UI_EVENT_MODEL_UPDATED, on_model_updated, ctx);
     update_ctrl(ctx);

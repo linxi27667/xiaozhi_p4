@@ -7,6 +7,7 @@
 
 #include <esp_log.h>
 #include <esp_timer.h>
+#include <wifi_manager.h>
 
 #include <cstdio>
 #include <cstring>
@@ -28,6 +29,7 @@ static uint32_t s_mqtt_rx_count = 0;
 static int64_t s_last_rx_time_s = 0;
 static int64_t s_last_heartbeat[4] = {0};
 static bool s_controller_online[4] = {false};
+static int64_t s_last_network_wait_log_ms = 0;
 
 static bool topic_starts_with(const std::string& topic, const char* prefix) {
     return topic.rfind(prefix, 0) == 0;
@@ -174,6 +176,11 @@ static void ensure_client_created(void) {
     });
 }
 
+static bool network_ready(void) {
+    auto& wifi = WifiManager::GetInstance();
+    return wifi.IsInitialized() && wifi.IsConnected();
+}
+
 extern "C" void mqtt_client_init(void) {
     if (s_initialized) {
         return;
@@ -185,6 +192,16 @@ extern "C" void mqtt_client_init(void) {
 
 extern "C" void mqtt_client_start(void) {
     if (s_connected || s_connecting) {
+        return;
+    }
+
+    if (!network_ready()) {
+        int64_t now_ms = esp_timer_get_time() / 1000;
+        if (now_ms - s_last_network_wait_log_ms > 15000) {
+            s_last_network_wait_log_ms = now_ms;
+            ESP_LOGI(TAG, "Waiting for WiFi before smart-home MQTT connect");
+        }
+        device_model_set_mqtt_state(MQTT_STATE_DISCONNECTED);
         return;
     }
 
