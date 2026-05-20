@@ -1,0 +1,93 @@
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include "lvgl.h"
+
+typedef enum {
+    UI_KEY_TAB_DATA = 0,
+    UI_KEY_TAB_CTRL,
+    UI_KEY_TAB_NET,
+    UI_KEY_TAB_SET,
+    UI_KEY_STATUS_ONLINE,
+    UI_KEY_STATUS_OFFLINE,
+    UI_KEY_BRAND,
+    UI_KEY_MODEL,
+    UI_KEY_DATA_REALTIME,
+    UI_KEY_SENSOR_LIGHT,
+    UI_KEY_SENSOR_SMOKE,
+    UI_KEY_SENSOR_RAIN,
+    UI_KEY_DEVICE_COURTYARD,
+    UI_KEY_DEVICE_STRIP,
+    UI_KEY_DEVICE_GARDEN,
+    UI_KEY_DEVICE_FAN,
+    UI_KEY_DEVICES,
+    UI_KEY_SENSORS,
+    UI_KEY_AUTO_MODE,
+    UI_KEY_MANUAL,
+    UI_KEY_ON,
+    UI_KEY_OFF,
+    UI_KEY_NOT_CONNECTED,
+    UI_KEY_SET_TITLE,
+    UI_KEY_SET_LANGUAGE,
+    UI_KEY_SET_LANG_CURRENT,
+    UI_KEY_SET_WIFI,
+    UI_KEY_SET_WIFI_SCAN,
+    UI_KEY_SET_WIFI_SCANNING,
+    UI_KEY_SET_WIFI_CONNECT,
+    UI_KEY_SET_WIFI_DISCONNECT,
+    UI_KEY_SET_WIFI_CONNECTED,
+    UI_KEY_SET_WIFI_PASSWORD,
+    UI_KEY_SET_WIFI_NO_AP,
+    UI_KEY_SET_WIFI_CONNECT_FAILED,
+    UI_KEY_SET_ABOUT,
+    UI_KEY_SET_VERSION,
+    UI_KEY_SET_RESET,
+    UI_KEY_SET_RESET_CONFIRM,
+    UI_KEY_CTRL_TITLE,
+    UI_KEY_CTRL_SCENE,
+    UI_KEY_CTRL_MORNING,
+    UI_KEY_CTRL_NIGHT,
+    UI_KEY_CTRL_AWAY,
+    UI_KEY_LUX,
+    UI_KEY_PPM,
+    UI_KEY_PERCENT,
+    UI_KEY_GARDEN_LIGHTING,
+    UI_KEY_GARDEN_DEVICES,
+    UI_KEY_GARDEN_SENSORS,
+    UI_KEY_GARDEN_AUTO,
+    UI_KEY_GARDEN_CORRIDOR,
+    UI_KEY_GARDEN_STRIP,
+    UI_KEY_GARDEN_VEG,
+    UI_KEY_GARDEN_FAN,
+    UI_KEY_GARDEN_SERVO,
+    UI_KEY_GARDEN_HUNG_OUT,
+    UI_KEY_GARDEN_COLLECTED,
+    UI_KEY_GARDEN_HANG,
+    UI_KEY_GARDEN_COLLECT,
+    UI_KEY_GARDEN_SOIL,
+    UI_KEY_GARDEN_LIGHT,
+    UI_KEY_GARDEN_RAIN,
+    UI_KEY_GARDEN_RAINING,
+    UI_KEY_GARDEN_DRY,
+    UI_KEY_GARDEN_AUTO_MODE,
+    UI_KEY_GARDEN_MANUAL,
+    UI_KEY_COUNT
+} ui_i18n_key_t;
+
+typedef enum {
+    UI_LANG_ZH = 0,
+    UI_LANG_EN = 1,
+} ui_lang_t;
+
+void ui_i18n_init(void);
+const char *ui_i18n_get(ui_i18n_key_t key);
+ui_lang_t ui_i18n_get_lang(void);
+void ui_i18n_set_lang(ui_lang_t lang);
+const lv_font_t *ui_i18n_font(const lv_font_t *fallback);
+
+#ifdef __cplusplus
+}
+#endif
