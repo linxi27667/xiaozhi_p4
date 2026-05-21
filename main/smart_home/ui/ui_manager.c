@@ -5,6 +5,7 @@
 #include "ui_font.h"
 #include "ui_i18n.h"
 #include "ui_icons.h"
+#include "smart_home_alarm_ui.h"
 #include "mqtt_device_model.h"
 #include "pages/page_data.h"
 #include "pages/page_ctrl.h"
@@ -228,6 +229,7 @@ void UI_Manager_Init(lv_obj_t *parent)
     ui_styles_init();
     ui_i18n_init();
     device_model_init();
+    smart_home_alarm_ui_init();
 
     lv_obj_t *scr = parent ? parent : lv_screen_active();
     bool embedded = parent != NULL;

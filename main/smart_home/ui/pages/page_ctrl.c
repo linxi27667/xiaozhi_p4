@@ -105,7 +105,8 @@ static const char *device_name_local(const rc_device_t *d)
     if (strcmp(d->id, "floor2_master_light") == 0) return "Master Light";
     if (strcmp(d->id, "floor2_hanger") == 0) return "2F Rack";
     if (strcmp(d->id, "floor3_balcony_light") == 0) return "Balcony Light";
-    if (strcmp(d->id, "floor3_skylight") == 0) return "Skylight";
+    if (strcmp(d->id, "floor3_left_skylight") == 0) return "Left Skylight";
+    if (strcmp(d->id, "floor3_right_skylight") == 0) return "Right Skylight";
     if (strcmp(d->id, "floor3_hanger") == 0) return "3F Rack";
     return d->name;
 }

@@ -50,6 +50,7 @@ list(REMOVE_ITEM SMART_HOME_UI_SOURCES
 list(APPEND SOURCES
     ${SMART_HOME_UI_SOURCES}
     "smart_home/services/xiaozhi_mqtt.cc"
+    "smart_home/services/smart_home_alarm_bridge.cc"
     "smart_home/services/wifi_manager.cc"
     "smart_home/tasks/smart_home_tasks.cc"
     "smart_home/mcp/smart_home_mcp_tool.cc"
@@ -61,6 +62,7 @@ list(APPEND INCLUDE_DIRS
     "smart_home/ui/model"
     "smart_home/ui/fonts"
     "smart_home/ui/services"
+    "../shared"
     "smart_home/tasks"
     "smart_home/mcp"
 )

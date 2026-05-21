@@ -143,7 +143,7 @@ static void top_status(lv_obj_t *page, data_ctx_t *ctx)
 
     cn_label(page, tr("智慧家庭控制面板", "Smart Home Console"), 20,
         UI_COLOR_TEXT_STRONG, 28, 18, 206);
-    ui_brand_create(page, 254, 10, 250, 36);
+    ui_brand_create(page, 254, 10, 330, 38);
     bool mqtt_ok = (m->mqtt_state == MQTT_STATE_CONNECTED);
     ctx->lbl_top_mqtt = cn_label(page, mqtt_ok ? tr("MQTT：已连接", "MQTT: Online") :
         tr("MQTT：未连接", "MQTT: Offline"), 12,
@@ -276,12 +276,12 @@ static bool rain_text(uint8_t floor_id, char *buf, size_t buf_size)
 
 static bool flame_text(uint8_t floor_id, char *buf, size_t buf_size)
 {
-    uint16_t value = 0;
-    if (!device_model_get_flame_value(floor_id, &value)) {
+    uint8_t status = 0;
+    if (!device_model_get_fire_status(floor_id, &status)) {
         lv_snprintf(buf, buf_size, "%s", tr("—", "—"));
         return false;
     }
-    lv_snprintf(buf, buf_size, "%u%%", (unsigned)value);
+    lv_snprintf(buf, buf_size, "%s", status >= 2 ? tr("告警", "Alert") : tr("正常", "OK"));
     return true;
 }
 
@@ -322,7 +322,7 @@ static void create_overview(data_ctx_t *ctx, lv_obj_t *page)
     const rc_device_t *d_master = device_by_id("floor2_master_light");
     const rc_device_t *d_hanger2 = device_by_id("floor2_hanger");
     const rc_device_t *d_balcony = device_by_id("floor3_balcony_light");
-    const rc_device_t *d_window = device_by_id("floor3_skylight");
+    const rc_device_t *d_window = device_by_id("floor3_left_skylight");
     const rc_device_t *d_hanger3 = device_by_id("floor3_hanger");
     const mqtt_device_model_t *m = device_model_get();
 
@@ -409,14 +409,14 @@ static void create_overview(data_ctx_t *ctx, lv_obj_t *page)
         tr("雨滴传感器", "Rain"), buf,
         rain3_valid ? tr("已上报", "Reported") : tr("未接入", "N/A"), false,
         &ctx->lbl_f3_rain_type, NULL);
-    uint16_t flame3 = 0;
-    bool flame3_valid = device_model_get_flame_value(3, &flame3);
-    if (flame3_valid) lv_snprintf(buf, sizeof(buf), "%u%%", (unsigned)flame3);
+    uint8_t flame3 = 0;
+    bool flame3_valid = device_model_get_fire_status(3, &flame3);
+    if (flame3_valid) lv_snprintf(buf, sizeof(buf), "%s", flame3 >= 2 ? tr("已触发", "Active") : tr("未触发", "Clear"));
     else lv_snprintf(buf, sizeof(buf), "%s", tr("未接入", "N/A"));
     device_tile(f3, 12, 216, 282, 42, ICON_FIRE, UI_COLOR_RED,
-        tr("火焰传感器", "Flame Sensor"), buf,
-        flame3_valid ? (flame3 < 50 ? tr("正常", "OK") : tr("告警", "Alert")) : tr("未接入", "N/A"),
-        flame3_valid && flame3 >= 50,
+        tr("火灾传感器", "Fire Sensor"), buf,
+        flame3_valid ? (flame3 >= 2 ? tr("告警", "Alert") : tr("正常", "OK")) : tr("未接入", "N/A"),
+        flame3_valid && flame3 >= 2,
         &ctx->lbl_f3_fire_type, &ctx->lbl_f3_fire);
     if (ctx->active_floor != 0 && ctx->active_floor != 3) lv_obj_set_style_opa(f3, LV_OPA_40, 0);
 
@@ -439,7 +439,7 @@ static void create_overview(data_ctx_t *ctx, lv_obj_t *page)
     rain_text(3, buf, sizeof(buf));
     metric(metrics, 298, ICON_DROP, UI_COLOR_BLUE, buf, tr("三楼雨滴", "3F Rain"), &ctx->lbl_rain3);
     flame_text(3, buf, sizeof(buf));
-    metric(metrics, 370, ICON_FIRE, UI_COLOR_RED, buf, tr("火焰", "Flame"), &ctx->lbl_fire);
+    metric(metrics, 370, ICON_FIRE, UI_COLOR_RED, buf, tr("火警", "Fire"), &ctx->lbl_fire);
     metric(metrics, 442, ICON_WINDOW, UI_COLOR_BLUE, tr("—", "—"), tr("天窗", "Window"), &ctx->lbl_window);
     metric(metrics, 514, ICON_BOLT, UI_COLOR_TEXT_SEC, "—", tr("功率", "Power"), NULL);
 
@@ -622,7 +622,7 @@ static void update_data(data_ctx_t *ctx)
             set_text_color(ctx->lbl_f2_hanger, tr("未接入", "N/A"), UI_COLOR_TEXT_SEC);
         }
     }
-    d = device_by_id("floor3_skylight");
+    d = device_by_id("floor3_left_skylight");
     if (d) {
         set_card_state(ctx->card_f3_window, UI_COLOR_BLUE, d->connected, d->power_on);
         if (d->connected) {
@@ -648,12 +648,12 @@ static void update_data(data_ctx_t *ctx)
             set_text_color(ctx->lbl_f3_hanger, tr("未接入", "N/A"), UI_COLOR_TEXT_SEC);
         }
     }
-    uint16_t flame3_value = 0;
-    if (device_model_get_flame_value(3, &flame3_value)) {
-        lv_snprintf(buf, sizeof(buf), "%u%%", (unsigned)flame3_value);
+    uint8_t flame3_value = 0;
+    if (device_model_get_fire_status(3, &flame3_value)) {
+        lv_snprintf(buf, sizeof(buf), "%s", flame3_value >= 2 ? tr("已触发", "Active") : tr("未触发", "Clear"));
         set_text_color(ctx->lbl_f3_fire_type, buf, UI_COLOR_TEXT_SEC);
-        set_text_color(ctx->lbl_f3_fire, flame3_value < 50 ? tr("正常", "OK") :
-            tr("告警", "Alert"), flame3_value < 50 ? UI_COLOR_GREEN : UI_COLOR_RED);
+        set_text_color(ctx->lbl_f3_fire, flame3_value >= 2 ? tr("告警", "Alert") :
+            tr("正常", "OK"), flame3_value >= 2 ? UI_COLOR_RED : UI_COLOR_GREEN);
     } else {
         set_text_color(ctx->lbl_f3_fire_type, tr("未接入", "N/A"), UI_COLOR_TEXT_SEC);
         set_text_color(ctx->lbl_f3_fire, tr("未接入", "N/A"), UI_COLOR_TEXT_SEC);

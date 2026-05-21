@@ -61,12 +61,23 @@ static cJSON* build_sensors_json() {
     for (uint8_t floor = 1; floor <= 3; floor++) {
         cJSON* item = cJSON_CreateObject();
         uint16_t value = 0;
+        uint8_t status = 0;
         cJSON_AddNumberToObject(item, "floor", floor);
+        if (device_model_get_smoke_value(floor, &value)) {
+            cJSON_AddNumberToObject(item, "smoke_mv", value);
+        }
         if (device_model_get_rain_value(floor, &value)) {
             cJSON_AddNumberToObject(item, "rain_mv", value);
         }
-        if (device_model_get_flame_value(floor, &value)) {
-            cJSON_AddNumberToObject(item, "flame_mv", value);
+        if (device_model_get_fire_status(floor, &status)) {
+            cJSON_AddNumberToObject(item, "fire_status", status);
+            cJSON_AddBoolToObject(item, "fire_alarm", status >= 2);
+        }
+        if (device_model_get_rain_status(floor, &status)) {
+            cJSON_AddNumberToObject(item, "rain_status", status);
+        }
+        if (device_model_get_help_status(floor, &status)) {
+            cJSON_AddNumberToObject(item, "help_status", status);
         }
         cJSON_AddItemToArray(floors, item);
     }

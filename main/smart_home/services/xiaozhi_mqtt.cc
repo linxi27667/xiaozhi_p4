@@ -7,7 +7,7 @@
 
 #include <esp_log.h>
 #include <esp_timer.h>
-#include <wifi_manager.h>
+#include "wifi_manager.h"
 
 #include <cstdio>
 #include <cstring>
@@ -55,6 +55,20 @@ static void process_announce(const std::string& payload) {
 }
 
 static void process_heartbeat(const std::string& payload) {
+    if (payload.size() >= sizeof(iot_heartbeat_v2_packet_t)) {
+        const auto* pkt = reinterpret_cast<const iot_heartbeat_v2_packet_t*>(payload.data());
+        if (pkt->command == IOT_CMD_HEARTBEAT &&
+            pkt->protocol_version == IOT_PROTOCOL_VERSION &&
+            pkt->device_id >= 1 && pkt->device_id <= 3) {
+            ESP_LOGD(TAG, "Heartbeat V2: device_id=%u name=%.*s mac=%s",
+                     pkt->device_id, (int)sizeof(pkt->device_name), pkt->device_name, pkt->mac_str);
+            device_model_apply_heartbeat(pkt);
+            s_controller_online[pkt->device_id] = true;
+            s_last_heartbeat[pkt->device_id] = esp_timer_get_time() / 1000000;
+            return;
+        }
+    }
+
     if (payload.size() < sizeof(iot_heartbeat_packet_t)) {
         return;
     }
@@ -69,7 +83,14 @@ static void process_heartbeat(const std::string& payload) {
     }
 }
 
-static void process_response(const std::string& payload) {
+static uint8_t floor_id_from_response_topic(const std::string& topic) {
+    if (!topic_starts_with(topic, MQTT_TOPIC_RESP_PREFIX)) {
+        return 0;
+    }
+    return 0;
+}
+
+static void process_response(const std::string& topic, const std::string& payload) {
     if (payload.size() < sizeof(iot_command_packet_t)) {
         return;
     }
@@ -78,21 +99,12 @@ static void process_response(const std::string& payload) {
     ESP_LOGI(TAG, "Response: cmd=0x%02X dev=%u gpio=%u val=%u",
              pkt->command, pkt->device_id, pkt->gpio_index, pkt->value);
 
-    if (pkt->device_id >= 1 && pkt->device_id <= 3) {
-        device_model_set_controller_online(pkt->device_id, true);
+    uint8_t floor_id = pkt->device_id;
+    if (floor_id == 0) {
+        floor_id = floor_id_from_response_topic(topic);
     }
-
-    for (uint16_t i = 0; i < device_model_count(); i++) {
-        const rc_device_t* d = device_model_at(i);
-        if (!d) {
-            continue;
-        }
-        if (d->floor_id == pkt->device_id &&
-            d->cmd_type == pkt->command &&
-            d->gpio_index == pkt->gpio_index) {
-            device_model_apply_power(i, pkt->value != 0);
-            break;
-        }
+    if (floor_id >= 1 && floor_id <= 3) {
+        device_model_apply_command_ack(floor_id, pkt->command, pkt->gpio_index, pkt->value);
     }
 }
 
@@ -169,7 +181,7 @@ static void ensure_client_created(void) {
         } else if (topic_starts_with(topic, MQTT_TOPIC_HEARTBEAT_PREFIX)) {
             process_heartbeat(payload);
         } else if (topic_starts_with(topic, MQTT_TOPIC_RESP_PREFIX)) {
-            process_response(payload);
+            process_response(topic, payload);
         } else if (topic_starts_with(topic, MQTT_TOPIC_SENSOR_PREFIX)) {
             process_sensor(payload);
         }
@@ -177,8 +189,7 @@ static void ensure_client_created(void) {
 }
 
 static bool network_ready(void) {
-    auto& wifi = WifiManager::GetInstance();
-    return wifi.IsInitialized() && wifi.IsConnected();
+    return wifi_manager_is_connected();
 }
 
 extern "C" void mqtt_client_init(void) {

@@ -16,6 +16,7 @@ static const char *s_event_names[] = {
     [UI_EVENT_WIFI_CHANGED]       = "WIFI_CHANGED",
     [UI_EVENT_LANG_CHANGED]       = "LANG_CHANGED",
     [UI_EVENT_PAGE_SWITCHED]      = "PAGE_SWITCHED",
+    [UI_EVENT_FIRE_ALARM]         = "FIRE_ALARM",
 };
 
 #define MAX_SUBSCRIBERS 16

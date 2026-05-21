@@ -6,6 +6,7 @@ extern "C" {
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "../../services/mqtt_iot_protocol.h"
 
 #define RC_DEVICE_MAX  32
 #define RC_NAME_MAX    20
@@ -90,9 +91,17 @@ typedef struct {
     bool flame_valid;
     bool smoke_valid;
     uint16_t rain_floor_value[3];
+    uint16_t smoke_floor_value[3];
     uint16_t flame_floor_value[3];
+    uint8_t fire_floor_status[3];
+    uint8_t rain_floor_status[3];
+    uint8_t help_floor_status[3];
     bool rain_floor_valid[3];
+    bool smoke_floor_valid[3];
     bool flame_floor_valid[3];
+    bool fire_floor_valid[3];
+    bool rain_status_floor_valid[3];
+    bool help_floor_valid[3];
     uint32_t sensor_rx_count;
 
     /* MQTT stats */
@@ -129,8 +138,14 @@ void device_model_update_wifi_aps(const wifi_ap_t *aps, uint16_t count);
 void device_model_update_sensors(float temp, float humi, uint16_t pm25,
                                   uint16_t rain, uint16_t flame, uint16_t smoke);
 void device_model_update_sensor_value(uint8_t floor_id, uint8_t sensor_type, uint16_t value);
+void device_model_apply_command_ack(uint8_t floor_id, uint8_t cmd_type, uint8_t gpio_index, uint8_t value);
+void device_model_apply_heartbeat(const iot_heartbeat_v2_packet_t *heartbeat);
+bool device_model_get_smoke_value(uint8_t floor_id, uint16_t *value);
 bool device_model_get_rain_value(uint8_t floor_id, uint16_t *value);
 bool device_model_get_flame_value(uint8_t floor_id, uint16_t *value);
+bool device_model_get_fire_status(uint8_t floor_id, uint8_t *status);
+bool device_model_get_rain_status(uint8_t floor_id, uint8_t *status);
+bool device_model_get_help_status(uint8_t floor_id, uint8_t *status);
 uint16_t device_model_sensor_online_count(void);
 void device_model_set_controller_online(uint8_t floor_id, bool online);
 void device_model_set_mqtt_stats(uint32_t rx_count, uint32_t last_seen_sec);

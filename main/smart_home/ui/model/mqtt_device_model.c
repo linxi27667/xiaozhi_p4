@@ -14,6 +14,13 @@ static const char *TAG = "DEV_MODEL";
 static EXT_RAM_BSS_ATTR mqtt_device_model_t s_model;
 static bool s_model_initialized;
 
+void smart_home_alarm_on_fire_status(uint8_t floor_id, bool active) __attribute__((weak));
+void smart_home_alarm_on_fire_status(uint8_t floor_id, bool active)
+{
+    (void)floor_id;
+    (void)active;
+}
+
 static void publish_update(void)
 {
     s_model.refresh_seq++;
@@ -35,14 +42,12 @@ static void refresh_device_value(rc_device_t *d)
                 d->power_on ? "风速 %u档" : "已关闭", (unsigned)d->value);
             break;
         case RC_DEVICE_DOOR:
-            d->value = d->power_on ? 1 : 0;
             lv_snprintf(d->value_text, sizeof(d->value_text),
                 d->power_on ? "已打开" : "已关闭");
             break;
         case RC_DEVICE_WINDOW:
-            d->value = d->power_on ? 50 : 0;
             lv_snprintf(d->value_text, sizeof(d->value_text),
-                d->power_on ? "开度 %u%%" : "已关闭", (unsigned)d->value);
+                d->power_on ? "角度 %u°" : "已关闭", (unsigned)d->value);
             break;
     }
 }
@@ -96,10 +101,11 @@ void device_model_init(void)
     add_device(RC_FLOOR_2, RC_DEVICE_LIGHT,  "floor2_living_light", "\xE5\xAE\xA2\xE5\x8E\x85\xE7\x81\xAF", true, 2, IOT_CMD_SET_LIGHT, 1); /* 客厅灯 */
     add_device(RC_FLOOR_2, RC_DEVICE_LIGHT,  "floor2_toilet_light", "\xE5\x8E\x95\xE6\x89\x80\xE7\x81\xAF", true, 2, IOT_CMD_SET_LIGHT, 2); /* 厕所灯 */
     add_device(RC_FLOOR_2, RC_DEVICE_FAN,    "floor2_fan",          "\xE9\xA3\x8E\xE6\x89\x87",     true, 2, IOT_CMD_SET_RELAY, 0);   /* 风扇 */
-    add_device(RC_FLOOR_2, RC_DEVICE_WINDOW, "floor2_hanger",       "\xE4\xBA\x8C\xE6\xA5\xBC\xE6\x99\xBE\xE8\xA1\xA3\xE6\x9D\x86", true, 2, IOT_CMD_SET_SERVO, 7); /* 二楼晾衣杆 */
+    add_device(RC_FLOOR_2, RC_DEVICE_WINDOW, "floor2_hanger",       "\xE4\xBA\x8C\xE6\xA5\xBC\xE6\x99\xBE\xE8\xA1\xA3\xE6\x9D\x86", true, 2, IOT_CMD_SET_SERVO, 6); /* 二楼晾衣杆 */
     add_device(RC_FLOOR_3, RC_DEVICE_LIGHT,  "floor3_balcony_light","\xE9\x98\xB3\xE5\x8F\xB0\xE7\x81\xAF", true, 3, IOT_CMD_SET_LIGHT, 0); /* 阳台灯 */
-    add_device(RC_FLOOR_3, RC_DEVICE_WINDOW, "floor3_skylight",     "\xE5\xA4\xA9\xE7\xAA\x97",     true, 3, IOT_CMD_SET_SERVO, 6);   /* 天窗 */
-    add_device(RC_FLOOR_3, RC_DEVICE_WINDOW, "floor3_hanger",       "\xE4\xB8\x89\xE6\xA5\xBC\xE6\x99\xBE\xE8\xA1\xA3\xE6\x9D\x86", true, 3, IOT_CMD_SET_SERVO, 7); /* 三楼晾衣杆 */
+    add_device(RC_FLOOR_3, RC_DEVICE_WINDOW, "floor3_left_skylight","\xE5\xB7\xA6\xE5\xA4\xA9\xE7\xAA\x97", true, 3, IOT_CMD_SET_SERVO, 6); /* 左天窗 */
+    add_device(RC_FLOOR_3, RC_DEVICE_WINDOW, "floor3_right_skylight","\xE5\x8F\xB3\xE5\xA4\xA9\xE7\xAA\x97", true, 3, IOT_CMD_SET_SERVO, 7); /* 右天窗 */
+    add_device(RC_FLOOR_3, RC_DEVICE_WINDOW, "floor3_hanger",       "\xE4\xB8\x89\xE6\xA5\xBC\xE6\x99\xBE\xE8\xA1\xA3\xE6\x9D\x86", true, 3, IOT_CMD_SET_SERVO, 8); /* 三楼晾衣杆 */
 
     ESP_LOGI(TAG, "Model initialized: %d devices", s_model.device_count);
     publish_update();
@@ -179,7 +185,7 @@ static void set_power_internal(uint16_t index, bool on, bool publish_mqtt)
     if (publish_mqtt) {
         uint8_t value = 0;
         if (d->cmd_type == IOT_CMD_SET_SERVO) {
-            value = on ? 90 : 0; /* servo: open=90, closed=0 */
+            value = on ? 180 : 0;
         } else {
             value = on ? 1 : 0;  /* light/relay: on=1, off=0 */
         }
@@ -212,6 +218,100 @@ void device_model_update_from_mqtt(const char *device_id, bool power_on, uint16_
     d->connected = true;
     s_model.gateway_connected = true;
     refresh_device_value(d);
+    publish_update();
+}
+
+void device_model_apply_command_ack(uint8_t floor_id, uint8_t cmd_type, uint8_t gpio_index, uint8_t value)
+{
+    bool changed = false;
+    if (floor_id >= 1 && floor_id <= 3) {
+        s_model.controller_online[floor_id - 1] = true;
+    }
+
+    for (uint16_t i = 0; i < s_model.device_count; i++) {
+        rc_device_t *d = &s_model.devices[i];
+        if (d->floor_id != floor_id || d->cmd_type != cmd_type || d->gpio_index != gpio_index) {
+            continue;
+        }
+        d->connected = true;
+        d->power_on = value != 0;
+        d->value = value;
+        refresh_device_value(d);
+        changed = true;
+        break;
+    }
+
+    if (changed) {
+        publish_update();
+    }
+}
+
+void device_model_apply_heartbeat(const iot_heartbeat_v2_packet_t *heartbeat)
+{
+    if (!heartbeat || heartbeat->device_id < 1 || heartbeat->device_id > 3) {
+        return;
+    }
+
+    uint8_t floor_id = heartbeat->device_id;
+    uint8_t floor_idx = floor_id - 1;
+    s_model.controller_online[floor_idx] = heartbeat->device_status != 0;
+    s_model.gateway_connected = true;
+
+    for (uint16_t i = 0; i < s_model.device_count; i++) {
+        rc_device_t *d = &s_model.devices[i];
+        if (d->floor_id != floor_id) {
+            continue;
+        }
+
+        bool known = false;
+        uint8_t value = 0;
+        if (d->cmd_type == IOT_CMD_SET_LIGHT && d->gpio_index < heartbeat->light_count &&
+            d->gpio_index < IOT_MAX_LIGHTS) {
+            value = heartbeat->lights[d->gpio_index];
+            known = true;
+        } else if (d->cmd_type == IOT_CMD_SET_RELAY && d->gpio_index < heartbeat->relay_count &&
+                   d->gpio_index < IOT_MAX_RELAYS) {
+            value = heartbeat->relays[d->gpio_index];
+            known = true;
+        } else if (d->cmd_type == IOT_CMD_SET_SERVO && d->gpio_index >= 6) {
+            uint8_t servo_index = d->gpio_index - 6;
+            if (servo_index < heartbeat->servo_count && servo_index < IOT_MAX_SERVOS) {
+                value = heartbeat->servos[servo_index];
+                known = true;
+            }
+        }
+
+        if (known) {
+            d->connected = true;
+            d->power_on = value != 0;
+            d->value = value;
+            refresh_device_value(d);
+        }
+    }
+
+    if (heartbeat->sensor_count > 0) {
+        s_model.rain_floor_value[floor_idx] = heartbeat->rain_mv;
+        s_model.rain_floor_valid[floor_idx] = true;
+        s_model.rain_floor_status[floor_idx] = heartbeat->rain_status;
+        s_model.rain_status_floor_valid[floor_idx] = true;
+    }
+    if (heartbeat->sensor_count >= 3 || heartbeat->smoke_mv != 0 || heartbeat->fire_status != 0) {
+        s_model.smoke_value = heartbeat->smoke_mv;
+        s_model.smoke_valid = true;
+        s_model.smoke_floor_value[floor_idx] = heartbeat->smoke_mv;
+        s_model.smoke_floor_valid[floor_idx] = true;
+        s_model.fire_floor_status[floor_idx] = heartbeat->fire_status;
+        s_model.fire_floor_valid[floor_idx] = true;
+        s_model.flame_value = heartbeat->fire_status;
+        s_model.flame_valid = true;
+        smart_home_alarm_on_fire_status(floor_id, heartbeat->fire_status >= 2);
+    }
+    if (heartbeat->sensor_count >= 3 || heartbeat->help_status != 0) {
+        s_model.help_floor_status[floor_idx] = heartbeat->help_status;
+        s_model.help_floor_valid[floor_idx] = true;
+    }
+
+    s_model.sensor_rx_count++;
     publish_update();
 }
 
@@ -275,30 +375,50 @@ void device_model_update_sensors(float temp, float humi, uint16_t pm25,
 
 void device_model_update_sensor_value(uint8_t floor_id, uint8_t sensor_type, uint16_t value)
 {
+    uint8_t idx = 0;
     if (floor_id >= 1 && floor_id <= 3) {
-        s_model.controller_online[floor_id - 1] = true;
+        idx = floor_id - 1;
+        s_model.controller_online[idx] = true;
     }
 
     switch (sensor_type) {
         case IOT_SENSOR_SMOKE_MV:
             s_model.smoke_value = value;
             s_model.smoke_valid = true;
+            if (floor_id >= 1 && floor_id <= 3) {
+                s_model.smoke_floor_value[idx] = value;
+                s_model.smoke_floor_valid[idx] = true;
+            }
             break;
         case IOT_SENSOR_RAIN_MV:
-        case IOT_SENSOR_RAIN_STATUS:
             s_model.rain_value = value;
             s_model.rain_valid = true;
             if (floor_id >= 1 && floor_id <= 3) {
-                s_model.rain_floor_value[floor_id - 1] = value;
-                s_model.rain_floor_valid[floor_id - 1] = true;
+                s_model.rain_floor_value[idx] = value;
+                s_model.rain_floor_valid[idx] = true;
+            }
+            break;
+        case IOT_SENSOR_RAIN_STATUS:
+            if (floor_id >= 1 && floor_id <= 3) {
+                s_model.rain_floor_status[idx] = (uint8_t)value;
+                s_model.rain_status_floor_valid[idx] = true;
             }
             break;
         case IOT_SENSOR_FIRE_STATUS:
             s_model.flame_value = value;
             s_model.flame_valid = true;
             if (floor_id >= 1 && floor_id <= 3) {
-                s_model.flame_floor_value[floor_id - 1] = value;
-                s_model.flame_floor_valid[floor_id - 1] = true;
+                s_model.fire_floor_status[idx] = (uint8_t)value;
+                s_model.fire_floor_valid[idx] = true;
+                s_model.flame_floor_value[idx] = value;
+                s_model.flame_floor_valid[idx] = true;
+                smart_home_alarm_on_fire_status(floor_id, value >= 2);
+            }
+            break;
+        case IOT_SENSOR_HELP_STATUS:
+            if (floor_id >= 1 && floor_id <= 3) {
+                s_model.help_floor_status[idx] = (uint8_t)value;
+                s_model.help_floor_valid[idx] = true;
             }
             break;
         default:
@@ -318,12 +438,48 @@ bool device_model_get_rain_value(uint8_t floor_id, uint16_t *value)
     return true;
 }
 
+bool device_model_get_smoke_value(uint8_t floor_id, uint16_t *value)
+{
+    if (floor_id < 1 || floor_id > 3) return false;
+    uint8_t idx = floor_id - 1;
+    if (!s_model.smoke_floor_valid[idx]) return false;
+    if (value) *value = s_model.smoke_floor_value[idx];
+    return true;
+}
+
 bool device_model_get_flame_value(uint8_t floor_id, uint16_t *value)
 {
     if (floor_id < 1 || floor_id > 3) return false;
     uint8_t idx = floor_id - 1;
     if (!s_model.flame_floor_valid[idx]) return false;
     if (value) *value = s_model.flame_floor_value[idx];
+    return true;
+}
+
+bool device_model_get_fire_status(uint8_t floor_id, uint8_t *status)
+{
+    if (floor_id < 1 || floor_id > 3) return false;
+    uint8_t idx = floor_id - 1;
+    if (!s_model.fire_floor_valid[idx]) return false;
+    if (status) *status = s_model.fire_floor_status[idx];
+    return true;
+}
+
+bool device_model_get_rain_status(uint8_t floor_id, uint8_t *status)
+{
+    if (floor_id < 1 || floor_id > 3) return false;
+    uint8_t idx = floor_id - 1;
+    if (!s_model.rain_status_floor_valid[idx]) return false;
+    if (status) *status = s_model.rain_floor_status[idx];
+    return true;
+}
+
+bool device_model_get_help_status(uint8_t floor_id, uint8_t *status)
+{
+    if (floor_id < 1 || floor_id > 3) return false;
+    uint8_t idx = floor_id - 1;
+    if (!s_model.help_floor_valid[idx]) return false;
+    if (status) *status = s_model.help_floor_status[idx];
     return true;
 }
 
@@ -336,7 +492,8 @@ uint16_t device_model_sensor_online_count(void)
     if (s_model.smoke_valid) count++;
     for (uint8_t i = 0; i < 3; i++) {
         if (s_model.rain_floor_valid[i]) count++;
-        if (s_model.flame_floor_valid[i]) count++;
+        if (s_model.fire_floor_valid[i]) count++;
+        if (s_model.help_floor_valid[i]) count++;
     }
     return count;
 }
@@ -359,9 +516,14 @@ void device_model_set_mqtt_stats(uint32_t rx_count, uint32_t last_seen_sec)
 void device_model_set_floor_runtime_offline(uint8_t floor_id)
 {
     if (floor_id < 1 || floor_id > 3) return;
-    s_model.controller_online[floor_id - 1] = false;
-    s_model.rain_floor_valid[floor_id - 1] = false;
-    s_model.flame_floor_valid[floor_id - 1] = false;
+    uint8_t idx = floor_id - 1;
+    s_model.controller_online[idx] = false;
+    s_model.rain_floor_valid[idx] = false;
+    s_model.smoke_floor_valid[idx] = false;
+    s_model.flame_floor_valid[idx] = false;
+    s_model.fire_floor_valid[idx] = false;
+    s_model.rain_status_floor_valid[idx] = false;
+    s_model.help_floor_valid[idx] = false;
     for (uint16_t i = 0; i < s_model.device_count; i++) {
         rc_device_t *d = &s_model.devices[i];
         if (d->floor_id == floor_id) {
@@ -375,9 +537,14 @@ void device_model_set_floor_runtime_offline(uint8_t floor_id)
 void device_model_reset_runtime_data(void)
 {
     for (uint8_t floor_id = 1; floor_id <= 3; floor_id++) {
-        s_model.controller_online[floor_id - 1] = false;
-        s_model.rain_floor_valid[floor_id - 1] = false;
-        s_model.flame_floor_valid[floor_id - 1] = false;
+        uint8_t idx = floor_id - 1;
+        s_model.controller_online[idx] = false;
+        s_model.rain_floor_valid[idx] = false;
+        s_model.smoke_floor_valid[idx] = false;
+        s_model.flame_floor_valid[idx] = false;
+        s_model.fire_floor_valid[idx] = false;
+        s_model.rain_status_floor_valid[idx] = false;
+        s_model.help_floor_valid[idx] = false;
     }
     for (uint16_t i = 0; i < s_model.device_count; i++) {
         s_model.devices[i].connected = false;
