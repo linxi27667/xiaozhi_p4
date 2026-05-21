@@ -2,5 +2,6 @@
 #define __MQTT_HEARTBEAT_H__
 
 void MQTT_Heartbeat_Init(void);
+void MQTT_Heartbeat_Publish_Now(void);
 
 #endif

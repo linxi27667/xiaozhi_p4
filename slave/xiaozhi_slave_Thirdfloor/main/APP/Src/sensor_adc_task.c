@@ -37,6 +37,18 @@ static uint8_t g_rain_exceed_count = 0;
 static uint8_t g_last_help_btn = 0;
 static uint8_t g_fire_alert_countdown = 0;
 static uint8_t g_help_alert_sent = 0;
+static volatile uint16_t g_last_smoke_mv = 0;
+static volatile uint16_t g_last_rain_mv = 0;
+
+void Sensor_ADC_Get_Snapshot(uint16_t *smoke_mv, uint16_t *rain_mv,
+                             uint8_t *fire_status, uint8_t *rain_status,
+                             uint8_t *help_status) {
+    if (smoke_mv) *smoke_mv = g_last_smoke_mv;
+    if (rain_mv) *rain_mv = g_last_rain_mv;
+    if (fire_status) *fire_status = (uint8_t)g_device_flags.fire_status;
+    if (rain_status) *rain_status = (uint8_t)g_device_flags.rain_status;
+    if (help_status) *help_status = (uint8_t)g_device_flags.help_status;
+}
 
 static void HW_Help_Button_Init(void) {
     gpio_config_t cfg = {
@@ -84,13 +96,15 @@ static void Sensor_ADC_Task(void* arg) {
         int32_t smoke_mv = ADC_Get_Voltage_MV(SMOKE_ADC_CHANNEL);
         int32_t rain_mv = ADC_Get_Voltage_MV(RAIN_ADC_CHANNEL);
         uint8_t help_btn = HW_Help_Button_Is_Pressed();
+        g_last_smoke_mv = (uint16_t)smoke_mv;
+        g_last_rain_mv = (uint16_t)rain_mv;
 
-        if (smoke_mv <= SMOKE_THRESHOLD_FIRE) {
+        if (smoke_mv >= SMOKE_THRESHOLD_FIRE) {
             if (++g_smoke_exceed_count >= SMOKE_TRIGGER_COUNT) {
                 if (g_device_flags.fire_status != FIRE_STATUS_CONFIRMED) {
                     g_device_flags.fire_status = FIRE_STATUS_CONFIRMED;
                     g_fire_alert_countdown = 1;
-                    ESP_LOGW(TAG, "[FIRE] Smoke detected! %ld mV <= %d mV",
+                    ESP_LOGW(TAG, "[FIRE] Smoke detected! %ld mV >= %d mV",
                              smoke_mv, SMOKE_THRESHOLD_FIRE);
                 }
                 if (g_fire_alert_countdown == 0) {
@@ -106,7 +120,7 @@ static void Sensor_ADC_Task(void* arg) {
             if (g_device_flags.fire_status != FIRE_STATUS_NORMAL) {
                 g_fire_alert_countdown = 0;
                 g_device_flags.fire_status = FIRE_STATUS_NORMAL;
-                ESP_LOGI(TAG, "[FIRE] Smoke normal %ld mV > %d mV",
+                ESP_LOGI(TAG, "[FIRE] Smoke normal %ld mV < %d mV",
                          smoke_mv, SMOKE_THRESHOLD_FIRE);
             }
         }

@@ -30,6 +30,7 @@
 static const char* TAG = "SENSOR_ADC";
 
 static uint8_t g_rain_exceed_count = 0;
+static volatile uint16_t g_last_rain_mv = 0;
 
 typedef enum {
     RAIN_STATUS_DRY = 0,
@@ -37,6 +38,11 @@ typedef enum {
 } rain_status_enum_t;
 
 static volatile rain_status_enum_t g_rain_status = RAIN_STATUS_DRY;
+
+void Sensor_ADC_Get_Snapshot(uint16_t *rain_mv, uint8_t *rain_status) {
+    if (rain_mv) *rain_mv = g_last_rain_mv;
+    if (rain_status) *rain_status = (uint8_t)g_rain_status;
+}
 
 static void HW_ADC_Init(void) {
     adc1_config_width(ADC_WIDTH_BIT_12);
@@ -63,6 +69,7 @@ static void Sensor_ADC_Task(void* arg) {
 
     while (1) {
         int32_t rain_mv = ADC_Get_Voltage_MV(RAIN_ADC_CHANNEL);
+        g_last_rain_mv = (uint16_t)rain_mv;
 
         if (rain_mv <= RAIN_THRESHOLD_LIGHT) {
             if (++g_rain_exceed_count >= RAIN_TRIGGER_COUNT) {

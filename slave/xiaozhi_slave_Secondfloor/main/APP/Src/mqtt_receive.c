@@ -12,6 +12,7 @@
  */
 #include "mqtt_receive.h"
 #include "iot_control_task.h"
+#include "mqtt_heartbeat.h"
 #include "mqtt_iot_protocol.h"
 
 #include "esp_log.h"
@@ -29,6 +30,7 @@ static char s_mac_str[13] = {0};
 #define DEVICE_NAME "2F_Device"
 #define DEVICE_NAME_CN "二楼设备"
 #define TOTAL_GPIO_COUNT 16
+#define DEVICE_ID_NUM 2
 
 /* ================= MQTT配置 ================= */
 #define MQTT_BROKER_URI     "mqtt://8.134.167.240"  // 阿里云服务器 IP
@@ -41,7 +43,7 @@ static void Send_Response(uint8_t cmd, uint8_t gpio_index, uint8_t value) {
 
     iot_command_packet_t resp = {
         .command = cmd,
-        .device_id = 0,
+        .device_id = DEVICE_ID_NUM,
         .gpio_index = gpio_index,
         .value = value,
         .reserved = {0}
@@ -81,11 +83,13 @@ static void Process_Command(const iot_command_packet_t* cmd) {
             if (cmd->gpio_index < LIGHT_COUNT) {
                 g_device_flags.light[cmd->gpio_index] = (cmd->value == 1) ? ON : OFF;
                 ESP_LOGI(TAG, "Light[%d] = %s", cmd->gpio_index, cmd->value ? "ON" : "OFF");
-                Send_Response(IOT_CMD_RESPONSE, cmd->gpio_index, cmd->value);
+                Send_Response(cmd->command, cmd->gpio_index, cmd->value);
+                MQTT_Heartbeat_Publish_Now();
             } else if (cmd->gpio_index < LIGHT_COUNT + RELAY_COUNT) {
                 g_device_flags.relay[cmd->gpio_index - LIGHT_COUNT] = (cmd->value == 1) ? ON : OFF;
                 ESP_LOGI(TAG, "Relay[%d] = %s", cmd->gpio_index - LIGHT_COUNT, cmd->value ? "ON" : "OFF");
-                Send_Response(IOT_CMD_RESPONSE, cmd->gpio_index, cmd->value);
+                Send_Response(cmd->command, cmd->gpio_index, cmd->value);
+                MQTT_Heartbeat_Publish_Now();
             }
             break;
 
@@ -93,7 +97,8 @@ static void Process_Command(const iot_command_packet_t* cmd) {
             if (cmd->gpio_index < LIGHT_COUNT) {
                 g_device_flags.light[cmd->gpio_index] = (cmd->value == 1) ? ON : OFF;
                 ESP_LOGI(TAG, "Light[%d] = %s", cmd->gpio_index, cmd->value ? "ON" : "OFF");
-                Send_Response(IOT_CMD_RESPONSE, cmd->gpio_index, cmd->value);
+                Send_Response(cmd->command, cmd->gpio_index, cmd->value);
+                MQTT_Heartbeat_Publish_Now();
             }
             break;
 
@@ -101,7 +106,8 @@ static void Process_Command(const iot_command_packet_t* cmd) {
             if (cmd->gpio_index < RELAY_COUNT) {
                 g_device_flags.relay[cmd->gpio_index] = (cmd->value == 1) ? ON : OFF;
                 ESP_LOGI(TAG, "Relay[%d] = %s", cmd->gpio_index, cmd->value ? "ON" : "OFF");
-                Send_Response(IOT_CMD_RESPONSE, cmd->gpio_index, cmd->value);
+                Send_Response(cmd->command, cmd->gpio_index, cmd->value);
+                MQTT_Heartbeat_Publish_Now();
             }
             break;
 
@@ -112,7 +118,8 @@ static void Process_Command(const iot_command_packet_t* cmd) {
                 if (step > 4) step = 4;
                 g_device_flags.servo[servo_local_index] = (servo_angle_enum_t)step;
                 ESP_LOGI(TAG, "Servo[%d] (GPIO%d) = %d deg", servo_local_index, cmd->gpio_index, cmd->value);
-                Send_Response(IOT_CMD_RESPONSE, cmd->gpio_index, cmd->value);
+                Send_Response(cmd->command, cmd->gpio_index, cmd->value);
+                MQTT_Heartbeat_Publish_Now();
             }
             break;
 
@@ -138,22 +145,26 @@ static void Process_Command(const iot_command_packet_t* cmd) {
             for (int i = 0; i < RELAY_COUNT; i++) g_device_flags.relay[i] = OFF;
             for (int i = 0; i < SERVO_COUNT; i++) g_device_flags.servo[i] = SERVO_0;
             ESP_LOGI(TAG, "All devices OFF");
+            MQTT_Heartbeat_Publish_Now();
             break;
 
         case IOT_CMD_BROADCAST_ALL_ON:
             for (int i = 0; i < LIGHT_COUNT; i++) g_device_flags.light[i] = ON;
             for (int i = 0; i < RELAY_COUNT; i++) g_device_flags.relay[i] = ON;
             ESP_LOGI(TAG, "All lights and relays ON");
+            MQTT_Heartbeat_Publish_Now();
             break;
 
         case IOT_CMD_BROADCAST_LIGHTS_OFF:
             for (int i = 0; i < LIGHT_COUNT; i++) g_device_flags.light[i] = OFF;
             ESP_LOGI(TAG, "All lights OFF");
+            MQTT_Heartbeat_Publish_Now();
             break;
 
         case IOT_CMD_BROADCAST_LIGHTS_ON:
             for (int i = 0; i < LIGHT_COUNT; i++) g_device_flags.light[i] = ON;
             ESP_LOGI(TAG, "All lights ON");
+            MQTT_Heartbeat_Publish_Now();
             break;
 
         default:
