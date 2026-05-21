@@ -194,7 +194,7 @@ private:
 
 public:
 
-    ESP32P4FunctionEvBoard() : boot_button_(0)
+    ESP32P4FunctionEvBoard() : boot_button_(GPIO_NUM_35)
     {
         InitializeI2cBuses();
         // Audio is initialized by Es8311AudioCodec

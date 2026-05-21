@@ -1,5 +1,6 @@
 #include "lcd_display.h"
 #include "gif/lvgl_gif.h"
+#include "application.h"
 #include "settings.h"
 #include "lvgl_theme.h"
 #include "assets/lang_config.h"
@@ -20,6 +21,8 @@
 
 extern "C" {
 #include "ui_manager.h"
+#include "ui_i18n.h"
+#include "ui_events.h"
 }
 
 #define TAG "LcdDisplay"
@@ -395,6 +398,22 @@ void LcdDisplay::OnShellNavClicked(lv_event_t* e) {
     display->SwitchShellPage(page);
 }
 
+static void OnShellLanguageChanged(void* user_data) {
+    auto* self = static_cast<LcdDisplay*>(user_data);
+    if (self) self->RefreshShellLabels();
+}
+
+void LcdDisplay::RefreshShellLabels() {
+    if (!shell_chat_label_ && !shell_overview_label_) return;
+
+    bool zh = ui_i18n_get_lang() == UI_LANG_ZH;
+    if (shell_chat_label_) lv_label_set_text(shell_chat_label_, zh ? "聊天" : "Chat");
+    if (shell_overview_label_) lv_label_set_text(shell_overview_label_, zh ? "总览" : "Home");
+    if (shell_control_label_) lv_label_set_text(shell_control_label_, zh ? "控制" : "Control");
+    if (shell_settings_label_) lv_label_set_text(shell_settings_label_, zh ? "设置" : "Settings");
+    if (shell_wake_label_) lv_label_set_text(shell_wake_label_, zh ? "唤醒" : "Wake");
+}
+
 void LcdDisplay::RefreshShellNav(ShellPage page) {
     struct NavObj {
         lv_obj_t* btn;
@@ -605,6 +624,43 @@ void LcdDisplay::CreateSmartHomeShell() {
     shell_settings_btn_ = settings.first;
     shell_settings_label_ = settings.second;
 
+    // Spacer to push wake button to bottom
+    lv_obj_t* spacer = lv_obj_create(side_bar_);
+    lv_obj_remove_style_all(spacer);
+    lv_obj_set_size(spacer, 4, 20);
+    lv_obj_set_style_bg_opa(spacer, LV_OPA_TRANSP, 0);
+    lv_obj_set_flex_grow(spacer, 1);
+
+    // Wake / microphone button at bottom of sidebar
+    lv_obj_t* wake_btn = lv_button_create(side_bar_);
+    lv_obj_remove_style_all(wake_btn);
+    lv_obj_set_size(wake_btn, kShellButtonWidth, kShellButtonHeight);
+    lv_obj_set_style_radius(wake_btn, 8, 0);
+    lv_obj_set_style_bg_color(wake_btn, lv_color_hex(0x10B981), 0);
+    lv_obj_set_style_pad_all(wake_btn, 0, 0);
+    lv_obj_set_layout(wake_btn, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(wake_btn, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(wake_btn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(wake_btn, 4, 0);
+    lv_obj_add_event_cb(wake_btn, [](lv_event_t* e) {
+        Application::GetInstance().ToggleChatState();
+    }, LV_EVENT_CLICKED, nullptr);
+
+    lv_obj_t* wake_icon = lv_label_create(wake_btn);
+    lv_label_set_text(wake_icon, FONT_AWESOME_MICROPHONE);
+    lv_obj_set_style_text_font(wake_icon, &font_awesome_20_4, 0);
+    lv_obj_set_style_text_color(wake_icon, lv_color_white(), 0);
+    lv_obj_set_style_text_align(wake_icon, LV_TEXT_ALIGN_CENTER, 0);
+
+    lv_obj_t* wake_label = lv_label_create(wake_btn);
+    lv_label_set_text(wake_label, "唤醒");
+    lv_obj_set_width(wake_label, kShellButtonWidth - 10);
+    lv_label_set_long_mode(wake_label, LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_font(wake_label, &ui_font_cn_20, 0);
+    lv_obj_set_style_text_color(wake_label, lv_color_white(), 0);
+    lv_obj_set_style_text_align(wake_label, LV_TEXT_ALIGN_CENTER, 0);
+    shell_wake_label_ = wake_label;
+
     smart_home_page_ = lv_obj_create(screen);
     lv_obj_remove_style_all(smart_home_page_);
     lv_obj_set_pos(smart_home_page_, kShellSidebarWidth, 0);
@@ -614,6 +670,7 @@ void LcdDisplay::CreateSmartHomeShell() {
     lv_obj_add_flag(smart_home_page_, LV_OBJ_FLAG_HIDDEN);
 
     lv_obj_move_foreground(side_bar_);
+    ui_event_subscribe(UI_EVENT_LANG_CHANGED, OnShellLanguageChanged, this);
     RefreshShellNav(ShellPage::Chat);
 }
 

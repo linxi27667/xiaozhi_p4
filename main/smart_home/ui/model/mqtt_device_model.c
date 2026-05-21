@@ -2,6 +2,7 @@
 #include "../../services/mqtt_iot_protocol.h"
 #include "../../services/xiaozhi_mqtt.h"
 #include "ui_events.h"
+#include "../services/ui_icons.h"
 #include "esp_log.h"
 #include "esp_attr.h"
 #include "lvgl.h"
@@ -153,11 +154,11 @@ const char *device_model_type_name(rc_device_type_t type)
 const char *device_model_type_icon(rc_device_type_t type)
 {
     switch (type) {
-        case RC_DEVICE_LIGHT: return "\xEF\x83\xAB";  /* ICON_LIGHTBULB */
-        case RC_DEVICE_FAN:   return "\xEF\xA1\xA3";  /* ICON_FAN */
-        case RC_DEVICE_DOOR:  return "\xEF\x80\x95";  /* ICON_HOME */
-        case RC_DEVICE_WINDOW:return "\xEF\x8B\x90";  /* ICON_WINDOW */
-        default: return "\xEF\x88\xB6";               /* ICON_POWER */
+        case RC_DEVICE_LIGHT: return ICON_LIGHTBULB;
+        case RC_DEVICE_FAN:   return ICON_FAN;
+        case RC_DEVICE_DOOR:  return ICON_HOME;
+        case RC_DEVICE_WINDOW:return ICON_WINDOW;
+        default: return ICON_POWER;
     }
 }
 
