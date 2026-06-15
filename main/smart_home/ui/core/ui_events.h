@@ -15,6 +15,7 @@ typedef enum {
     UI_EVENT_LANG_CHANGED,
     UI_EVENT_PAGE_SWITCHED,
     UI_EVENT_FIRE_ALARM,
+    UI_EVENT_SCENE_CHANGED,
     UI_EVENT_COUNT
 } ui_event_type_t;
 

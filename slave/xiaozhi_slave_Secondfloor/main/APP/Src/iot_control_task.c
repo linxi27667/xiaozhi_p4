@@ -15,6 +15,7 @@
  * - 标志位由 esp_now_receive.c 更新
  */
 #include "iot_control_task.h"
+#include "app_ambient_light.h"
 #include "sensor_config.h"
 
 #include "esp_log.h"
@@ -99,17 +100,17 @@ static void HW_Servo_Set_Angle(ledc_channel_t channel, int16_t angle) {
 }
 
 /* ================= 2. GPIO 硬件定义 (人工可改) ================= */
-#define LIGHT_GPIO_1     GPIO_NUM_2
-#define LIGHT_GPIO_2     GPIO_NUM_4
-#define LIGHT_GPIO_3     GPIO_NUM_5
+#define LIGHT_GPIO_1     GPIO_NUM_NC
+#define LIGHT_GPIO_2     GPIO_NUM_5
+#define LIGHT_GPIO_3     GPIO_NUM_6
 
-#define RELAY_GPIO_1     GPIO_NUM_6
-#define RELAY_GPIO_2     GPIO_NUM_7
-#define RELAY_GPIO_3     GPIO_NUM_15
+#define RELAY_GPIO_1     GPIO_NUM_7
+#define RELAY_GPIO_2     GPIO_NUM_9
+#define RELAY_GPIO_3     GPIO_NUM_10
 
-#define SERVO_GPIO_1     GPIO_NUM_18
-#define SERVO_GPIO_2     GPIO_NUM_21
-#define SERVO_GPIO_3     GPIO_NUM_40
+#define SERVO_GPIO_1     GPIO_NUM_8
+#define SERVO_GPIO_2     GPIO_NUM_11
+#define SERVO_GPIO_3     GPIO_NUM_12
 
 #define REFRESH_INTERVAL_MS     100
 
@@ -189,7 +190,9 @@ static void Device_Refresh_Task(void* arg) {
 #endif
 
     for (int i = 0; i < LIGHT_COUNT; i++) {
-        HW_Gpio_Init(g_light_gpios[i]);
+        if (g_light_gpios[i] != GPIO_NUM_NC) {
+            HW_Gpio_Init(g_light_gpios[i]);
+        }
         ESP_LOGI(TAG, "Light[%d] -> GPIO%d", i, g_light_gpios[i]);
     }
 
@@ -203,6 +206,8 @@ static void Device_Refresh_Task(void* arg) {
         ESP_LOGI(TAG, "Servo[%d] -> GPIO%d", i, g_servo_gpios[i]);
     }
 
+    App_Ambient_Light_Init();
+
     static uint8_t last_btn_state = 1;
 
     while (1) {
@@ -215,7 +220,11 @@ static void Device_Refresh_Task(void* arg) {
 #endif
 
         for (int i = 0; i < LIGHT_COUNT; i++) {
-            HW_Gpio_Write(g_light_gpios[i], g_device_flags.light[i]);
+            if (i == 0) {
+                App_Ambient_Light_Set_Power(AMBIENT_BEDROOM_INDEX, g_device_flags.light[i] == ON);
+            } else if (g_light_gpios[i] != GPIO_NUM_NC) {
+                HW_Gpio_Write(g_light_gpios[i], g_device_flags.light[i]);
+            }
         }
 
         for (int i = 0; i < RELAY_COUNT; i++) {
@@ -225,6 +234,8 @@ static void Device_Refresh_Task(void* arg) {
         for (int i = 0; i < SERVO_COUNT; i++) {
             HW_Servo_Set_Angle(g_servo_channels[i], g_servo_angle_map[g_device_flags.servo[i]]);
         }
+
+        App_Ambient_Light_Tick();
 
         vTaskDelay(pdMS_TO_TICKS(REFRESH_INTERVAL_MS));
     }

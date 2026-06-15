@@ -135,7 +135,7 @@ static uint32_t state_hash(void)
     uint32_t h = 2166136261u;
     for (uint16_t i = 0; i < device_model_count(); i++) {
         const rc_device_t *d = device_model_at(i);
-        if (!d || !d->controllable) continue;
+        if (!d || !d->controllable || d->type == RC_DEVICE_RGB_LIGHT) continue;
         h ^= ((uint32_t)d->floor << 24) ^ ((uint32_t)d->type << 16) ^
              ((uint32_t)d->power_on << 8) ^ ((uint32_t)d->connected << 7) ^ i;
         h *= 16777619u;
@@ -202,7 +202,7 @@ static void rebuild_controls(ctrl_ctx_t *ctx)
         int count = 0;
         for (uint16_t i = 0; i < device_model_count(); i++) {
             const rc_device_t *d = device_model_at(i);
-            if (d && d->controllable && d->floor == floor) count++;
+            if (d && d->controllable && d->floor == floor && d->type != RC_DEVICE_RGB_LIGHT) count++;
         }
         if (count == 0) continue;
 
@@ -212,7 +212,7 @@ static void rebuild_controls(ctrl_ctx_t *ctx)
         int col = 0;
         for (uint16_t i = 0; i < device_model_count(); i++) {
             const rc_device_t *d = device_model_at(i);
-            if (!d || !d->controllable || d->floor != floor) continue;
+            if (!d || !d->controllable || d->floor != floor || d->type == RC_DEVICE_RGB_LIGHT) continue;
             device_button(ctx->grid, 20 + col * 160, y, d, i);
             col++;
         }

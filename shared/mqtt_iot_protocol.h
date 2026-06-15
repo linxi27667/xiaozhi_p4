@@ -32,7 +32,9 @@ typedef enum {
     IOT_CMD_BROADCAST_ALL_ON = 0x31,
     IOT_CMD_BROADCAST_LIGHTS_OFF = 0x32,
     IOT_CMD_BROADCAST_LIGHTS_ON = 0x33,
-    IOT_CMD_EMERGENCY = 0x34
+    IOT_CMD_EMERGENCY = 0x34,
+    IOT_CMD_SET_RGB_LIGHT = 0x40,
+    IOT_CMD_SET_SCENE = 0x41
 } iot_command_t;
 
 typedef struct {
@@ -60,9 +62,51 @@ typedef struct {
 } __attribute__((packed)) iot_heartbeat_packet_t;
 
 #define IOT_PROTOCOL_VERSION 2
+#define IOT_PROTOCOL_VERSION_V3 3
 #define IOT_MAX_LIGHTS      3
 #define IOT_MAX_RELAYS      3
 #define IOT_MAX_SERVOS      3
+#define IOT_MAX_RGB_LIGHTS  2
+
+typedef enum {
+    IOT_LIGHT_EFFECT_STATIC = 0,
+    IOT_LIGHT_EFFECT_BREATHE = 1,
+    IOT_LIGHT_EFFECT_RAINBOW = 2,
+    IOT_LIGHT_EFFECT_WARNING = 3,
+} iot_light_effect_t;
+
+typedef enum {
+    IOT_SCENE_NONE = 0,
+    IOT_SCENE_SLEEP = 1,
+    IOT_SCENE_MOVIE = 2,
+    IOT_SCENE_NIGHT = 3,
+    IOT_SCENE_FIRE = 4,
+    IOT_SCENE_RAIN = 5,
+    IOT_SCENE_AWAY = 6,
+    IOT_SCENE_HOME = 7,
+} iot_scene_id_t;
+
+typedef struct {
+    uint8_t command;
+    uint8_t protocol_version;
+    uint8_t device_id;
+    uint8_t index;
+    uint8_t red;
+    uint8_t green;
+    uint8_t blue;
+    uint8_t brightness;
+    uint8_t effect;
+    uint8_t speed;
+    uint8_t reserved[6];
+} __attribute__((packed)) iot_rgb_light_packet_t;
+
+typedef struct {
+    uint8_t command;
+    uint8_t protocol_version;
+    uint8_t scene_id;
+    uint8_t source;
+    uint8_t reserved[8];
+} __attribute__((packed)) iot_scene_packet_t;
 
 typedef struct {
     uint8_t command;
@@ -86,6 +130,19 @@ typedef struct {
     uint32_t uptime_s;
     uint8_t reserved[8];
 } __attribute__((packed)) iot_heartbeat_v2_packet_t;
+
+typedef struct {
+    iot_heartbeat_v2_packet_t v2;
+    uint8_t rgb_count;
+    uint8_t rgb_on[IOT_MAX_RGB_LIGHTS];
+    uint8_t rgb_red[IOT_MAX_RGB_LIGHTS];
+    uint8_t rgb_green[IOT_MAX_RGB_LIGHTS];
+    uint8_t rgb_blue[IOT_MAX_RGB_LIGHTS];
+    uint8_t rgb_brightness[IOT_MAX_RGB_LIGHTS];
+    uint8_t rgb_effect[IOT_MAX_RGB_LIGHTS];
+    uint8_t current_scene;
+    uint8_t reserved_v3[8];
+} __attribute__((packed)) iot_heartbeat_v3_packet_t;
 
 typedef enum {
     IOT_SENSOR_SMOKE_MV    = 0,

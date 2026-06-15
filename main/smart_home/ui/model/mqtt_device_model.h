@@ -24,6 +24,7 @@ typedef enum {
 
 typedef enum {
     RC_DEVICE_LIGHT,
+    RC_DEVICE_RGB_LIGHT,
     RC_DEVICE_FAN,
     RC_DEVICE_DOOR,
     RC_DEVICE_WINDOW,
@@ -56,6 +57,11 @@ typedef struct {
     uint8_t floor_id;
     uint8_t cmd_type;
     uint8_t gpio_index;
+    uint8_t red;
+    uint8_t green;
+    uint8_t blue;
+    uint8_t brightness;
+    uint8_t effect;
 } rc_device_t;
 
 typedef struct {
@@ -111,6 +117,10 @@ typedef struct {
 
     /* Controller online status (per floor) */
     bool controller_online[3];
+
+    uint8_t current_scene;
+    uint32_t scene_seq;
+    char scene_name[RC_NAME_MAX];
 } mqtt_device_model_t;
 
 void device_model_init(void);
@@ -140,6 +150,11 @@ void device_model_update_sensors(float temp, float humi, uint16_t pm25,
 void device_model_update_sensor_value(uint8_t floor_id, uint8_t sensor_type, uint16_t value);
 void device_model_apply_command_ack(uint8_t floor_id, uint8_t cmd_type, uint8_t gpio_index, uint8_t value);
 void device_model_apply_heartbeat(const iot_heartbeat_v2_packet_t *heartbeat);
+void device_model_apply_heartbeat_v3(const iot_heartbeat_v3_packet_t *heartbeat);
+void device_model_apply_rgb_ack(uint8_t floor_id, uint8_t index, uint8_t red, uint8_t green,
+                                uint8_t blue, uint8_t brightness, uint8_t effect);
+void device_model_set_scene(uint8_t scene_id);
+const char *device_model_scene_name(uint8_t scene_id);
 bool device_model_get_smoke_value(uint8_t floor_id, uint16_t *value);
 bool device_model_get_rain_value(uint8_t floor_id, uint16_t *value);
 bool device_model_get_flame_value(uint8_t floor_id, uint16_t *value);

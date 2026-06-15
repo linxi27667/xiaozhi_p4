@@ -55,6 +55,20 @@ static void process_announce(const std::string& payload) {
 }
 
 static void process_heartbeat(const std::string& payload) {
+    if (payload.size() >= sizeof(iot_heartbeat_v3_packet_t)) {
+        const auto* pkt = reinterpret_cast<const iot_heartbeat_v3_packet_t*>(payload.data());
+        if (pkt->v2.command == IOT_CMD_HEARTBEAT &&
+            pkt->v2.protocol_version == IOT_PROTOCOL_VERSION_V3 &&
+            pkt->v2.device_id >= 1 && pkt->v2.device_id <= 3) {
+            ESP_LOGD(TAG, "Heartbeat V3: device_id=%u rgb_count=%u scene=%u",
+                     pkt->v2.device_id, pkt->rgb_count, pkt->current_scene);
+            device_model_apply_heartbeat_v3(pkt);
+            s_controller_online[pkt->v2.device_id] = true;
+            s_last_heartbeat[pkt->v2.device_id] = esp_timer_get_time() / 1000000;
+            return;
+        }
+    }
+
     if (payload.size() >= sizeof(iot_heartbeat_v2_packet_t)) {
         const auto* pkt = reinterpret_cast<const iot_heartbeat_v2_packet_t*>(payload.data());
         if (pkt->command == IOT_CMD_HEARTBEAT &&
@@ -91,6 +105,20 @@ static uint8_t floor_id_from_response_topic(const std::string& topic) {
 }
 
 static void process_response(const std::string& topic, const std::string& payload) {
+    if (payload.size() >= sizeof(iot_rgb_light_packet_t)) {
+        const auto* rgb = reinterpret_cast<const iot_rgb_light_packet_t*>(payload.data());
+        if (rgb->command == IOT_CMD_SET_RGB_LIGHT &&
+            rgb->protocol_version == IOT_PROTOCOL_VERSION_V3 &&
+            rgb->device_id >= 1 && rgb->device_id <= 3) {
+            ESP_LOGI(TAG, "RGB response: dev=%u idx=%u rgb=(%u,%u,%u) br=%u effect=%u",
+                     rgb->device_id, rgb->index, rgb->red, rgb->green, rgb->blue,
+                     rgb->brightness, rgb->effect);
+            device_model_apply_rgb_ack(rgb->device_id, rgb->index, rgb->red, rgb->green,
+                                       rgb->blue, rgb->brightness, rgb->effect);
+            return;
+        }
+    }
+
     if (payload.size() < sizeof(iot_command_packet_t)) {
         return;
     }
@@ -281,6 +309,90 @@ extern "C" void mqtt_send_command(uint8_t floor_id, uint8_t cmd_type, uint8_t gp
     std::string payload(reinterpret_cast<const char*>(&pkt), sizeof(pkt));
     s_mqtt->Publish(topic, payload, 0);
     ESP_LOGI(TAG, "CMD -> %s: cmd=0x%02X gpio=%u val=%u", topic, cmd_type, gpio_index, value);
+}
+
+extern "C" void mqtt_send_rgb_light(uint8_t floor_id, uint8_t index, uint8_t red, uint8_t green,
+                                    uint8_t blue, uint8_t brightness, uint8_t effect, uint8_t speed) {
+    if (!mqtt_client_is_connected()) {
+        ESP_LOGW(TAG, "Cannot send RGB command: MQTT not connected");
+        return;
+    }
+
+    iot_rgb_light_packet_t pkt = {};
+    pkt.command = IOT_CMD_SET_RGB_LIGHT;
+    pkt.protocol_version = IOT_PROTOCOL_VERSION_V3;
+    pkt.device_id = floor_id;
+    pkt.index = index;
+    pkt.red = red;
+    pkt.green = green;
+    pkt.blue = blue;
+    pkt.brightness = brightness;
+    pkt.effect = effect;
+    pkt.speed = speed;
+
+    char topic[48];
+    snprintf(topic, sizeof(topic), "%s%u", MQTT_TOPIC_CMD_PREFIX, floor_id);
+
+    std::string payload(reinterpret_cast<const char*>(&pkt), sizeof(pkt));
+    s_mqtt->Publish(topic, payload, 0);
+    device_model_apply_rgb_ack(floor_id, index, red, green, blue, brightness, effect);
+    ESP_LOGI(TAG, "RGB -> %s: idx=%u rgb=(%u,%u,%u) br=%u effect=%u",
+             topic, index, red, green, blue, brightness, effect);
+}
+
+extern "C" void mqtt_send_scene(uint8_t scene_id) {
+    if (!mqtt_client_is_connected()) {
+        ESP_LOGW(TAG, "Cannot send scene: MQTT not connected");
+        return;
+    }
+
+    iot_scene_packet_t pkt = {};
+    pkt.command = IOT_CMD_SET_SCENE;
+    pkt.protocol_version = IOT_PROTOCOL_VERSION_V3;
+    pkt.scene_id = scene_id;
+    pkt.source = 1;
+
+    std::string payload(reinterpret_cast<const char*>(&pkt), sizeof(pkt));
+    s_mqtt->Publish(MQTT_TOPIC_CMD_BROADCAST, payload, 0);
+    device_model_set_scene(scene_id);
+
+    switch (scene_id) {
+        case IOT_SCENE_SLEEP:
+            mqtt_send_rgb_light(2, 0, 24, 30, 96, 18, IOT_LIGHT_EFFECT_STATIC, 20);
+            mqtt_send_command(2, IOT_CMD_SET_LIGHT, 1, 0);
+            mqtt_send_command(2, IOT_CMD_SET_LIGHT, 2, 0);
+            mqtt_send_command(2, IOT_CMD_SET_RELAY, 0, 0);
+            break;
+        case IOT_SCENE_MOVIE:
+            mqtt_send_rgb_light(2, 0, 52, 68, 210, 24, IOT_LIGHT_EFFECT_STATIC, 20);
+            mqtt_send_command(2, IOT_CMD_SET_LIGHT, 1, 0);
+            break;
+        case IOT_SCENE_NIGHT:
+            mqtt_send_rgb_light(2, 0, 255, 154, 68, 8, IOT_LIGHT_EFFECT_STATIC, 10);
+            mqtt_send_command(2, IOT_CMD_SET_LIGHT, 2, 1);
+            break;
+        case IOT_SCENE_FIRE:
+            mqtt_send_rgb_light(2, 0, 255, 0, 0, 80, IOT_LIGHT_EFFECT_WARNING, 5);
+            mqtt_send_broadcast(IOT_CMD_BROADCAST_LIGHTS_ON);
+            mqtt_send_broadcast(IOT_CMD_EMERGENCY);
+            break;
+        case IOT_SCENE_RAIN:
+            mqtt_send_rgb_light(2, 0, 0, 120, 255, 35, IOT_LIGHT_EFFECT_BREATHE, 15);
+            mqtt_send_command(2, IOT_CMD_SET_SERVO, 6, 0);
+            mqtt_send_command(3, IOT_CMD_SET_SERVO, 8, 0);
+            break;
+        case IOT_SCENE_AWAY:
+            mqtt_send_broadcast(IOT_CMD_BROADCAST_ALL_OFF);
+            break;
+        case IOT_SCENE_HOME:
+            mqtt_send_command(1, IOT_CMD_SET_LIGHT, 0, 1);
+            mqtt_send_rgb_light(2, 0, 255, 166, 82, 45, IOT_LIGHT_EFFECT_BREATHE, 18);
+            break;
+        default:
+            break;
+    }
+
+    ESP_LOGI(TAG, "SCENE -> broadcast: scene=%u", scene_id);
 }
 
 extern "C" void mqtt_send_broadcast(uint8_t cmd_type) {

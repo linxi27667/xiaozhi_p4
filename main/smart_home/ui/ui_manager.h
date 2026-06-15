@@ -9,9 +9,11 @@ extern "C" {
 typedef enum {
     UI_PAGE_DATA = 0,
     UI_PAGE_CTRL = 1,
-    UI_PAGE_NET  = 2,
-    UI_PAGE_SET  = 3,
-    UI_PAGE_COUNT = 4,
+    UI_PAGE_LIGHT = 2,
+    UI_PAGE_SCENE = 3,
+    UI_PAGE_NET  = 4,
+    UI_PAGE_SET  = 5,
+    UI_PAGE_COUNT = 6,
 } ui_page_id_t;
 
 void UI_Manager_Init(lv_obj_t *parent);

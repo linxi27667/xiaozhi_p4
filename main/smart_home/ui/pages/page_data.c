@@ -25,6 +25,7 @@ typedef struct {
     int active_floor;
     lv_obj_t *lbl_online;
     lv_obj_t *lbl_sensor_online;
+    lv_obj_t *lbl_scene;
     lv_obj_t *lbl_top_mqtt;
     lv_obj_t *dot_mqtt_card;
     lv_obj_t *lbl_mqtt_card_state;
@@ -191,6 +192,16 @@ static void summary_card(lv_obj_t *page, data_ctx_t *ctx)
     lv_obj_set_style_text_align(ctx->lbl_sensor_online, LV_TEXT_ALIGN_CENTER, 0);
 }
 
+static void scene_card(lv_obj_t *page, data_ctx_t *ctx)
+{
+    const mqtt_device_model_t *m = device_model_get();
+    lv_obj_t *c = panel(page, 708, 136, 238, 44);
+    lv_obj_set_style_shadow_width(c, 0, 0);
+    icon_text(c, ICON_STAR, UI_COLOR_ACCENT, 14, 12, 15);
+    cn_label(c, tr("当前场景", "Scene"), 11, UI_COLOR_TEXT_SEC, 38, 8, 68);
+    ctx->lbl_scene = cn_label(c, m->scene_name, 13, UI_COLOR_TEXT_STRONG, 112, 8, 100);
+}
+
 static void create_overview(data_ctx_t *ctx, lv_obj_t *page);
 static void update_data(data_ctx_t *ctx);
 
@@ -331,6 +342,7 @@ static void create_overview(data_ctx_t *ctx, lv_obj_t *page)
     controller_card(page, ctx, 1, 248, tr("二楼控制器", "2F Controller"), m->controller_online[1]);
     controller_card(page, ctx, 2, 468, tr("三楼控制器", "3F Controller"), m->controller_online[2]);
     summary_card(page, ctx);
+    scene_card(page, ctx);
     floor_tabs(ctx, page);
 
     /* Floor 1 */
@@ -363,8 +375,8 @@ static void create_overview(data_ctx_t *ctx, lv_obj_t *page)
         toilet_on, NULL, &ctx->lbl_f2_toilet);
     bool master_on = d_master && d_master->connected && d_master->power_on;
     ctx->card_f2_master = device_tile(f2, 232, 42, 98, 82, ICON_LIGHTBULB, UI_COLOR_ORANGE,
-        tr("主卧灯", "Master"), tr("吸顶灯", "Light"),
-        d_master && d_master->connected ? (master_on ? tr("已开启", "On") : tr("已关闭", "Off")) : tr("未接入", "N/A"),
+        tr("主卧灯", "Master"), tr("氛围灯", "RGB"),
+        d_master && d_master->connected ? (master_on ? d_master->value_text : tr("已关闭", "Off")) : tr("未接入", "N/A"),
         master_on, NULL, &ctx->lbl_f2_master);
     device_tile(f2, 12, 142, 116, 82, ICON_DROP, UI_COLOR_BLUE,
         tr("雨滴传感器", "Rain"), tr("雨滴值", "Value"), tr("未接入", "N/A"), false, NULL, &ctx->lbl_f2_rain);
@@ -528,6 +540,11 @@ static void update_data(data_ctx_t *ctx)
         lv_snprintf(buf, sizeof(buf), "%u", (unsigned)sensors);
         lv_label_set_text(ctx->lbl_sensor_online, buf);
     }
+    if (ctx->lbl_scene) {
+        lv_label_set_text(ctx->lbl_scene, m->scene_name);
+        lv_obj_set_style_text_color(ctx->lbl_scene,
+            m->current_scene == IOT_SCENE_NONE ? UI_COLOR_TEXT_SEC : UI_COLOR_ACCENT, 0);
+    }
     if (ctx->lbl_mqtt_rx) {
         lv_snprintf(buf, sizeof(buf), "%lu", (unsigned long)m->mqtt_rx_count);
         lv_label_set_text(ctx->lbl_mqtt_rx, buf);
@@ -590,7 +607,12 @@ static void update_data(data_ctx_t *ctx)
     }
     d = device_by_id("floor2_master_light");
     if (d) {
-        set_state_label(ctx->lbl_f2_master, d->connected, d->power_on);
+        if (ctx->lbl_f2_master) {
+            lv_label_set_text(ctx->lbl_f2_master, d->connected ?
+                (d->power_on ? d->value_text : tr("已关闭", "Off")) : tr("未接入", "N/A"));
+            lv_obj_set_style_text_color(ctx->lbl_f2_master,
+                d->connected && d->power_on ? UI_COLOR_GREEN : UI_COLOR_TEXT_SEC, 0);
+        }
         set_card_state(ctx->card_f2_master, UI_COLOR_ORANGE, d->connected, d->power_on);
     }
     d = device_by_id("floor3_balcony_light");

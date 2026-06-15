@@ -162,6 +162,38 @@ extern "C" void SmartHomeMcp_RegisterTools(void) {
             return true;
         });
 
+    server.AddTool("self.iot.set_rgb_light",
+        "Set the 2F master bedroom RGB ambient light color, brightness, and effect.",
+        PropertyList({
+            Property("red", kPropertyTypeInteger, 0, 255),
+            Property("green", kPropertyTypeInteger, 0, 255),
+            Property("blue", kPropertyTypeInteger, 0, 255),
+            Property("brightness", kPropertyTypeInteger, 0, 100),
+            Property("effect", kPropertyTypeInteger, 0, 3),
+        }),
+        [](const PropertyList& properties) -> ReturnValue {
+            mqtt_send_rgb_light(
+                2,
+                0,
+                static_cast<uint8_t>(properties["red"].value<int>()),
+                static_cast<uint8_t>(properties["green"].value<int>()),
+                static_cast<uint8_t>(properties["blue"].value<int>()),
+                static_cast<uint8_t>(properties["brightness"].value<int>()),
+                static_cast<uint8_t>(properties["effect"].value<int>()),
+                16);
+            return true;
+        });
+
+    server.AddTool("self.iot.set_scene",
+        "Run a smart-home scene. scene_id: 1 sleep, 2 movie, 3 night, 4 fire demo, 5 rain, 6 away, 7 home.",
+        PropertyList({
+            Property("scene_id", kPropertyTypeInteger, 1, 7),
+        }),
+        [](const PropertyList& properties) -> ReturnValue {
+            mqtt_send_scene(static_cast<uint8_t>(properties["scene_id"].value<int>()));
+            return true;
+        });
+
     server.AddTool("self.iot.set_relay",
         "Turn a smart-home relay on or off.",
         PropertyList({

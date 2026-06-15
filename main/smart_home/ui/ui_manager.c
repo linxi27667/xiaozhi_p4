@@ -9,15 +9,18 @@
 #include "mqtt_device_model.h"
 #include "pages/page_data.h"
 #include "pages/page_ctrl.h"
+#include "pages/page_light.h"
+#include "pages/page_scene.h"
 #include "pages/page_net.h"
 #include "pages/page_set.h"
+#include "ui_welcome_popup.h"
 #include "esp_log.h"
 #include <string.h>
 #include <stdint.h>
 
 static const char *TAG = "UI_MGR";
 
-#define NAV_COUNT 4
+#define NAV_COUNT 6
 
 typedef struct {
     lv_obj_t *content_parent;
@@ -39,6 +42,8 @@ typedef struct {
 static const nav_item_t s_nav_items[NAV_COUNT] = {
     { ICON_HOME,     "\xE6\x80\xBB\xE8\xA7\x88", "Home",     UI_PAGE_DATA },  /* 总览 */
     { ICON_CHART,    "\xE6\x8E\xA7\xE5\x88\xB6", "Control",  UI_PAGE_CTRL },  /* 控制 */
+    { ICON_LIGHTBULB, "\xE7\x81\xAF\xE5\x85\x89", "Light",   UI_PAGE_LIGHT }, /* 灯光 */
+    { ICON_STAR,     "\xE5\x9C\xBA\xE6\x99\xAF", "Scenes",   UI_PAGE_SCENE }, /* 场景 */
     { ICON_WIFI,     "\xE7\xBD\x91\xE7\xBB\x9C", "Network",  UI_PAGE_NET },   /* 网络 */
     { ICON_SETTINGS, "\xE8\xAE\xBE\xE7\xBD\xAE", "Settings", UI_PAGE_SET },   /* 设置 */
 };
@@ -58,8 +63,10 @@ static void reset_all_indev(void)
 static int active_nav_index(ui_page_id_t page)
 {
     if (page == UI_PAGE_CTRL) return 1;
-    if (page == UI_PAGE_NET) return 2;
-    if (page == UI_PAGE_SET) return 3;
+    if (page == UI_PAGE_LIGHT) return 2;
+    if (page == UI_PAGE_SCENE) return 3;
+    if (page == UI_PAGE_NET) return 4;
+    if (page == UI_PAGE_SET) return 5;
     return 0;
 }
 
@@ -122,6 +129,8 @@ static void do_switch_page(void)
         switch (page) {
             case UI_PAGE_DATA: page_data_create(s_app_ctx.content_parent); break;
             case UI_PAGE_CTRL: page_ctrl_create(s_app_ctx.content_parent); break;
+            case UI_PAGE_LIGHT: page_light_create(s_app_ctx.content_parent); break;
+            case UI_PAGE_SCENE: page_scene_create(s_app_ctx.content_parent); break;
             case UI_PAGE_NET:  page_net_create(s_app_ctx.content_parent); break;
             case UI_PAGE_SET:  page_set_create(s_app_ctx.content_parent); break;
             default: break;
@@ -230,6 +239,7 @@ void UI_Manager_Init(lv_obj_t *parent)
     ui_i18n_init();
     device_model_init();
     smart_home_alarm_ui_init();
+    ui_welcome_popup_init();
 
     lv_obj_t *scr = parent ? parent : lv_screen_active();
     bool embedded = parent != NULL;
@@ -262,8 +272,8 @@ void UI_Manager_Init(lv_obj_t *parent)
     }
 
     ESP_LOGI(TAG, "%s", embedded ?
-        "UI initialized in embedded content mode, 4 pages" :
-        "UI initialized in standalone sidebar layout, 4 pages");
+        "UI initialized in embedded content mode, 6 pages" :
+        "UI initialized in standalone sidebar layout, 6 pages");
 }
 
 void UI_Manager_Switch_Page(ui_page_id_t page)

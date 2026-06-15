@@ -1,7 +1,8 @@
 #include "mqtt_heartbeat.h"
 #include "mqtt_receive.h"
-#include "mqtt_iot_protocol.h"
 #include "iot_control_task.h"
+#include "app_ambient_light.h"
+#include "mqtt_iot_protocol.h"
 #include "sensor_adc_task.h"
 
 #include "esp_log.h"
@@ -28,30 +29,37 @@ void MQTT_Heartbeat_Publish_Now(void) {
     uint8_t rain_status = 0;
     Sensor_ADC_Get_Snapshot(&rain_mv, &rain_status);
 
-    iot_heartbeat_v2_packet_t heartbeat = {
-        .command = IOT_CMD_HEARTBEAT,
-        .protocol_version = IOT_PROTOCOL_VERSION,
-        .device_id = DEVICE_ID_NUM,
-        .device_status = 1,
-        .light_count = LIGHT_COUNT,
-        .relay_count = RELAY_COUNT,
-        .servo_count = SERVO_COUNT,
-        .sensor_count = 1,
-        .rain_mv = rain_mv,
-        .rain_status = rain_status,
-        .uptime_s = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS / 1000)
-    };
+    iot_heartbeat_v3_packet_t heartbeat = {0};
+    heartbeat.v2.command = IOT_CMD_HEARTBEAT;
+    heartbeat.v2.protocol_version = IOT_PROTOCOL_VERSION_V3;
+    heartbeat.v2.device_id = DEVICE_ID_NUM;
+    heartbeat.v2.device_status = 1;
+    heartbeat.v2.light_count = LIGHT_COUNT;
+    heartbeat.v2.relay_count = RELAY_COUNT;
+    heartbeat.v2.servo_count = SERVO_COUNT;
+    heartbeat.v2.sensor_count = 1;
+    heartbeat.v2.rain_mv = rain_mv;
+    heartbeat.v2.rain_status = rain_status;
+    heartbeat.v2.uptime_s = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS / 1000);
 
-    snprintf(heartbeat.device_name, sizeof(heartbeat.device_name), "%s", DEVICE_NAME);
-    snprintf(heartbeat.mac_str, sizeof(heartbeat.mac_str), "%s", mac_str);
-    for (int i = 0; i < LIGHT_COUNT && i < IOT_MAX_LIGHTS; i++) heartbeat.lights[i] = g_device_flags.light[i];
-    for (int i = 0; i < RELAY_COUNT && i < IOT_MAX_RELAYS; i++) heartbeat.relays[i] = g_device_flags.relay[i];
-    for (int i = 0; i < SERVO_COUNT && i < IOT_MAX_SERVOS; i++) heartbeat.servos[i] = g_device_flags.servo[i];
+    snprintf(heartbeat.v2.device_name, sizeof(heartbeat.v2.device_name), "%s", DEVICE_NAME);
+    snprintf(heartbeat.v2.mac_str, sizeof(heartbeat.v2.mac_str), "%s", mac_str);
+    for (int i = 0; i < LIGHT_COUNT && i < IOT_MAX_LIGHTS; i++) heartbeat.v2.lights[i] = g_device_flags.light[i];
+    for (int i = 0; i < RELAY_COUNT && i < IOT_MAX_RELAYS; i++) heartbeat.v2.relays[i] = g_device_flags.relay[i];
+    for (int i = 0; i < SERVO_COUNT && i < IOT_MAX_SERVOS; i++) heartbeat.v2.servos[i] = g_device_flags.servo[i];
+
+    heartbeat.rgb_count = AMBIENT_STRIP_COUNT;
+    heartbeat.rgb_on[0] = App_Ambient_Light_Is_On(AMBIENT_BEDROOM_INDEX) ? 1 : 0;
+    heartbeat.rgb_red[0] = App_Ambient_Light_Get_Red(AMBIENT_BEDROOM_INDEX);
+    heartbeat.rgb_green[0] = App_Ambient_Light_Get_Green(AMBIENT_BEDROOM_INDEX);
+    heartbeat.rgb_blue[0] = App_Ambient_Light_Get_Blue(AMBIENT_BEDROOM_INDEX);
+    heartbeat.rgb_brightness[0] = App_Ambient_Light_Get_Brightness(AMBIENT_BEDROOM_INDEX);
+    heartbeat.rgb_effect[0] = App_Ambient_Light_Get_Effect(AMBIENT_BEDROOM_INDEX);
 
     char topic[64];
     snprintf(topic, sizeof(topic), MQTT_TOPIC_HEARTBEAT_PREFIX "%s", mac_str);
     esp_mqtt_client_publish(client, topic, (const char*)&heartbeat, sizeof(heartbeat), 0, 0);
-    ESP_LOGD(TAG, "Heartbeat V2 sent");
+    ESP_LOGD(TAG, "Heartbeat V3 sent");
 }
 
 void Heartbeat_Task(void* arg) {
