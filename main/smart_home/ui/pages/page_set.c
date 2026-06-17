@@ -1,199 +1,76 @@
 #include "page_set.h"
-#include "ui_manager.h"
+#include "ui_kit.h"
 #include "ui_events.h"
 #include "ui_styles.h"
+#include "ui_theme.h"
 #include "ui_font.h"
 #include "mqtt_device_model.h"
 #include "ui_i18n.h"
 #include "ui_icons.h"
+#include "ui_manager.h"
 #include "esp_log.h"
 #include "lvgl.h"
 #include <string.h>
-#include <time.h>
 
 static const char *TAG = "PAGE_SET";
 
+/* ===== UTF-8 hex escapes for Chinese strings ===== */
+
+/* Page title */
+#define STR_TITLE_ZH        "\xE8\xAE\xBE\xE7\xBD\xAE"                          /* 设置 */
+#define STR_TITLE_EN        "Settings"
+
+/* Group titles */
+#define STR_GENERAL_ZH      "\xE9\x80\x9A\xE7\x94\xA8"                          /* 通用 */
+#define STR_GENERAL_EN      "General"
+#define STR_ABOUT_ZH        "\xE5\x85\xB3\xE4\xBA\x8E"                          /* 关于 */
+#define STR_ABOUT_EN        "About"
+
+/* Setting row labels */
+#define STR_NETWORK_ZH      "\xE7\xBD\x91\xE7\xBB\x9C"                          /* 网络 */
+#define STR_NETWORK_EN      "Network"
+#define STR_LANGUAGE_ZH     "\xE8\xAF\xAD\xE8\xA8\x80"                          /* 语言 */
+#define STR_LANGUAGE_EN     "Language"
+#define STR_BRIGHTNESS_ZH   "\xE4\xBA\xAE\xE5\xBA\xA6"                          /* 亮度 */
+#define STR_BRIGHTNESS_EN   "Brightness"
+#define STR_VOLUME_ZH       "\xE5\xA3\xB0\xE9\x9F\xB3"                          /* 声音 */
+#define STR_VOLUME_EN       "Volume"
+#define STR_FIRMWARE_ZH     "\xE5\x9B\xBA\xE4\xBB\xB6\xE7\x89\x88\xE6\x9C\xAC"  /* 固件版本 */
+#define STR_FIRMWARE_EN     "Firmware"
+#define STR_WEATHER_LOC_ZH  "\xE5\xA4\xA9\xE6\xB0\x94\xE4\xBD\x8D\xE7\xBD\xAE"  /* 天气位置 */
+#define STR_WEATHER_LOC_EN  "Weather Location"
+#define STR_DEVICE_ID_ZH    "\xE8\xAE\xBE\xE5\xA4\x87 ID"                       /* 设备 ID */
+#define STR_DEVICE_ID_EN    "Device ID"
+
+/* Language names */
+#define STR_LANG_ZH_NAME    "\xE4\xB8\xAD\xE6\x96\x87"                          /* 中文 */
+#define STR_LANG_EN_NAME    "English"
+
+/* Weather location */
+#define STR_SHANGHAI_ZH     "\xE5\xB9\xBF\xE5\xB7\x9E"                          /* 广州 */
+#define STR_SHANGHAI_EN     "Guangzhou"
+
+#define MQTT_BROKER_STR     "8.134.167.240:1883"
+#define MQTT_CLIENT_ID      "xiaozhi_p4_host"
+#define FIRMWARE_VERSION    "v1.0.0"
+
+/* Persist slider values across page rebuilds (display only, no real effect) */
+static int s_brightness = 80;
+static int s_volume = 70;
+
 typedef struct {
-    lv_obj_t *network_value;
-    lv_obj_t *brightness_slider;
-    lv_obj_t *brightness_value;
-    lv_obj_t *volume_value;
-    lv_obj_t *chip_zh;
-    lv_obj_t *chip_en;
-    lv_obj_t *modal;
+    lv_obj_t *page;
+    lv_obj_t *brightness_val;
+    lv_obj_t *volume_val;
     bool deleted;
 } set_ctx_t;
-
-static int s_brightness = 80;
-static int s_volume_level = 1;
 
 static const char *tr(const char *zh, const char *en)
 {
     return ui_i18n_get_lang() == UI_LANG_ZH ? zh : en;
 }
 
-static lv_obj_t *cn_label(lv_obj_t *parent, const char *text, int size, lv_color_t color,
-    int x, int y, int w)
-{
-    lv_obj_t *lbl = lv_label_create(parent);
-    lv_label_set_text(lbl, text ? text : "");
-    lv_obj_set_style_text_font(lbl, ui_font_cn((uint8_t)size), 0);
-    lv_obj_set_style_text_color(lbl, color, 0);
-    lv_obj_set_pos(lbl, x, y);
-    if (w > 0) {
-        lv_obj_set_width(lbl, w);
-        lv_label_set_long_mode(lbl, LV_LABEL_LONG_CLIP);
-    }
-    return lbl;
-}
-
-static void icon_text(lv_obj_t *parent, const char *icon, lv_color_t color,
-    int x, int y, int icon_size)
-{
-    lv_obj_t *lbl = ui_create_icon(parent, icon, ui_font_icon((uint8_t)icon_size), color);
-    lv_obj_set_pos(lbl, x, y);
-}
-
-static lv_obj_t *panel(lv_obj_t *parent, int x, int y, int w, int h, int radius)
-{
-    lv_obj_t *obj = lv_obj_create(parent);
-    lv_obj_remove_style_all(obj);
-    lv_obj_set_pos(obj, x, y);
-    lv_obj_set_size(obj, w, h);
-    lv_obj_set_style_bg_color(obj, UI_COLOR_CARD, 0);
-    lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(obj, radius, 0);
-    lv_obj_set_style_border_width(obj, 1, 0);
-    lv_obj_set_style_border_color(obj, UI_COLOR_BORDER, 0);
-    lv_obj_set_style_shadow_width(obj, 8, 0);
-    lv_obj_set_style_shadow_opa(obj, LV_OPA_10, 0);
-    lv_obj_set_style_shadow_color(obj, UI_COLOR_SHADOW, 0);
-    lv_obj_set_style_shadow_offset_y(obj, 2, 0);
-    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
-    return obj;
-}
-
-static lv_obj_t *row_hit(lv_obj_t *parent, int y, lv_event_cb_t cb, void *user_data)
-{
-    lv_obj_t *hit = lv_obj_create(parent);
-    lv_obj_remove_style_all(hit);
-    lv_obj_set_pos(hit, 12, y);
-    lv_obj_set_size(hit, 832, 50);
-    lv_obj_add_flag(hit, LV_OBJ_FLAG_CLICKABLE);
-    if (cb) lv_obj_add_event_cb(hit, cb, LV_EVENT_CLICKED, user_data);
-    return hit;
-}
-
-static lv_obj_t *setting_row(lv_obj_t *parent, int y, const char *icon, const char *name,
-    const char *value, lv_color_t value_color, lv_event_cb_t cb, void *user_data)
-{
-    icon_text(parent, icon, UI_COLOR_TEXT_SEC, 26, y + 14, 15);
-    cn_label(parent, name, 14, UI_COLOR_TEXT_STRONG, 66, y + 12, 130);
-    lv_obj_t *val = cn_label(parent, value, 13, value_color, 342, y + 13, 250);
-    icon_text(parent, ICON_NEXT, UI_COLOR_TEXT_SEC, 790, y + 15, 12);
-
-    lv_obj_t *line = lv_obj_create(parent);
-    lv_obj_remove_style_all(line);
-    lv_obj_set_pos(line, 66, y + 48);
-    lv_obj_set_size(line, 746, 1);
-    lv_obj_set_style_bg_color(line, UI_COLOR_BORDER, 0);
-    lv_obj_set_style_bg_opa(line, LV_OPA_COVER, 0);
-
-    if (cb) row_hit(parent, y, cb, user_data);
-    return val;
-}
-
-static lv_obj_t *chip(lv_obj_t *parent, int x, int y, int w, const char *text,
-    bool active, lv_event_cb_t cb, void *user_data)
-{
-    lv_obj_t *c = panel(parent, x, y, w, 30, 8);
-    lv_obj_set_style_shadow_width(c, 0, 0);
-    lv_obj_set_style_bg_color(c, active ? UI_COLOR_ACCENT : UI_COLOR_INPUT_BG, 0);
-    lv_obj_add_flag(c, LV_OBJ_FLAG_CLICKABLE);
-    if (cb) lv_obj_add_event_cb(c, cb, LV_EVENT_CLICKED, user_data);
-    lv_obj_t *lbl = cn_label(c, text, 12, active ? lv_color_white() : UI_COLOR_TEXT_SEC, 0, 7, w);
-    lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-    return c;
-}
-
-static void apply_chip_state(lv_obj_t *chip_obj, bool active)
-{
-    if (!chip_obj) return;
-    lv_obj_set_style_bg_color(chip_obj, active ? UI_COLOR_ACCENT : UI_COLOR_INPUT_BG, 0);
-    lv_obj_t *lbl = lv_obj_get_child(chip_obj, 0);
-    if (lbl) lv_obj_set_style_text_color(lbl, active ? lv_color_white() : UI_COLOR_TEXT_SEC, 0);
-}
-
-static void refresh_language_chips(set_ctx_t *ctx)
-{
-    if (!ctx) return;
-    bool zh = ui_i18n_get_lang() == UI_LANG_ZH;
-    apply_chip_state(ctx->chip_zh, zh);
-    apply_chip_state(ctx->chip_en, !zh);
-}
-
-static void update_network_value(set_ctx_t *ctx)
-{
-    if (!ctx || !ctx->network_value) return;
-    const mqtt_device_model_t *m = device_model_get();
-    char buf[80];
-    if (m->wifi_state == WIFI_STATE_CONNECTED && m->wifi_ssid[0]) {
-        lv_snprintf(buf, sizeof(buf), "%s  %s", tr("已连接", "Connected"), m->wifi_ssid);
-        lv_label_set_text(ctx->network_value, buf);
-        lv_obj_set_style_text_color(ctx->network_value, UI_COLOR_GREEN, 0);
-    } else if (m->wifi_state == WIFI_STATE_SCANNING) {
-        lv_label_set_text(ctx->network_value, tr("扫描中...", "Scanning..."));
-        lv_obj_set_style_text_color(ctx->network_value, UI_COLOR_ORANGE, 0);
-    } else {
-        lv_label_set_text(ctx->network_value, tr("未连接", "Disconnected"));
-        lv_obj_set_style_text_color(ctx->network_value, UI_COLOR_RED, 0);
-    }
-}
-
-static void close_modal(set_ctx_t *ctx)
-{
-    if (!ctx || !ctx->modal) return;
-    lv_obj_delete(ctx->modal);
-    ctx->modal = NULL;
-}
-
-static void on_modal_close(lv_event_t *e)
-{
-    close_modal((set_ctx_t *)lv_event_get_user_data(e));
-}
-
-static void show_info_modal(set_ctx_t *ctx, const char *title, const char *body)
-{
-    if (!ctx) return;
-    close_modal(ctx);
-
-    ctx->modal = lv_obj_create(lv_screen_active());
-    lv_obj_remove_style_all(ctx->modal);
-    lv_obj_set_size(ctx->modal, lv_pct(100), lv_pct(100));
-    lv_obj_add_flag(ctx->modal, LV_OBJ_FLAG_FLOATING);
-    lv_obj_set_style_bg_color(ctx->modal, lv_color_black(), 0);
-    lv_obj_set_style_bg_opa(ctx->modal, LV_OPA_30, 0);
-    lv_obj_clear_flag(ctx->modal, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_obj_t *box = panel(ctx->modal, 322, 172, 380, 230, 14);
-    icon_text(box, ICON_INFO, UI_COLOR_ACCENT, 28, 26, 20);
-    cn_label(box, title, 20, UI_COLOR_TEXT_STRONG, 62, 22, 170);
-    lv_obj_t *desc = cn_label(box, body, 13, UI_COLOR_TEXT_SEC, 28, 70, 320);
-    lv_label_set_long_mode(desc, LV_LABEL_LONG_WRAP);
-    lv_obj_set_height(desc, 86);
-
-    lv_obj_t *btn = lv_btn_create(box);
-    lv_obj_remove_style_all(btn);
-    lv_obj_set_pos(btn, 226, 166);
-    lv_obj_set_size(btn, 116, 36);
-    lv_obj_set_style_bg_color(btn, UI_COLOR_ACCENT, 0);
-    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(btn, 8, 0);
-    lv_obj_add_event_cb(btn, on_modal_close, LV_EVENT_CLICKED, ctx);
-    ui_apply_press_feedback(btn, UI_COLOR_ACCENT);
-    lv_obj_t *lbl = cn_label(btn, tr("确定", "OK"), 13, lv_color_white(), 0, 9, 116);
-    lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-}
+/* ---- Click handlers ---- */
 
 static void on_network_row(lv_event_t *e)
 {
@@ -201,137 +78,163 @@ static void on_network_row(lv_event_t *e)
     UI_Manager_Switch_Page(UI_PAGE_NET);
 }
 
-static void on_lang_zh(lv_event_t *e)
+static void on_language_row(lv_event_t *e)
 {
-    set_ctx_t *ctx = (set_ctx_t *)lv_event_get_user_data(e);
-    ui_i18n_set_lang(UI_LANG_ZH);
-    refresh_language_chips(ctx);
-    UI_Manager_Rebuild_Current();
-}
-
-static void on_lang_en(lv_event_t *e)
-{
-    set_ctx_t *ctx = (set_ctx_t *)lv_event_get_user_data(e);
-    ui_i18n_set_lang(UI_LANG_EN);
-    refresh_language_chips(ctx);
-    UI_Manager_Rebuild_Current();
+    (void)e;
+    /* Toggle language; ui_manager subscribes to UI_EVENT_LANG_CHANGED
+     * and will rebuild the current page automatically. */
+    ui_lang_t cur = ui_i18n_get_lang();
+    ui_i18n_set_lang(cur == UI_LANG_ZH ? UI_LANG_EN : UI_LANG_ZH);
 }
 
 static void on_brightness_changed(lv_event_t *e)
 {
     set_ctx_t *ctx = (set_ctx_t *)lv_event_get_user_data(e);
-    if (!ctx || !ctx->brightness_slider || !ctx->brightness_value) return;
-    s_brightness = (int)lv_slider_get_value(ctx->brightness_slider);
+    if (!ctx || ctx->deleted || !ctx->brightness_val) return;
+    lv_obj_t *slider = lv_event_get_target(e);
+    s_brightness = (int)lv_slider_get_value(slider);
     char buf[12];
     lv_snprintf(buf, sizeof(buf), "%d%%", s_brightness);
-    lv_label_set_text(ctx->brightness_value, buf);
+    lv_label_set_text(ctx->brightness_val, buf);
 }
 
-static const char *volume_name(void)
-{
-    static const char *names_zh[] = { "静音", "中等", "高" };
-    static const char *names_en[] = { "Mute", "Medium", "High" };
-    return ui_i18n_get_lang() == UI_LANG_ZH ?
-        names_zh[s_volume_level % 3] : names_en[s_volume_level % 3];
-}
-
-static void on_volume_row(lv_event_t *e)
+static void on_volume_changed(lv_event_t *e)
 {
     set_ctx_t *ctx = (set_ctx_t *)lv_event_get_user_data(e);
-    s_volume_level = (s_volume_level + 1) % 3;
-    if (ctx && ctx->volume_value) lv_label_set_text(ctx->volume_value, volume_name());
+    if (!ctx || ctx->deleted || !ctx->volume_val) return;
+    lv_obj_t *slider = lv_event_get_target(e);
+    s_volume = (int)lv_slider_get_value(slider);
+    char buf[12];
+    lv_snprintf(buf, sizeof(buf), "%d%%", s_volume);
+    lv_label_set_text(ctx->volume_val, buf);
 }
 
-static void on_about_row(lv_event_t *e)
-{
-    show_info_modal((set_ctx_t *)lv_event_get_user_data(e), tr("关于设备", "About"),
-        tr("智慧家庭控制面板基于 LVGL v9 构建，面向 ESP32-P4 主控与多楼层从机控制。",
-           "Smart home control panel built with LVGL v9 for ESP32-P4 and multi-floor slave controllers."));
-}
-
-static void on_firmware_row(lv_event_t *e)
-{
-    show_info_modal((set_ctx_t *)lv_event_get_user_data(e), tr("固件版本", "Firmware"),
-        tr("ESP32-P4 LVGL v9 固件，支持 WiFi、MQTT 通信与多楼层从机控制。",
-           "ESP32-P4 LVGL v9 firmware with WiFi, MQTT communication and multi-floor slave control."));
-}
-
-static void on_model_updated(void *user_data)
-{
-    set_ctx_t *ctx = (set_ctx_t *)user_data;
-    if (!ctx || ctx->deleted) return;
-    update_network_value(ctx);
-}
-
-static void page_set_delete(lv_event_t *e)
+/* ---- Delete callback ---- */
+static void on_delete(lv_event_t *e)
 {
     set_ctx_t *ctx = (set_ctx_t *)lv_event_get_user_data(e);
     if (!ctx) return;
     ctx->deleted = true;
-    close_modal(ctx);
-    ui_event_unsubscribe(UI_EVENT_MODEL_UPDATED, on_model_updated, ctx);
     lv_free(ctx);
 }
 
+/* ---- Create a styled slider for setting rows ---- */
+static lv_obj_t *make_slider(lv_obj_t *parent, int value,
+    lv_event_cb_t cb, void *user_data)
+{
+    lv_obj_t *slider = lv_slider_create(parent);
+    lv_obj_set_width(slider, 140);
+    lv_slider_set_range(slider, 0, 100);
+    lv_slider_set_value(slider, value, LV_ANIM_OFF);
+    lv_obj_set_style_bg_color(slider, UI_COLOR_INPUT_BG, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(slider, UI_COLOR_ACCENT, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(slider, UI_COLOR_ACCENT, LV_PART_KNOB);
+    lv_obj_clear_flag(slider, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+    if (cb) lv_obj_add_event_cb(slider, cb, LV_EVENT_VALUE_CHANGED, user_data);
+    return slider;
+}
+
+/* ---- Create a slider + value label container as right_widget ---- */
+static lv_obj_t *make_slider_group(lv_obj_t *parent, int value,
+    lv_obj_t **val_label_out, lv_event_cb_t cb, void *user_data)
+{
+    lv_obj_t *cont = lv_obj_create(parent);
+    lv_obj_remove_style_all(cont);
+    lv_obj_set_width(cont, LV_SIZE_CONTENT);
+    lv_obj_set_height(cont, LV_SIZE_CONTENT);
+    lv_obj_set_style_pad_all(cont, 0, 0);
+    lv_obj_set_style_pad_column(cont, 8, 0);
+    lv_obj_set_layout(cont, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_START,
+        LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
+
+    make_slider(cont, value, cb, user_data);
+
+    char buf[12];
+    lv_snprintf(buf, sizeof(buf), "%d%%", value);
+    lv_obj_t *val = ui_create_label(cont, buf, ui_font_cn(13), UI_COLOR_TEXT_SEC);
+    lv_obj_set_width(val, 40);
+    if (val_label_out) *val_label_out = val;
+
+    return cont;
+}
+
+/* ---- Page create ---- */
 lv_obj_t *page_set_create(lv_obj_t *parent)
 {
     set_ctx_t *ctx = lv_malloc(sizeof(set_ctx_t));
     memset(ctx, 0, sizeof(*ctx));
 
-    lv_obj_t *page = lv_obj_create(parent);
-    lv_obj_remove_style_all(page);
-    lv_obj_set_size(page, lv_pct(100), lv_pct(100));
-    lv_obj_set_style_bg_color(page, UI_COLOR_BG, 0);
-    lv_obj_set_style_bg_opa(page, LV_OPA_COVER, 0);
-    lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_event_cb(page, page_set_delete, LV_EVENT_DELETE, ctx);
+    ctx->page = ui_create_page(parent, on_delete, ctx);
 
-    time_t now = time(NULL);
-    struct tm *t = localtime(&now);
-    char tm_buf[16];
-    lv_snprintf(tm_buf, sizeof(tm_buf), "%02d:%02d", t ? t->tm_hour : 9, t ? t->tm_min : 41);
+    /* Title */
+    ui_kit_page_title(ctx->page, ICON_SETTINGS,
+        tr(STR_TITLE_ZH, STR_TITLE_EN), NULL);
 
-    cn_label(page, tr("设置", "Settings"), 22, UI_COLOR_TEXT_STRONG, 32, 24, 100);
-    cn_label(page, tm_buf, 16, UI_COLOR_TEXT_STRONG, 816, 28, 54);
-    icon_text(page, ICON_WIFI, UI_COLOR_TEXT_STRONG, 878, 28, 16);
+    /* ===== General group ===== */
+    ui_kit_group_title(ctx->page, tr(STR_GENERAL_ZH, STR_GENERAL_EN));
 
-    lv_obj_t *card = panel(page, 32, 74, 890, 450, 16);
-    cn_label(card, tr("系统偏好", "System"), 18, UI_COLOR_TEXT_STRONG, 26, 22, 120);
-    cn_label(card, tr("面板显示、语言和设备信息", "Display, language and device information"),
-        12, UI_COLOR_TEXT_SEC, 26, 50, 260);
+    /* Network row: right arrow, clickable -> switch to network page */
+    lv_obj_t *net_arrow = ui_create_label(ctx->page, ICON_NEXT,
+        ui_font_icon(14), UI_COLOR_TEXT_SEC);
+    lv_obj_t *net_row = ui_kit_setting_row(ctx->page, ICON_WIFI,
+        tr(STR_NETWORK_ZH, STR_NETWORK_EN), net_arrow);
+    lv_obj_add_flag(net_row, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(net_row, on_network_row, LV_EVENT_CLICKED, NULL);
+    ui_apply_press_feedback(net_row, UI_COLOR_ACCENT);
 
-    ctx->network_value = setting_row(card, 88, ICON_WIFI, tr("网络设置", "Network"), tr("未连接", "Disconnected"),
-        UI_COLOR_RED, on_network_row, ctx);
-    setting_row(card, 146, ICON_GLOBE, tr("语言切换", "Language"), "", UI_COLOR_TEXT_SEC, NULL, NULL);
-    ctx->chip_zh = chip(card, 342, 154, 78, "简体中文", true, on_lang_zh, ctx);
-    ctx->chip_en = chip(card, 430, 154, 72, "English", false, on_lang_en, ctx);
+    /* Language row: current language label, clickable -> toggle language */
+    lv_obj_t *lang_val = ui_create_label(ctx->page,
+        ui_i18n_get_lang() == UI_LANG_ZH ? STR_LANG_ZH_NAME : STR_LANG_EN_NAME,
+        ui_font_cn(13), UI_COLOR_TEXT_SEC);
+    lv_obj_t *lang_row = ui_kit_setting_row(ctx->page, ICON_LANGUAGE,
+        tr(STR_LANGUAGE_ZH, STR_LANGUAGE_EN), lang_val);
+    lv_obj_add_flag(lang_row, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(lang_row, on_language_row, LV_EVENT_CLICKED, NULL);
+    ui_apply_press_feedback(lang_row, UI_COLOR_ACCENT);
 
-    icon_text(card, ICON_SUN, UI_COLOR_TEXT_SEC, 26, 218, 15);
-    cn_label(card, tr("屏幕亮度", "Brightness"), 14, UI_COLOR_TEXT_STRONG, 66, 216, 130);
-    ctx->brightness_slider = lv_slider_create(card);
-    lv_obj_set_pos(ctx->brightness_slider, 342, 224);
-    lv_obj_set_size(ctx->brightness_slider, 220, 8);
-    lv_slider_set_range(ctx->brightness_slider, 10, 100);
-    lv_slider_set_value(ctx->brightness_slider, s_brightness, LV_ANIM_OFF);
-    lv_obj_set_style_bg_color(ctx->brightness_slider, lv_color_hex(0xE6ECF5), LV_PART_MAIN);
-    lv_obj_set_style_bg_color(ctx->brightness_slider, UI_COLOR_ACCENT, LV_PART_INDICATOR);
-    lv_obj_set_style_bg_color(ctx->brightness_slider, UI_COLOR_ACCENT, LV_PART_KNOB);
-    lv_obj_add_event_cb(ctx->brightness_slider, on_brightness_changed, LV_EVENT_VALUE_CHANGED, ctx);
-    char brightness_buf[12];
-    lv_snprintf(brightness_buf, sizeof(brightness_buf), "%d%%", s_brightness);
-    ctx->brightness_value = cn_label(card, brightness_buf, 13, UI_COLOR_TEXT_SEC, 586, 216, 46);
+    /* Brightness row: slider + value label (display only) */
+    lv_obj_t *bright_right = make_slider_group(ctx->page, s_brightness,
+        &ctx->brightness_val, on_brightness_changed, ctx);
+    ui_kit_setting_row(ctx->page, ICON_LIGHTBULB,
+        tr(STR_BRIGHTNESS_ZH, STR_BRIGHTNESS_EN), bright_right);
 
-    ctx->volume_value = setting_row(card, 260, ICON_VOLUME, tr("声音", "Sound"), volume_name(),
-        UI_COLOR_TEXT_SEC, on_volume_row, ctx);
-    setting_row(card, 318, ICON_INFO, tr("关于设备", "About"), "ESP32-P4 LVGL v9",
-        UI_COLOR_TEXT_SEC, on_about_row, ctx);
-    setting_row(card, 376, ICON_REFRESH, tr("固件版本", "Firmware"), "v1.0.0",
-        UI_COLOR_TEXT_SEC, on_firmware_row, ctx);
+    /* Volume row: slider + value label (display only) */
+    lv_obj_t *vol_right = make_slider_group(ctx->page, s_volume,
+        &ctx->volume_val, on_volume_changed, ctx);
+    ui_kit_setting_row(ctx->page, ICON_VOLUME,
+        tr(STR_VOLUME_ZH, STR_VOLUME_EN), vol_right);
 
-    refresh_language_chips(ctx);
-    ui_event_subscribe(UI_EVENT_MODEL_UPDATED, on_model_updated, ctx);
-    update_network_value(ctx);
+    /* ===== About group ===== */
+    ui_kit_group_title(ctx->page, tr(STR_ABOUT_ZH, STR_ABOUT_EN));
+
+    /* Firmware version */
+    lv_obj_t *fw_val = ui_create_label(ctx->page, FIRMWARE_VERSION,
+        ui_font_cn(13), UI_COLOR_TEXT_SEC);
+    ui_kit_setting_row(ctx->page, ICON_INFO,
+        tr(STR_FIRMWARE_ZH, STR_FIRMWARE_EN), fw_val);
+
+    /* MQTT Broker */
+    lv_obj_t *broker_val = ui_create_label(ctx->page, MQTT_BROKER_STR,
+        ui_font_cn(13), UI_COLOR_TEXT_SEC);
+    ui_kit_setting_row(ctx->page, ICON_SERVER,
+        "MQTT Broker", broker_val);
+
+    /* Weather location */
+    lv_obj_t *loc_val = ui_create_label(ctx->page,
+        tr(STR_SHANGHAI_ZH, STR_SHANGHAI_EN),
+        ui_font_cn(13), UI_COLOR_TEXT_SEC);
+    ui_kit_setting_row(ctx->page, ICON_DROP,
+        tr(STR_WEATHER_LOC_ZH, STR_WEATHER_LOC_EN), loc_val);
+
+    /* Device ID */
+    lv_obj_t *id_val = ui_create_label(ctx->page, MQTT_CLIENT_ID,
+        ui_font_cn(13), UI_COLOR_TEXT_SEC);
+    ui_kit_setting_row(ctx->page, ICON_INFO,
+        tr(STR_DEVICE_ID_ZH, STR_DEVICE_ID_EN), id_val);
 
     ESP_LOGI(TAG, "Settings page created");
-    return page;
+    return ctx->page;
 }

@@ -1,8 +1,11 @@
 #include "page_ctrl.h"
+#include "ui_kit.h"
 #include "ui_events.h"
 #include "ui_styles.h"
+#include "ui_theme.h"
 #include "ui_font.h"
 #include "mqtt_device_model.h"
+#include "mqtt_iot_protocol.h"
 #include "ui_i18n.h"
 #include "ui_icons.h"
 #include "esp_log.h"
@@ -11,98 +14,31 @@
 #include <string.h>
 
 static const char *TAG = "PAGE_CTRL";
-static int32_t s_x_scale = 256;
-
-static int sx(int value)
-{
-    return (int)(((int64_t)value * s_x_scale + 128) / 256);
-}
-
-typedef struct {
-    lv_obj_t *grid;
-    uint32_t last_hash;
-    bool deleted;
-} ctrl_ctx_t;
 
 static const char *tr(const char *zh, const char *en)
 {
     return ui_i18n_get_lang() == UI_LANG_ZH ? zh : en;
 }
 
-static lv_obj_t *cn_label(lv_obj_t *parent, const char *text, int size, lv_color_t color,
-    int x, int y, int w)
-{
-    lv_obj_t *lbl = lv_label_create(parent);
-    lv_label_set_text(lbl, text ? text : "");
-    lv_obj_set_style_text_font(lbl, ui_font_cn((uint8_t)size), 0);
-    lv_obj_set_style_text_color(lbl, color, 0);
-    lv_obj_set_pos(lbl, sx(x), y);
-    if (w > 0) {
-        lv_obj_set_width(lbl, sx(w));
-        lv_label_set_long_mode(lbl, LV_LABEL_LONG_CLIP);
-    }
-    return lbl;
-}
+typedef struct {
+    lv_obj_t *page;
+    lv_obj_t *tab_row;       /* tab button container */
+    lv_obj_t *devices_col;   /* device cards grid container (scrollable) */
+    int active_floor;        /* 1, 2, or 3 */
+    uint32_t last_hash;      /* for change detection */
+    bool deleted;
+} ctrl_ctx_t;
 
-static void icon_text(lv_obj_t *parent, const char *icon, lv_color_t color,
-    int x, int y, int icon_size)
-{
-    lv_obj_t *lbl = ui_create_icon(parent, icon, ui_font_icon((uint8_t)icon_size), color);
-    lv_obj_set_pos(lbl, sx(x), y);
-}
+/* ---- Device name localization ---- */
 
-static lv_obj_t *panel(lv_obj_t *parent, int x, int y, int w, int h)
+static const char *device_name_en(const rc_device_t *d)
 {
-    lv_obj_t *obj = lv_obj_create(parent);
-    lv_obj_remove_style_all(obj);
-    lv_obj_set_pos(obj, sx(x), y);
-    lv_obj_set_size(obj, sx(w), h);
-    lv_obj_set_style_bg_color(obj, UI_COLOR_CARD, 0);
-    lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(obj, 16, 0);
-    lv_obj_set_style_border_width(obj, 1, 0);
-    lv_obj_set_style_border_color(obj, UI_COLOR_BORDER, 0);
-    lv_obj_set_style_shadow_width(obj, 5, 0);
-    lv_obj_set_style_shadow_opa(obj, LV_OPA_10, 0);
-    lv_obj_set_style_shadow_color(obj, UI_COLOR_SHADOW, 0);
-    lv_obj_set_style_shadow_offset_y(obj, 2, 0);
-    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
-    return obj;
-}
-
-static lv_color_t device_accent(const rc_device_t *d)
-{
-    if (!d) return UI_COLOR_TEXT_STRONG;
-    switch (d->type) {
-        case RC_DEVICE_LIGHT: return UI_COLOR_ORANGE;
-        case RC_DEVICE_FAN: return UI_COLOR_BLUE;
-        case RC_DEVICE_DOOR: return UI_COLOR_TEXT_STRONG;
-        case RC_DEVICE_WINDOW: return UI_COLOR_BLUE;
-        default: return UI_COLOR_TEXT_STRONG;
-    }
-}
-
-static const char *device_icon(const rc_device_t *d)
-{
-    if (!d) return ICON_POWER;
-    return device_model_type_icon(d->type);
-}
-
-static const char *device_kind(const rc_device_t *d)
-{
-    if (!d) return tr("设备", "Device");
-    return device_model_type_name(d->type);
-}
-
-static const char *device_name_local(const rc_device_t *d)
-{
-    if (!d || ui_i18n_get_lang() == UI_LANG_ZH) return d ? d->name : "";
+    if (!d) return "";
     if (strcmp(d->id, "floor1_gate") == 0) return "Gate";
     if (strcmp(d->id, "floor1_hall_light") == 0) return "Hall Light";
     if (strcmp(d->id, "floor2_fan") == 0) return "Fan";
     if (strcmp(d->id, "floor2_living_light") == 0) return "Living Light";
     if (strcmp(d->id, "floor2_toilet_light") == 0) return "Toilet Light";
-    if (strcmp(d->id, "floor2_master_light") == 0) return "Master Light";
     if (strcmp(d->id, "floor2_hanger") == 0) return "2F Rack";
     if (strcmp(d->id, "floor3_balcony_light") == 0) return "Balcony Light";
     if (strcmp(d->id, "floor3_left_skylight") == 0) return "Left Skylight";
@@ -111,122 +47,181 @@ static const char *device_name_local(const rc_device_t *d)
     return d->name;
 }
 
-static const char *floor_name_local(rc_floor_t floor)
+static const char *device_name_local(const rc_device_t *d)
 {
-    if (ui_i18n_get_lang() == UI_LANG_EN) {
-        switch (floor) {
-            case RC_FLOOR_1: return "1F";
-            case RC_FLOOR_2: return "2F";
-            case RC_FLOOR_3: return "3F";
-            default: return "Unknown";
-        }
+    if (!d) return "";
+    if (ui_i18n_get_lang() == UI_LANG_ZH) return d->name;
+    return device_name_en(d);
+}
+
+/* ---- Device status helpers ---- */
+
+static const char *device_status_text(const rc_device_t *d)
+{
+    if (!d || !d->connected) return tr("\xE6\x9C\xAA\xE6\x8E\xA5\xE5\x85\xA5", "Offline");
+    if (d->type == RC_DEVICE_DOOR || d->type == RC_DEVICE_WINDOW) {
+        /* UTF-8: 已打开=E5B7B2E68993E5BC80, 已关闭=E5B7B2E585B3E997AD */
+        return d->power_on ? tr("\xE5\xB7\xB2\xE6\x89\x93\xE5\xBC\x80", "Open")
+                           : tr("\xE5\xB7\xB2\xE5\x85\xB3\xE9\x97\xAD", "Closed");
     }
-    return device_model_floor_name(floor);
+    if (d->type == RC_DEVICE_FAN) {
+        /* UTF-8: 运行=E8BF90E8A18C, 停止=E5819CE6ADA2 */
+        return d->power_on ? tr("\xE8\xBF\x90\xE8\xA1\x8C", "Running")
+                           : tr("\xE5\x81\x9C\xE6\xAD\xA2", "Stopped");
+    }
+    /* LIGHT / RGB_LIGHT */
+    /* UTF-8: 已开启=E5B7B2E5BC80E590AF, 已关闭=E5B7B2E585B3E997AD */
+    return d->power_on ? tr("\xE5\xB7\xB2\xE5\xBC\x80\xE5\x90\xAF", "On")
+                       : tr("\xE5\xB7\xB2\xE5\x85\xB3\xE9\x97\xAD", "Off");
 }
 
-static void on_device_click(lv_event_t *e)
+static lv_color_t device_status_color(const rc_device_t *d)
 {
-    uint16_t idx = (uint16_t)(uintptr_t)lv_event_get_user_data(e);
-    device_model_toggle_device(idx);
+    if (!d || !d->connected) return UI_COLOR_TEXT_SEC;
+    return d->power_on ? UI_COLOR_GREEN : UI_COLOR_TEXT_SEC;
 }
 
-static uint32_t state_hash(void)
+/* ---- State hash for change detection ---- */
+
+static uint32_t floor_state_hash(int floor)
 {
     uint32_t h = 2166136261u;
     for (uint16_t i = 0; i < device_model_count(); i++) {
         const rc_device_t *d = device_model_at(i);
-        if (!d || !d->controllable || d->type == RC_DEVICE_RGB_LIGHT) continue;
-        h ^= ((uint32_t)d->floor << 24) ^ ((uint32_t)d->type << 16) ^
-             ((uint32_t)d->power_on << 8) ^ ((uint32_t)d->connected << 7) ^ i;
+        if (!d || !d->controllable) continue;
+        if (d->floor != (rc_floor_t)floor) continue;
+        if (d->type == RC_DEVICE_RGB_LIGHT) continue;
+        h ^= ((uint32_t)d->power_on << 8) ^ ((uint32_t)d->connected << 7) ^ (uint32_t)i;
         h *= 16777619u;
     }
     return h;
 }
 
-static void floor_title(lv_obj_t *parent, int x, int y, const char *title)
+/* ---- Device click handler ---- */
+
+static void on_device_click(lv_event_t *e)
 {
-    lv_obj_t *dot = lv_obj_create(parent);
-    lv_obj_remove_style_all(dot);
-    lv_obj_set_pos(dot, x, y + 8);
-    lv_obj_set_size(dot, 7, 7);
-    lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color(dot, UI_COLOR_ACCENT, 0);
-    lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
-    cn_label(parent, title, 14, UI_COLOR_TEXT_STRONG, x + 16, y, 80);
+    uint16_t idx = (uint16_t)(uintptr_t)lv_event_get_user_data(e);
+    const rc_device_t *d = device_model_at(idx);
+    if (d && d->controllable && d->connected) {
+        device_model_toggle_device(idx);
+    }
 }
 
-static void device_button(lv_obj_t *parent, int x, int y, const rc_device_t *d, uint16_t idx)
+/* ---- Forward declarations ---- */
+
+static void rebuild_tabs(ctrl_ctx_t *ctx);
+static void rebuild_devices(ctrl_ctx_t *ctx);
+
+/* ---- Tab click handler ---- */
+
+static void on_tab_click(lv_event_t *e)
 {
-    lv_color_t accent = device_accent(d);
-    bool on = d->power_on;
-    bool conn = d->connected;
-    lv_obj_t *btn = panel(parent, x, y, 146, 112);
+    ctrl_ctx_t *ctx = (ctrl_ctx_t *)lv_event_get_user_data(e);
+    if (!ctx || ctx->deleted) return;
+    lv_obj_t *btn = lv_event_get_current_target(e);
+    int floor = (int)(intptr_t)lv_obj_get_user_data(btn);
+    if (floor < 1 || floor > 3) return;
+    if (ctx->active_floor == floor) return;
+    ctx->active_floor = floor;
+    ctx->last_hash = 0;  /* force rebuild */
+    rebuild_tabs(ctx);
+    rebuild_devices(ctx);
+}
+
+/* ---- Tab builder ---- */
+
+static lv_obj_t *create_tab_btn(lv_obj_t *parent, const char *text, bool active,
+                                  int floor, ctrl_ctx_t *ctx)
+{
+    lv_obj_t *btn = lv_obj_create(parent);
+    lv_obj_remove_style_all(btn);
+    lv_obj_set_height(btn, 36);
+    lv_obj_set_width(btn, 0);
+    lv_obj_set_flex_grow(btn, 1);
+    lv_obj_set_style_bg_color(btn, active ? UI_COLOR_ACCENT : UI_COLOR_INPUT_BG, 0);
+    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(btn, 18, 0);
+    lv_obj_set_style_pad_hor(btn, 16, 0);
+    lv_obj_set_style_pad_ver(btn, 8, 0);
+    lv_obj_set_layout(btn, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(btn, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(btn, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(btn, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(btn, on_device_click, LV_EVENT_CLICKED, (void *)(uintptr_t)idx);
-    ui_apply_press_feedback(btn, accent);
-    if (on && conn) {
-        lv_obj_set_style_bg_color(btn, lv_color_mix(accent, UI_COLOR_CARD, 13), 0);
-        lv_obj_set_style_border_color(btn, lv_color_mix(accent, UI_COLOR_BORDER, 42), 0);
-    }
-    if (!conn) {
-        lv_obj_set_style_opa(btn, LV_OPA_80, 0);
-    }
+    lv_obj_set_user_data(btn, (void *)(intptr_t)floor);
 
-    icon_text(btn, device_icon(d), (on && conn) ? accent : UI_COLOR_TEXT_STRONG, 14, 14, 22);
-    lv_obj_t *state = panel(btn, 108, 12, 26, 24);
-    lv_obj_set_style_shadow_width(state, 0, 0);
-    lv_obj_set_style_radius(state, 8, 0);
-    lv_obj_set_style_bg_color(state, (on && conn) ? UI_COLOR_GREEN_SOFT : UI_COLOR_INPUT_BG, 0);
-    lv_obj_set_style_border_color(state, (on && conn) ? UI_COLOR_GREEN : UI_COLOR_BORDER, 0);
-    lv_obj_t *state_lbl = cn_label(state,
-        conn ? (on ? tr("开", "On") : tr("关", "Off")) : "?",
-        12, (on && conn) ? UI_COLOR_GREEN : UI_COLOR_TEXT_SEC, 0, 5, 26);
-    lv_obj_set_style_text_align(state_lbl, LV_TEXT_ALIGN_CENTER, 0);
-    cn_label(btn, device_name_local(d), ui_i18n_get_lang() == UI_LANG_ZH ? 20 : 16,
-        UI_COLOR_TEXT_STRONG, 14, 42, 112);
-    cn_label(btn, conn ? device_kind(d) : tr("待同步", "Sync"), 12, UI_COLOR_TEXT_SEC, 14, 72, 64);
-    cn_label(btn, conn ? (on ? tr("已开启", "On") : tr("已关闭", "Off")) : tr("未接入", "N/A"),
-        12, conn ? (on ? UI_COLOR_GREEN : UI_COLOR_TEXT_SEC) : UI_COLOR_TEXT_SEC, 14, 90, 70);
+    ui_create_label(btn, text, ui_font_cn(14),
+                    active ? lv_color_white() : UI_COLOR_TEXT_SEC);
+
+    lv_obj_add_event_cb(btn, on_tab_click, LV_EVENT_CLICKED, ctx);
+    ui_apply_press_feedback(btn, UI_COLOR_ACCENT);
+    return btn;
 }
 
-static void rebuild_controls(ctrl_ctx_t *ctx)
+static void rebuild_tabs(ctrl_ctx_t *ctx)
 {
-    if (!ctx || !ctx->grid) return;
-    lv_obj_clean(ctx->grid);
+    if (!ctx || !ctx->tab_row) return;
+    lv_obj_clean(ctx->tab_row);
 
-    cn_label(ctx->grid, tr("控制", "Control"), 22, UI_COLOR_TEXT_STRONG, 20, 18, 90);
-    cn_label(ctx->grid, tr("选择要控制的设备", "Select a device to control"), 13, UI_COLOR_TEXT_SEC, 92, 25, 190);
+    /* UTF-8: 一楼=E4B880E6A5BC, 二楼=E4BA8CE6A5BC, 三楼=E4B889E6A5BC */
+    const char *names_zh[] = { "\xE4\xB8\x80\xE6\xA5\xBC", "\xE4\xBA\x8C\xE6\xA5\xBC", "\xE4\xB8\x89\xE6\xA5\xBC" };
+    const char *names_en[] = { "1F", "2F", "3F" };
 
-    int y = 70;
-    for (int floor = RC_FLOOR_1; floor <= RC_FLOOR_3; floor++) {
-        int count = 0;
-        for (uint16_t i = 0; i < device_model_count(); i++) {
-            const rc_device_t *d = device_model_at(i);
-            if (d && d->controllable && d->floor == floor && d->type != RC_DEVICE_RGB_LIGHT) count++;
-        }
-        if (count == 0) continue;
-
-        floor_title(ctx->grid, 20, y, floor_name_local((rc_floor_t)floor));
-        y += 30;
-
-        int col = 0;
-        for (uint16_t i = 0; i < device_model_count(); i++) {
-            const rc_device_t *d = device_model_at(i);
-            if (!d || !d->controllable || d->floor != floor || d->type == RC_DEVICE_RGB_LIGHT) continue;
-            device_button(ctx->grid, 20 + col * 160, y, d, i);
-            col++;
-        }
-        y += 132;
+    for (int i = 0; i < 3; i++) {
+        int floor = i + 1;
+        bool active = (ctx->active_floor == floor);
+        create_tab_btn(ctx->tab_row, tr(names_zh[i], names_en[i]),
+                       active, floor, ctx);
     }
 }
+
+/* ---- Device cards builder ---- */
+
+static void rebuild_devices(ctrl_ctx_t *ctx)
+{
+    if (!ctx || !ctx->devices_col || ctx->deleted) return;
+    lv_obj_clean(ctx->devices_col);
+
+    int floor = ctx->active_floor;
+    uint16_t count = 0;
+
+    for (uint16_t i = 0; i < device_model_count(); i++) {
+        const rc_device_t *d = device_model_at(i);
+        if (!d || !d->controllable) continue;
+        if (d->floor != (rc_floor_t)floor) continue;
+        /* RGB_LIGHT (master bedroom light) is exclusive to the lighting page */
+        if (d->type == RC_DEVICE_RGB_LIGHT) continue;
+
+        const char *icon = device_model_type_icon(d->type);
+        const char *name = device_name_local(d);
+        const char *status = device_status_text(d);
+        lv_color_t color = device_status_color(d);
+
+        lv_obj_t *card = ui_kit_device_card(ctx->devices_col, icon, name, status, color,
+                                            d->connected, on_device_click,
+                                            (void *)(uintptr_t)i);
+        lv_obj_set_width(card, lv_pct(31));
+        lv_obj_set_style_min_height(card, 112, 0);
+        count++;
+    }
+
+    if (count == 0) {
+        /* UTF-8: 暂无设备=E69A82E697A0E8AEBEE5A487 */
+        ui_kit_group_title(ctx->devices_col, tr("\xE6\x9A\x82\xE6\x97\xA0\xE8\xAE\xBE\xE5\xA4\x87", "No devices"));
+    }
+}
+
+/* ---- Update ---- */
 
 static void update_ctrl(ctrl_ctx_t *ctx)
 {
     if (!ctx || ctx->deleted) return;
-    uint32_t h = state_hash();
+    uint32_t h = floor_state_hash(ctx->active_floor);
     if (h != ctx->last_hash) {
         ctx->last_hash = h;
-        rebuild_controls(ctx);
+        rebuild_devices(ctx);
     }
 }
 
@@ -235,7 +230,9 @@ static void on_model_updated(void *user_data)
     update_ctrl((ctrl_ctx_t *)user_data);
 }
 
-static void page_ctrl_delete(lv_event_t *e)
+/* ---- Lifecycle ---- */
+
+static void on_delete(lv_event_t *e)
 {
     ctrl_ctx_t *ctx = (ctrl_ctx_t *)lv_event_get_user_data(e);
     if (!ctx) return;
@@ -244,33 +241,65 @@ static void page_ctrl_delete(lv_event_t *e)
     lv_free(ctx);
 }
 
+/* ---- Flex helpers ---- */
+
+static lv_obj_t *make_flex_row(lv_obj_t *parent, lv_flex_align_t main_align)
+{
+    lv_obj_t *row = lv_obj_create(parent);
+    lv_obj_remove_style_all(row);
+    lv_obj_set_width(row, lv_pct(100));
+    lv_obj_set_height(row, LV_SIZE_CONTENT);
+    lv_obj_set_style_pad_all(row, 0, 0);
+    lv_obj_set_layout(row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, main_align, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+    return row;
+}
+
+/* ---- Create ---- */
+
 lv_obj_t *page_ctrl_create(lv_obj_t *parent)
 {
     ctrl_ctx_t *ctx = lv_malloc(sizeof(ctrl_ctx_t));
     memset(ctx, 0, sizeof(*ctx));
+    ctx->active_floor = 1;
 
-    lv_obj_t *page = lv_obj_create(parent);
-    lv_obj_remove_style_all(page);
-    lv_obj_set_size(page, lv_pct(100), lv_pct(100));
-    lv_obj_set_style_bg_color(page, UI_COLOR_BG, 0);
-    lv_obj_set_style_bg_opa(page, LV_OPA_COVER, 0);
-    lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_scrollbar_mode(page, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_add_event_cb(page, page_ctrl_delete, LV_EVENT_DELETE, ctx);
-    int32_t parent_w = lv_obj_get_width(parent);
-    if (parent_w <= 1) parent_w = LV_HOR_RES;
-    s_x_scale = parent_w < 960 ? (int32_t)((int64_t)parent_w * 256 / 960) : 256;
+    ctx->page = ui_create_page(parent, on_delete, ctx);
+    /* Fill parent height so devices column can scroll */
+    lv_obj_set_height(ctx->page, lv_pct(100));
 
-    ctx->grid = lv_obj_create(page);
-    lv_obj_remove_style_all(ctx->grid);
-    lv_obj_set_pos(ctx->grid, 0, 0);
-    lv_obj_set_size(ctx->grid, lv_pct(100), lv_pct(100));
-    lv_obj_clear_flag(ctx->grid, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_scrollbar_mode(ctx->grid, LV_SCROLLBAR_MODE_OFF);
+    /* Page title */
+    ui_kit_page_title(ctx->page, ICON_CONTROL,
+                      /* UTF-8: 设备控制=E8AEBEE5A484E68EA7E588B6 */
+                      tr("\xE8\xAE\xBE\xE5\xA4\x87\xE6\x8E\xA7\xE5\x88\xB6", "Device Control"),
+                      /* UTF-8: 点击设备切换开关=E782B9E587BBE8AEBEE5A484E58887E68DA2E5BC80E585B3 */
+                      tr("\xE7\x82\xB9\xE5\x87\xBB\xE8\xAE\xBE\xE5\xA4\x87\xE5\x88\x87\xE6\x8D\xA2\xE5\xBC\x80\xE5\x85\xB3", "Tap device to toggle"));
 
+    /* Floor tab row */
+    ctx->tab_row = make_flex_row(ctx->page, LV_FLEX_ALIGN_SPACE_BETWEEN);
+    lv_obj_set_style_pad_column(ctx->tab_row, 8, 0);
+    rebuild_tabs(ctx);
+
+    /* Devices grid (scrollable, fills remaining space) */
+    ctx->devices_col = lv_obj_create(ctx->page);
+    lv_obj_remove_style_all(ctx->devices_col);
+    lv_obj_set_width(ctx->devices_col, lv_pct(100));
+    lv_obj_set_flex_grow(ctx->devices_col, 1);
+    lv_obj_set_style_pad_all(ctx->devices_col, 0, 0);
+    lv_obj_set_style_pad_row(ctx->devices_col, 8, 0);
+    lv_obj_set_style_pad_column(ctx->devices_col, 10, 0);
+    lv_obj_set_layout(ctx->devices_col, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(ctx->devices_col, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(ctx->devices_col, LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_scrollbar_mode(ctx->devices_col, LV_SCROLLBAR_MODE_AUTO);
+
+    /* Initial build + subscribe */
+    rebuild_devices(ctx);
+    ctx->last_hash = floor_state_hash(ctx->active_floor);
     ui_event_subscribe(UI_EVENT_MODEL_UPDATED, on_model_updated, ctx);
-    update_ctrl(ctx);
 
-    ESP_LOGI(TAG, "Device control page created");
-    return page;
+    ESP_LOGI(TAG, "Device control page created (floor=%d)", ctx->active_floor);
+    return ctx->page;
 }

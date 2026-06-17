@@ -11,6 +11,7 @@
 #include "settings.h"
 #include "smart_home_tasks.h"
 #include "smart_home_mcp_tool.h"
+#include "smart_home/ui/model/mqtt_device_model.h"
 
 #include <cstring>
 #include <esp_log.h>
@@ -105,10 +106,12 @@ void Application::Initialize() {
         
         switch (event) {
             case NetworkEvent::Scanning:
+                device_model_update_wifi_state(WIFI_STATE_SCANNING, nullptr);
                 display->ShowNotification(Lang::Strings::SCANNING_WIFI, 30000);
                 xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_DISCONNECTED);
                 break;
             case NetworkEvent::Connecting: {
+                device_model_update_wifi_state(WIFI_STATE_CONNECTING, data.empty() ? nullptr : data.c_str());
                 if (data.empty()) {
                     // Cellular network - registering without carrier info yet
                     display->SetStatus(Lang::Strings::REGISTERING_NETWORK);
@@ -122,6 +125,7 @@ void Application::Initialize() {
                 break;
             }
             case NetworkEvent::Connected: {
+                device_model_update_wifi_state(WIFI_STATE_CONNECTED, data.empty() ? "ESP-Hosted" : data.c_str());
                 std::string msg = Lang::Strings::CONNECTED_TO;
                 msg += data;
                 display->ShowNotification(msg.c_str(), 30000);
@@ -129,6 +133,7 @@ void Application::Initialize() {
                 break;
             }
             case NetworkEvent::Disconnected:
+                device_model_update_wifi_state(WIFI_STATE_FAILED, nullptr);
                 xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_DISCONNECTED);
                 break;
             case NetworkEvent::WifiConfigModeEnter:

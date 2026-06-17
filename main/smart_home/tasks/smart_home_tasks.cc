@@ -3,6 +3,7 @@
 #include "mqtt_device_model.h"
 #include "ui_events.h"
 #include "../services/xiaozhi_mqtt.h"
+#include "../services/weather_service.h"
 
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
@@ -24,6 +25,7 @@ static void smart_home_mqtt_task(void* arg) {
         } else {
             mqtt_client_poll();
         }
+        weather_service_poll();
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
@@ -37,11 +39,13 @@ void SmartHomeTasksStart(void) {
     ui_events_init();
     device_model_init();
     mqtt_client_init();
+    weather_service_init();
+    weather_service_start();
 
     BaseType_t ret = xTaskCreatePinnedToCore(
         smart_home_mqtt_task,
         "sh_iot_mqtt",
-        6144,
+        8192,
         nullptr,
         5,
         &s_mqtt_task,

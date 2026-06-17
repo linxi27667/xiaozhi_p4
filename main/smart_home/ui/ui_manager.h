@@ -11,9 +11,10 @@ typedef enum {
     UI_PAGE_CTRL = 1,
     UI_PAGE_LIGHT = 2,
     UI_PAGE_SCENE = 3,
-    UI_PAGE_NET  = 4,
-    UI_PAGE_SET  = 5,
-    UI_PAGE_COUNT = 6,
+    UI_PAGE_ENV   = 4,
+    UI_PAGE_NET   = 5,
+    UI_PAGE_SET   = 6,
+    UI_PAGE_COUNT = 7,
 } ui_page_id_t;
 
 void UI_Manager_Init(lv_obj_t *parent);

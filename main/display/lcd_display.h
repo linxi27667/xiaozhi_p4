@@ -29,10 +29,18 @@ protected:
     lv_obj_t* shell_chat_btn_ = nullptr;
     lv_obj_t* shell_overview_btn_ = nullptr;
     lv_obj_t* shell_control_btn_ = nullptr;
+    lv_obj_t* shell_light_btn_ = nullptr;
+    lv_obj_t* shell_scene_btn_ = nullptr;
+    lv_obj_t* shell_env_btn_ = nullptr;
+    lv_obj_t* shell_network_btn_ = nullptr;
     lv_obj_t* shell_settings_btn_ = nullptr;
     lv_obj_t* shell_chat_label_ = nullptr;
     lv_obj_t* shell_overview_label_ = nullptr;
     lv_obj_t* shell_control_label_ = nullptr;
+    lv_obj_t* shell_light_label_ = nullptr;
+    lv_obj_t* shell_scene_label_ = nullptr;
+    lv_obj_t* shell_env_label_ = nullptr;
+    lv_obj_t* shell_network_label_ = nullptr;
     lv_obj_t* shell_settings_label_ = nullptr;
     lv_obj_t* shell_wake_label_ = nullptr;
     bool smart_home_ui_initialized_ = false;
@@ -55,6 +63,10 @@ protected:
         Chat,
         Overview,
         Control,
+        Lighting,
+        Scenes,
+        Environment,
+        Network,
         Settings,
     };
     void CreateSmartHomeShell();

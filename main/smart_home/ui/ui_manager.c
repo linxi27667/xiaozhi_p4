@@ -7,10 +7,12 @@
 #include "ui_icons.h"
 #include "smart_home_alarm_ui.h"
 #include "mqtt_device_model.h"
+#include "ui_asset_service.h"
 #include "pages/page_data.h"
 #include "pages/page_ctrl.h"
 #include "pages/page_light.h"
 #include "pages/page_scene.h"
+#include "pages/page_env.h"
 #include "pages/page_net.h"
 #include "pages/page_set.h"
 #include "ui_welcome_popup.h"
@@ -20,7 +22,7 @@
 
 static const char *TAG = "UI_MGR";
 
-#define NAV_COUNT 6
+#define NAV_COUNT 7
 
 typedef struct {
     lv_obj_t *content_parent;
@@ -44,6 +46,7 @@ static const nav_item_t s_nav_items[NAV_COUNT] = {
     { ICON_CHART,    "\xE6\x8E\xA7\xE5\x88\xB6", "Control",  UI_PAGE_CTRL },  /* 控制 */
     { ICON_LIGHTBULB, "\xE7\x81\xAF\xE5\x85\x89", "Light",   UI_PAGE_LIGHT }, /* 灯光 */
     { ICON_STAR,     "\xE5\x9C\xBA\xE6\x99\xAF", "Scenes",   UI_PAGE_SCENE }, /* 场景 */
+    { ICON_LEAF,     "\xE7\x8E\xAF\xE5\xA2\x83", "Env",      UI_PAGE_ENV },   /* 环境 */
     { ICON_WIFI,     "\xE7\xBD\x91\xE7\xBB\x9C", "Network",  UI_PAGE_NET },   /* 网络 */
     { ICON_SETTINGS, "\xE8\xAE\xBE\xE7\xBD\xAE", "Settings", UI_PAGE_SET },   /* 设置 */
 };
@@ -65,8 +68,9 @@ static int active_nav_index(ui_page_id_t page)
     if (page == UI_PAGE_CTRL) return 1;
     if (page == UI_PAGE_LIGHT) return 2;
     if (page == UI_PAGE_SCENE) return 3;
-    if (page == UI_PAGE_NET) return 4;
-    if (page == UI_PAGE_SET) return 5;
+    if (page == UI_PAGE_ENV) return 4;
+    if (page == UI_PAGE_NET) return 5;
+    if (page == UI_PAGE_SET) return 6;
     return 0;
 }
 
@@ -131,6 +135,7 @@ static void do_switch_page(void)
             case UI_PAGE_CTRL: page_ctrl_create(s_app_ctx.content_parent); break;
             case UI_PAGE_LIGHT: page_light_create(s_app_ctx.content_parent); break;
             case UI_PAGE_SCENE: page_scene_create(s_app_ctx.content_parent); break;
+            case UI_PAGE_ENV: page_env_create(s_app_ctx.content_parent); break;
             case UI_PAGE_NET:  page_net_create(s_app_ctx.content_parent); break;
             case UI_PAGE_SET:  page_set_create(s_app_ctx.content_parent); break;
             default: break;
@@ -237,6 +242,7 @@ void UI_Manager_Init(lv_obj_t *parent)
     ui_events_init();
     ui_styles_init();
     ui_i18n_init();
+    ui_asset_service_init();
     device_model_init();
     smart_home_alarm_ui_init();
     ui_welcome_popup_init();
@@ -261,9 +267,8 @@ void UI_Manager_Init(lv_obj_t *parent)
     }
     ui_event_subscribe(UI_EVENT_LANG_CHANGED, on_language_changed, NULL);
 
-    if (s_app_ctx.content_parent) {
-        page_data_create(s_app_ctx.content_parent);
-    }
+    s_app_ctx.switch_pending = 1;
+    s_app_ctx.target_page = s_app_ctx.current_page;
     refresh_nav_state();
 
     /* Timer for deferred page switching */
@@ -272,8 +277,8 @@ void UI_Manager_Init(lv_obj_t *parent)
     }
 
     ESP_LOGI(TAG, "%s", embedded ?
-        "UI initialized in embedded content mode, 6 pages" :
-        "UI initialized in standalone sidebar layout, 6 pages");
+        "UI initialized in embedded content mode, 7 pages" :
+        "UI initialized in standalone sidebar layout, 7 pages");
 }
 
 void UI_Manager_Switch_Page(ui_page_id_t page)

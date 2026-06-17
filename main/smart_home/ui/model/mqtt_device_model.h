@@ -110,6 +110,19 @@ typedef struct {
     bool help_floor_valid[3];
     uint32_t sensor_rx_count;
 
+    /* Outdoor weather service */
+    bool weather_valid;
+    bool air_quality_valid;
+    char weather_location[RC_NAME_MAX];
+    float outdoor_temp;
+    uint8_t outdoor_humidity;
+    float precipitation_mm;
+    float wind_speed;
+    uint16_t weather_code;
+    float pm25_outdoor;
+    uint16_t aqi;
+    uint32_t weather_last_update_s;
+
     /* MQTT stats */
     char mqtt_broker[40];
     uint32_t mqtt_rx_count;
@@ -147,6 +160,10 @@ void device_model_update_wifi_state(wifi_state_t state, const char *ssid);
 void device_model_update_wifi_aps(const wifi_ap_t *aps, uint16_t count);
 void device_model_update_sensors(float temp, float humi, uint16_t pm25,
                                   uint16_t rain, uint16_t flame, uint16_t smoke);
+void device_model_update_weather(const char *location, float temp, uint8_t humidity,
+                                  float precipitation_mm, float wind_speed,
+                                  uint16_t weather_code, float pm25, uint16_t aqi,
+                                  bool air_quality_valid);
 void device_model_update_sensor_value(uint8_t floor_id, uint8_t sensor_type, uint16_t value);
 void device_model_apply_command_ack(uint8_t floor_id, uint8_t cmd_type, uint8_t gpio_index, uint8_t value);
 void device_model_apply_heartbeat(const iot_heartbeat_v2_packet_t *heartbeat);

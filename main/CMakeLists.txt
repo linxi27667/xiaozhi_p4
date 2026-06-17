@@ -52,6 +52,7 @@ list(APPEND SOURCES
     "smart_home/services/xiaozhi_mqtt.cc"
     "smart_home/services/smart_home_alarm_bridge.cc"
     "smart_home/services/wifi_manager.cc"
+    "smart_home/services/weather_service.cc"
     "smart_home/tasks/smart_home_tasks.cc"
     "smart_home/mcp/smart_home_mcp_tool.cc"
 )
@@ -961,7 +962,7 @@ target_compile_definitions(${COMPONENT_LIB}
 # Add generation rules
 add_custom_command(
     OUTPUT ${LANG_HEADER}
-    COMMAND python ${PROJECT_DIR}/scripts/gen_lang.py
+    COMMAND ${PYTHON} ${PROJECT_DIR}/scripts/gen_lang.py
             --language "${LANG_DIR}"
             --output "${LANG_HEADER}"
     DEPENDS
@@ -1057,7 +1058,7 @@ function(build_default_assets_bin)
     # Create custom command to build assets
     add_custom_command(
         OUTPUT ${GENERATED_ASSETS_BIN}
-        COMMAND python ${PROJECT_DIR}/scripts/build_default_assets.py ${BUILD_ARGS}
+        COMMAND ${PYTHON} ${PROJECT_DIR}/scripts/build_default_assets.py ${BUILD_ARGS}
         DEPENDS
             ${SDKCONFIG}
             ${PROJECT_DIR}/scripts/build_default_assets.py

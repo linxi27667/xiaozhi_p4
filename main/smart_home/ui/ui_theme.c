@@ -40,10 +40,10 @@ void UI_Theme_Init(lv_display_t *disp)
         disp,
         UI_COLOR_ACCENT,
         UI_COLOR_BLUE,
-        true,
+        false,
         &g_font_body
     );
     lv_disp_set_theme(disp, th);
 
-    ESP_LOGI(TAG, "Dark navy theme initialized");
+    ESP_LOGI(TAG, "Cloud White theme initialized");
 }

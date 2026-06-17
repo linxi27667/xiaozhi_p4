@@ -29,8 +29,9 @@ extern "C" {
 
 static constexpr int kShellSidebarWidth = 112;
 static constexpr int kShellButtonWidth = 96;
-static constexpr int kShellButtonHeight = 84;
+static constexpr int kShellButtonHeight = 52;
 static constexpr int kShellStartupTouchGuardMs = 1000;
+static constexpr int kLvglTaskStackSize = 12 * 1024;
 
 LV_FONT_DECLARE(BUILTIN_TEXT_FONT);
 LV_FONT_DECLARE(BUILTIN_ICON_FONT);
@@ -144,6 +145,7 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
     ESP_LOGI(TAG, "Initialize LVGL port");
     lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
     port_cfg.task_priority = 1;
+    port_cfg.task_stack = kLvglTaskStackSize;
 #if CONFIG_SOC_CPU_CORES_NUM > 1
     port_cfg.task_affinity = 1;
 #endif
@@ -206,6 +208,7 @@ RgbLcdDisplay::RgbLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
     ESP_LOGI(TAG, "Initialize LVGL port");
     lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
     port_cfg.task_priority = 1;
+    port_cfg.task_stack = kLvglTaskStackSize;
     port_cfg.timer_period_ms = 50;
     lvgl_port_init(&port_cfg);
 
@@ -258,6 +261,7 @@ MipiLcdDisplay::MipiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel
 
     ESP_LOGI(TAG, "Initialize LVGL port");
     lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
+    port_cfg.task_stack = kLvglTaskStackSize;
     lvgl_port_init(&port_cfg);
 
     ESP_LOGI(TAG, "Adding LCD display");
@@ -380,6 +384,14 @@ void LcdDisplay::OnShellNavClicked(lv_event_t* e) {
         page = ShellPage::Overview;
     } else if (target == display->shell_control_btn_) {
         page = ShellPage::Control;
+    } else if (target == display->shell_light_btn_) {
+        page = ShellPage::Lighting;
+    } else if (target == display->shell_scene_btn_) {
+        page = ShellPage::Scenes;
+    } else if (target == display->shell_env_btn_) {
+        page = ShellPage::Environment;
+    } else if (target == display->shell_network_btn_) {
+        page = ShellPage::Network;
     } else if (target == display->shell_settings_btn_) {
         page = ShellPage::Settings;
     } else {
@@ -410,6 +422,10 @@ void LcdDisplay::RefreshShellLabels() {
     if (shell_chat_label_) lv_label_set_text(shell_chat_label_, zh ? "聊天" : "Chat");
     if (shell_overview_label_) lv_label_set_text(shell_overview_label_, zh ? "总览" : "Home");
     if (shell_control_label_) lv_label_set_text(shell_control_label_, zh ? "控制" : "Control");
+    if (shell_light_label_) lv_label_set_text(shell_light_label_, zh ? "灯光" : "Light");
+    if (shell_scene_label_) lv_label_set_text(shell_scene_label_, zh ? "场景" : "Scenes");
+    if (shell_env_label_) lv_label_set_text(shell_env_label_, zh ? "环境" : "Env");
+    if (shell_network_label_) lv_label_set_text(shell_network_label_, zh ? "网络" : "Net");
     if (shell_settings_label_) lv_label_set_text(shell_settings_label_, zh ? "设置" : "Settings");
     if (shell_wake_label_) lv_label_set_text(shell_wake_label_, zh ? "唤醒" : "Wake");
 }
@@ -425,6 +441,10 @@ void LcdDisplay::RefreshShellNav(ShellPage page) {
         {shell_chat_btn_, shell_chat_label_, ShellPage::Chat},
         {shell_overview_btn_, shell_overview_label_, ShellPage::Overview},
         {shell_control_btn_, shell_control_label_, ShellPage::Control},
+        {shell_light_btn_, shell_light_label_, ShellPage::Lighting},
+        {shell_scene_btn_, shell_scene_label_, ShellPage::Scenes},
+        {shell_env_btn_, shell_env_label_, ShellPage::Environment},
+        {shell_network_btn_, shell_network_label_, ShellPage::Network},
         {shell_settings_btn_, shell_settings_label_, ShellPage::Settings},
     };
 
@@ -434,11 +454,11 @@ void LcdDisplay::RefreshShellNav(ShellPage page) {
         }
         const bool active = item.page == page;
         lv_obj_set_style_bg_opa(item.btn, active ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
-        lv_obj_set_style_bg_color(item.btn, active ? lv_color_hex(0x2563EB) : lv_color_hex(0x1F2937), 0);
+        lv_obj_set_style_bg_color(item.btn, active ? lv_color_hex(0xEAF2FF) : lv_color_hex(0xFFFFFF), 0);
         lv_obj_set_style_border_width(item.btn, active ? 0 : 1, 0);
-        lv_obj_set_style_border_color(item.btn, lv_color_hex(0x334155), 0);
-        lv_obj_set_style_text_color(item.btn, active ? lv_color_hex(0xFFFFFF) : lv_color_hex(0xCBD5E1), 0);
-        const lv_color_t text_color = active ? lv_color_hex(0xFFFFFF) : lv_color_hex(0xCBD5E1);
+        lv_obj_set_style_border_color(item.btn, lv_color_hex(0xDDE7F5), 0);
+        lv_obj_set_style_text_color(item.btn, active ? lv_color_hex(0x2F6BFF) : lv_color_hex(0x64748B), 0);
+        const lv_color_t text_color = active ? lv_color_hex(0x2F6BFF) : lv_color_hex(0x64748B);
         uint32_t child_count = lv_obj_get_child_count(item.btn);
         for (uint32_t child_index = 0; child_index < child_count; child_index++) {
             lv_obj_set_style_text_color(lv_obj_get_child(item.btn, child_index), text_color, 0);
@@ -464,6 +484,10 @@ void LcdDisplay::SwitchShellPage(ShellPage page) {
     switch (page) {
         case ShellPage::Overview: page_name = "overview"; break;
         case ShellPage::Control: page_name = "control"; break;
+        case ShellPage::Lighting: page_name = "lighting"; break;
+        case ShellPage::Scenes: page_name = "scenes"; break;
+        case ShellPage::Environment: page_name = "environment"; break;
+        case ShellPage::Network: page_name = "network"; break;
         case ShellPage::Settings: page_name = "settings"; break;
         case ShellPage::Chat:
         default: break;
@@ -505,10 +529,21 @@ void LcdDisplay::SwitchShellPage(ShellPage page) {
             case ShellPage::Control:
                 UI_Manager_Switch_Page(UI_PAGE_CTRL);
                 break;
+            case ShellPage::Lighting:
+                UI_Manager_Switch_Page(UI_PAGE_LIGHT);
+                break;
+            case ShellPage::Scenes:
+                UI_Manager_Switch_Page(UI_PAGE_SCENE);
+                break;
+            case ShellPage::Environment:
+                UI_Manager_Switch_Page(UI_PAGE_ENV);
+                break;
+            case ShellPage::Network:
+                UI_Manager_Switch_Page(UI_PAGE_NET);
+                break;
             case ShellPage::Settings:
                 UI_Manager_Switch_Page(UI_PAGE_SET);
                 break;
-            case ShellPage::Chat:
             default:
                 break;
         }
@@ -555,11 +590,19 @@ void LcdDisplay::CreateSmartHomeShell() {
         lv_obj_align(preview_image_, LV_ALIGN_CENTER, kShellSidebarWidth / 2, 0);
     }
     if (bottom_bar_) {
-        lv_obj_set_width(bottom_bar_, content_width);
+        lv_obj_set_width(bottom_bar_, content_width - 48);
         lv_obj_align(bottom_bar_, LV_ALIGN_BOTTOM_MID, kShellSidebarWidth / 2, 0);
-        lv_obj_set_style_bg_color(bottom_bar_, lv_color_hex(0xF8FAFC), 0);
+        lv_obj_set_style_bg_color(bottom_bar_, lv_color_hex(0xFFFFFF), 0);
+        lv_obj_set_style_bg_opa(bottom_bar_, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(bottom_bar_, 12, 0);
+        lv_obj_set_style_border_width(bottom_bar_, 1, 0);
+        lv_obj_set_style_border_color(bottom_bar_, lv_color_hex(0xDDE7F5), 0);
+        lv_obj_set_style_shadow_width(bottom_bar_, 12, 0);
+        lv_obj_set_style_shadow_opa(bottom_bar_, LV_OPA_20, 0);
         if (chat_message_label_) {
-            lv_obj_set_width(chat_message_label_, content_width - 48);
+            lv_obj_set_width(chat_message_label_, content_width - 92);
+            lv_obj_set_style_text_align(chat_message_label_, LV_TEXT_ALIGN_CENTER, 0);
+            lv_obj_align(chat_message_label_, LV_ALIGN_CENTER, 0, 0);
         }
     }
 
@@ -567,14 +610,14 @@ void LcdDisplay::CreateSmartHomeShell() {
     lv_obj_remove_style_all(side_bar_);
     lv_obj_set_size(side_bar_, kShellSidebarWidth, LV_VER_RES);
     lv_obj_align(side_bar_, LV_ALIGN_LEFT_MID, 0, 0);
-    lv_obj_set_style_bg_color(side_bar_, lv_color_hex(0x111827), 0);
+    lv_obj_set_style_bg_color(side_bar_, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_bg_opa(side_bar_, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(side_bar_, 1, 0);
     lv_obj_set_style_border_side(side_bar_, LV_BORDER_SIDE_RIGHT, 0);
-    lv_obj_set_style_border_color(side_bar_, lv_color_hex(0x263244), 0);
-    lv_obj_set_style_pad_top(side_bar_, 18, 0);
+    lv_obj_set_style_border_color(side_bar_, lv_color_hex(0xDDE7F5), 0);
+    lv_obj_set_style_pad_top(side_bar_, 8, 0);
     lv_obj_set_style_pad_hor(side_bar_, 8, 0);
-    lv_obj_set_style_pad_row(side_bar_, 14, 0);
+    lv_obj_set_style_pad_row(side_bar_, 6, 0);
     lv_obj_set_layout(side_bar_, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(side_bar_, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(side_bar_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -585,7 +628,10 @@ void LcdDisplay::CreateSmartHomeShell() {
         lv_obj_remove_style_all(btn);
         lv_obj_set_size(btn, kShellButtonWidth, kShellButtonHeight);
         lv_obj_set_style_radius(btn, 8, 0);
-        lv_obj_set_style_bg_color(btn, lv_color_hex(0x2563EB), 0);
+        lv_obj_set_style_bg_color(btn, lv_color_hex(0xFFFFFF), 0);
+        lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(btn, 1, 0);
+        lv_obj_set_style_border_color(btn, lv_color_hex(0xDDE7F5), 0);
         lv_obj_set_style_pad_all(btn, 0, 0);
         lv_obj_set_style_text_align(btn, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_set_layout(btn, LV_LAYOUT_FLEX);
@@ -597,6 +643,7 @@ void LcdDisplay::CreateSmartHomeShell() {
         lv_obj_t* icon_label = lv_label_create(btn);
         lv_label_set_text(icon_label, icon);
         lv_obj_set_style_text_font(icon_label, &font_awesome_20_4, 0);
+        lv_obj_set_style_text_color(icon_label, lv_color_hex(0x64748B), 0);
         lv_obj_set_style_text_align(icon_label, LV_TEXT_ALIGN_CENTER, 0);
 
         lv_obj_t* label = lv_label_create(btn);
@@ -604,6 +651,7 @@ void LcdDisplay::CreateSmartHomeShell() {
         lv_obj_set_width(label, kShellButtonWidth - 10);
         lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
         lv_obj_set_style_text_font(label, &ui_font_cn_20, 0);
+        lv_obj_set_style_text_color(label, lv_color_hex(0x64748B), 0);
         lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
         return std::pair<lv_obj_t*, lv_obj_t*>(btn, label);
     };
@@ -619,6 +667,22 @@ void LcdDisplay::CreateSmartHomeShell() {
     auto control = create_btn(FONT_AWESOME_POWER_OFF, "控制");
     shell_control_btn_ = control.first;
     shell_control_label_ = control.second;
+
+    auto light = create_btn(FONT_AWESOME_BRIGHTNESS, "灯光");
+    shell_light_btn_ = light.first;
+    shell_light_label_ = light.second;
+
+    auto scene = create_btn(FONT_AWESOME_STAR, "场景");
+    shell_scene_btn_ = scene.first;
+    shell_scene_label_ = scene.second;
+
+    auto env = create_btn(FONT_AWESOME_CLOUD_SUN, "环境");
+    shell_env_btn_ = env.first;
+    shell_env_label_ = env.second;
+
+    auto network = create_btn(FONT_AWESOME_WIFI, "网络");
+    shell_network_btn_ = network.first;
+    shell_network_label_ = network.second;
 
     auto settings = create_btn(FONT_AWESOME_GEAR, "设置");
     shell_settings_btn_ = settings.first;
@@ -636,7 +700,7 @@ void LcdDisplay::CreateSmartHomeShell() {
     lv_obj_remove_style_all(wake_btn);
     lv_obj_set_size(wake_btn, kShellButtonWidth, kShellButtonHeight);
     lv_obj_set_style_radius(wake_btn, 8, 0);
-    lv_obj_set_style_bg_color(wake_btn, lv_color_hex(0x10B981), 0);
+    lv_obj_set_style_bg_color(wake_btn, lv_color_hex(0x2F6BFF), 0);
     lv_obj_set_style_pad_all(wake_btn, 0, 0);
     lv_obj_set_layout(wake_btn, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(wake_btn, LV_FLEX_FLOW_COLUMN);
@@ -1367,10 +1431,11 @@ void LcdDisplay::SetChatMessage(const char* role, const char* content) {
         }
         return;
     }
-    lv_label_set_text(chat_message_label_, content);
+    const char* safe_content = content ? content : "";
+    lv_label_set_text(chat_message_label_, safe_content);
     // Show bottom_bar_ only when there is content (and subtitle is not globally hidden)
     if (bottom_bar_ != nullptr) {
-        if (content == nullptr || content[0] == '\0') {
+        if (safe_content[0] == '\0') {
             lv_obj_add_flag(bottom_bar_, LV_OBJ_FLAG_HIDDEN);
         } else if (!hide_subtitle_) {
             lv_obj_remove_flag(bottom_bar_, LV_OBJ_FLAG_HIDDEN);

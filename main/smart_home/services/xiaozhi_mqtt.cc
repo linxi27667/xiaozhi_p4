@@ -335,7 +335,6 @@ extern "C" void mqtt_send_rgb_light(uint8_t floor_id, uint8_t index, uint8_t red
 
     std::string payload(reinterpret_cast<const char*>(&pkt), sizeof(pkt));
     s_mqtt->Publish(topic, payload, 0);
-    device_model_apply_rgb_ack(floor_id, index, red, green, blue, brightness, effect);
     ESP_LOGI(TAG, "RGB -> %s: idx=%u rgb=(%u,%u,%u) br=%u effect=%u",
              topic, index, red, green, blue, brightness, effect);
 }

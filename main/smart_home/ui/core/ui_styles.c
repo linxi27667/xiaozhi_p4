@@ -86,11 +86,11 @@ lv_obj_t *ui_create_card(lv_obj_t *parent)
     lv_obj_set_style_radius(card, UI_CARD_RADIUS, 0);
     lv_obj_set_style_border_width(card, 1, 0);
     lv_obj_set_style_border_color(card, UI_COLOR_BORDER, 0);
-    lv_obj_set_style_border_opa(card, LV_OPA_70, 0);
-    lv_obj_set_style_shadow_width(card, 10, 0);
-    lv_obj_set_style_shadow_opa(card, LV_OPA_10, 0);
+    lv_obj_set_style_border_opa(card, LV_OPA_COVER, 0);
+    lv_obj_set_style_shadow_width(card, 16, 0);
+    lv_obj_set_style_shadow_opa(card, LV_OPA_20, 0);
     lv_obj_set_style_shadow_color(card, UI_COLOR_SHADOW, 0);
-    lv_obj_set_style_shadow_offset_y(card, 3, 0);
+    lv_obj_set_style_shadow_offset_y(card, 6, 0);
     lv_obj_set_style_pad_all(card, 18, 0);
     lv_obj_set_style_pad_gap(card, 8, 0);
     lv_obj_set_layout(card, LV_LAYOUT_FLEX);
@@ -103,10 +103,10 @@ lv_obj_t *ui_create_card(lv_obj_t *parent)
 
 void ui_apply_card_shadow(lv_obj_t *card)
 {
-    lv_obj_set_style_shadow_width(card, 12, 0);
-    lv_obj_set_style_shadow_opa(card, LV_OPA_10, 0);
+    lv_obj_set_style_shadow_width(card, 16, 0);
+    lv_obj_set_style_shadow_opa(card, LV_OPA_20, 0);
     lv_obj_set_style_shadow_color(card, UI_COLOR_SHADOW, 0);
-    lv_obj_set_style_shadow_offset_y(card, 4, 0);
+    lv_obj_set_style_shadow_offset_y(card, 6, 0);
 }
 
 void ui_apply_soft_gradient(lv_obj_t *obj, lv_color_t base, lv_color_t grad)
@@ -173,17 +173,18 @@ lv_obj_t *ui_create_page(lv_obj_t *parent, lv_event_cb_t delete_cb, void *user_d
     lv_obj_t *page = lv_obj_create(parent);
     lv_obj_remove_style_all(page);
     lv_obj_set_width(page, lv_pct(100));
-    lv_obj_set_height(page, LV_SIZE_CONTENT);
+    lv_obj_set_height(page, lv_pct(100));
     lv_obj_set_style_bg_opa(page, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(page, 0, 0);
-    lv_obj_set_style_pad_hor(page, 20, 0);
+    lv_obj_set_style_pad_hor(page, 18, 0);
     lv_obj_set_style_pad_top(page, 14, 0);
-    lv_obj_set_style_pad_bottom(page, 18, 0);
+    lv_obj_set_style_pad_bottom(page, 16, 0);
     lv_obj_set_layout(page, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(page, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(page, LV_FLEX_ALIGN_START,
         LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    lv_obj_set_style_pad_row(page, 12, 0);
+    lv_obj_set_style_pad_row(page, 10, 0);
+    lv_obj_set_scrollbar_mode(page, LV_SCROLLBAR_MODE_AUTO);
     if (delete_cb && user_data) {
         lv_obj_add_event_cb(page, delete_cb, LV_EVENT_DELETE, user_data);
     }

@@ -1,0 +1,20 @@
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include "lvgl.h"
+#include <stdbool.h>
+
+#define UI_ASSET_DRIVE_LETTER 'S'
+#define UI_ASSET_ROOT "/sdcard/xiaozhi_ui"
+
+void ui_asset_service_init(void);
+bool ui_asset_available(const char *name);
+const char *ui_asset_src(const char *name);
+lv_obj_t *ui_asset_image_create(lv_obj_t *parent, const char *name);
+
+#ifdef __cplusplus
+}
+#endif

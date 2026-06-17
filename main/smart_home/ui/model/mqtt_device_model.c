@@ -98,6 +98,7 @@ void device_model_init(void)
     s_model.mqtt_state = MQTT_STATE_DISCONNECTED;
     s_model.wifi_state = WIFI_STATE_IDLE;
     snprintf(s_model.mqtt_broker, sizeof(s_model.mqtt_broker), "mqtt://8.134.167.240");
+    snprintf(s_model.weather_location, sizeof(s_model.weather_location), "%s", "广州");
 
     /*                    floor   type            id                      name       ctrl  floor_id  cmd_type           gpio_idx */
     add_device(RC_FLOOR_1, RC_DEVICE_DOOR,   "floor1_gate",         "\xE5\xA4\xA7\xE9\x97\xA8",     true, 1, IOT_CMD_SET_SERVO, 6);   /* 大门 */
@@ -487,6 +488,28 @@ void device_model_update_sensors(float temp, float humi, uint16_t pm25,
     s_model.flame_valid = true;
     s_model.smoke_valid = true;
     s_model.sensor_rx_count++;
+    publish_update();
+}
+
+void device_model_update_weather(const char *location, float temp, uint8_t humidity,
+                                  float precipitation_mm, float wind_speed,
+                                  uint16_t weather_code, float pm25, uint16_t aqi,
+                                  bool air_quality_valid)
+{
+    if (location && location[0] != '\0') {
+        strncpy(s_model.weather_location, location, sizeof(s_model.weather_location) - 1);
+        s_model.weather_location[sizeof(s_model.weather_location) - 1] = '\0';
+    }
+    s_model.outdoor_temp = temp;
+    s_model.outdoor_humidity = humidity;
+    s_model.precipitation_mm = precipitation_mm;
+    s_model.wind_speed = wind_speed;
+    s_model.weather_code = weather_code;
+    s_model.pm25_outdoor = pm25;
+    s_model.aqi = aqi;
+    s_model.weather_valid = true;
+    s_model.air_quality_valid = air_quality_valid;
+    s_model.weather_last_update_s = (uint32_t)(lv_tick_get() / 1000U);
     publish_update();
 }
 
