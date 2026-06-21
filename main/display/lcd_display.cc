@@ -27,9 +27,11 @@ extern "C" {
 
 #define TAG "LcdDisplay"
 
-static constexpr int kShellSidebarWidth = 112;
-static constexpr int kShellButtonWidth = 96;
-static constexpr int kShellButtonHeight = 52;
+static constexpr int kShellSidebarWidth = 128;
+static constexpr int kShellButtonWidth = 108;
+static constexpr int kShellButtonHeight = 56;
+static constexpr int kShellWakeButtonHeight = 68;
+static constexpr int kShellWakeBottomOffset = 20;
 static constexpr int kShellStartupTouchGuardMs = 1000;
 static constexpr int kLvglTaskStackSize = 12 * 1024;
 
@@ -640,19 +642,24 @@ void LcdDisplay::CreateSmartHomeShell() {
     lv_obj_set_style_border_width(side_bar_, 1, 0);
     lv_obj_set_style_border_side(side_bar_, LV_BORDER_SIDE_RIGHT, 0);
     lv_obj_set_style_border_color(side_bar_, lv_color_hex(0xDDE7F5), 0);
-    lv_obj_set_style_pad_top(side_bar_, 8, 0);
-    lv_obj_set_style_pad_hor(side_bar_, 8, 0);
-    lv_obj_set_style_pad_row(side_bar_, 6, 0);
-    lv_obj_set_layout(side_bar_, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(side_bar_, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(side_bar_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_clear_flag(side_bar_, LV_OBJ_FLAG_SCROLLABLE);
 
-    auto create_btn = [this](const char* icon, const char* text) {
-        lv_obj_t* btn = lv_button_create(side_bar_);
+    lv_obj_t* nav_col = lv_obj_create(side_bar_);
+    lv_obj_remove_style_all(nav_col);
+    lv_obj_set_size(nav_col, kShellSidebarWidth, LV_VER_RES - kShellWakeButtonHeight - kShellWakeBottomOffset - 22);
+    lv_obj_align(nav_col, LV_ALIGN_TOP_MID, 0, 8);
+    lv_obj_set_style_pad_row(nav_col, 6, 0);
+    lv_obj_set_layout(nav_col, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(nav_col, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(nav_col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_scroll_dir(nav_col, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(nav_col, LV_SCROLLBAR_MODE_AUTO);
+
+    auto create_btn = [this, nav_col](const char* icon, const char* text) {
+        lv_obj_t* btn = lv_button_create(nav_col);
         lv_obj_remove_style_all(btn);
         lv_obj_set_size(btn, kShellButtonWidth, kShellButtonHeight);
-        lv_obj_set_style_radius(btn, 8, 0);
+        lv_obj_set_style_radius(btn, 10, 0);
         lv_obj_set_style_bg_color(btn, lv_color_hex(0xFFFFFF), 0);
         lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
         lv_obj_set_style_border_width(btn, 1, 0);
@@ -662,7 +669,7 @@ void LcdDisplay::CreateSmartHomeShell() {
         lv_obj_set_layout(btn, LV_LAYOUT_FLEX);
         lv_obj_set_flex_flow(btn, LV_FLEX_FLOW_COLUMN);
         lv_obj_set_flex_align(btn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_pad_row(btn, 4, 0);
+        lv_obj_set_style_pad_row(btn, 2, 0);
         lv_obj_add_event_cb(btn, OnShellNavClicked, LV_EVENT_CLICKED, this);
 
         lv_obj_t* icon_label = lv_label_create(btn);
@@ -713,24 +720,22 @@ void LcdDisplay::CreateSmartHomeShell() {
     shell_settings_btn_ = settings.first;
     shell_settings_label_ = settings.second;
 
-    // Spacer to push wake button to bottom
-    lv_obj_t* spacer = lv_obj_create(side_bar_);
-    lv_obj_remove_style_all(spacer);
-    lv_obj_set_size(spacer, 4, 20);
-    lv_obj_set_style_bg_opa(spacer, LV_OPA_TRANSP, 0);
-    lv_obj_set_flex_grow(spacer, 1);
-
     // Wake / microphone button at bottom of sidebar
     lv_obj_t* wake_btn = lv_button_create(side_bar_);
     lv_obj_remove_style_all(wake_btn);
-    lv_obj_set_size(wake_btn, kShellButtonWidth, kShellButtonHeight);
-    lv_obj_set_style_radius(wake_btn, 8, 0);
-    lv_obj_set_style_bg_color(wake_btn, lv_color_hex(0x2F6BFF), 0);
+    lv_obj_set_size(wake_btn, kShellButtonWidth, kShellWakeButtonHeight);
+    lv_obj_align(wake_btn, LV_ALIGN_BOTTOM_MID, 0, -kShellWakeBottomOffset);
+    lv_obj_set_style_radius(wake_btn, 12, 0);
+    lv_obj_set_style_bg_color(wake_btn, lv_color_hex(0x64748B), 0);
+    lv_obj_set_style_bg_opa(wake_btn, LV_OPA_COVER, 0);
+    lv_obj_set_style_shadow_color(wake_btn, lv_color_hex(0x334155), 0);
+    lv_obj_set_style_shadow_width(wake_btn, 12, 0);
+    lv_obj_set_style_shadow_opa(wake_btn, LV_OPA_20, 0);
     lv_obj_set_style_pad_all(wake_btn, 0, 0);
     lv_obj_set_layout(wake_btn, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(wake_btn, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(wake_btn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_row(wake_btn, 4, 0);
+    lv_obj_set_style_pad_row(wake_btn, 2, 0);
     lv_obj_add_event_cb(wake_btn, [](lv_event_t* e) {
         auto* display = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
         Application::GetInstance().ToggleChatState();
