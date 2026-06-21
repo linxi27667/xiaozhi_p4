@@ -2,6 +2,7 @@
 
 #include "mqtt_device_model.h"
 #include "mqtt_iot_protocol.h"
+#include "ui_asset_service.h"
 #include "ui_events.h"
 #include "ui_font.h"
 #include "ui_i18n.h"
@@ -18,48 +19,56 @@
 
 static const char *TAG = "PAGE_SCENE";
 
-/* ===== UTF-8 hex escapes for Chinese strings ===== */
-
-/* Scene names */
-#define SCN_HOME_ZH    "\xE5\x9B\x9E\xE5\xAE\xB6"                              /* 回家 */
-#define SCN_SLEEP_ZH   "\xE7\x9D\xA1\xE7\x9C\xA0"                              /* 睡眠 */
-#define SCN_MOVIE_ZH   "\xE8\xA7\x82\xE5\xBD\xB1"                              /* 观影 */
-#define SCN_NIGHT_ZH   "\xE8\xB5\xB7\xE5\xA4\x9C"                              /* 起夜 */
-#define SCN_RAIN_ZH    "\xE9\x9B\xA8\xE5\xA4\xA9\xE6\x94\xB6\xE8\xA1\xA3"      /* 雨天收衣 */
-#define SCN_AWAY_ZH    "\xE7\xA6\xBB\xE5\xAE\xB6"                              /* 离家 */
-#define SCN_FIRE_ZH    "\xE7\x81\xAB\xE8\xAD\xA6\xE6\xBC\x94\xE7\xA4\xBA"      /* 火警演示 */
-
-/* Scene descriptions */
-#define DESC_HOME_ZH   "\xE5\xBC\x80\xE7\x81\xAF+\xE6\x9A\x96\xE8\x89\xB2\xE6\xB0\x9B\xE5\x9B\xB4"      /* 开灯+暖色氛围 */
-#define DESC_SLEEP_ZH  "\xE5\x85\xB3\xE7\x81\xAF+\xE8\x93\x9D\xE8\x89\xB2\xE5\xA4\x9C\xE7\x81\xAF"      /* 关灯+蓝色夜灯 */
-#define DESC_MOVIE_ZH  "\xE5\x85\xB3\xE7\x81\xAF+\xE5\xBD\xB1\xE9\x99\xA2\xE8\x93\x9D"                  /* 关灯+影院蓝 */
-#define DESC_NIGHT_ZH  "\xE5\xBC\x80\xE7\x81\xAF+\xE6\xA9\x99\xE8\x89\xB2\xE5\xBC\xB1\xE5\x85\x89"      /* 开灯+橙色弱光 */
-#define DESC_RAIN_ZH   "\xE6\x94\xB6\xE6\x99\xBE\xE8\xA1\xA3\xE6\x9D\x86+\xE8\x93\x9D\xE8\x89\xB2\xE5\x91\xBC\xE5\x90\xB8"  /* 收晾衣杆+蓝色呼吸 */
-#define DESC_AWAY_ZH   "\xE5\x85\xA8\xE5\x85\xB3"                                                      /* 全关 */
-#define DESC_FIRE_ZH   "\xE7\xBA\xA2\xE8\x89\xB2\xE8\xAD\xA6\xE7\xA4\xBA+\xE5\x85\xA8\xE5\xBC\x80"      /* 红色警示+全开 */
-
-/* Page title */
-#define STR_TITLE_ZH      "\xE5\x9C\xBA\xE6\x99\xAF\xE6\xA8\xA1\xE5\xBC\x8F"  /* 场景模式 */
-#define STR_TITLE_EN      "Scene Mode"
+typedef enum {
+    SCENE_ACTION_SCENE = 0,
+    SCENE_ACTION_BRIGHT,
+} scene_action_t;
 
 typedef struct {
     uint8_t id;
+    scene_action_t action;
     const char *icon;
+    const char *asset;
     const char *zh;
     const char *en;
     const char *desc_zh;
     const char *desc_en;
-    bool danger;
+    uint32_t accent_hex;
 } scene_item_t;
 
 static const scene_item_t s_scenes[] = {
-    { IOT_SCENE_HOME,  ICON_HOME,      SCN_HOME_ZH,  "Home",      DESC_HOME_ZH,  "Lights on, warm tone",    false },
-    { IOT_SCENE_SLEEP, ICON_MOON,      SCN_SLEEP_ZH, "Sleep",     DESC_SLEEP_ZH, "Lights off, blue night",  false },
-    { IOT_SCENE_MOVIE, ICON_STAR,      SCN_MOVIE_ZH, "Movie",     DESC_MOVIE_ZH, "Lights off, cinema blue", false },
-    { IOT_SCENE_NIGHT, ICON_LIGHTBULB, SCN_NIGHT_ZH, "Night",     DESC_NIGHT_ZH, "Lights on, dim orange",   false },
-    { IOT_SCENE_RAIN,  ICON_UMBRELLA,  SCN_RAIN_ZH,  "Rain",      DESC_RAIN_ZH,  "Retract racks, breathe",  false },
-    { IOT_SCENE_AWAY,  ICON_LOCK,      SCN_AWAY_ZH,  "Away",      DESC_AWAY_ZH,  "All off",                 false },
-    { IOT_SCENE_FIRE,  ICON_FIRE,      SCN_FIRE_ZH,  "Fire Demo", DESC_FIRE_ZH,  "Red alert, all on",       true  },
+    { IOT_SCENE_HOME,  SCENE_ACTION_SCENE,  ICON_HOME,      "scene_home.png",
+      "\xE5\x9B\x9E\xE5\xAE\xB6", "Home",
+      "\xE5\xA4\xA7\xE5\x8E\x85\xE7\x81\xAF+\xE4\xB8\xBB\xE5\x8D\xA7\xE6\x9A\x96\xE5\x85\x89", "Hall + warm RGB",
+      0x2F6BFF },
+    { IOT_SCENE_SLEEP, SCENE_ACTION_SCENE,  ICON_MOON,      "scene_sleep.png",
+      "\xE7\x9D\xA1\xE7\x9C\xA0", "Sleep",
+      "\xE5\x85\xB3\xE9\x97\xAD\xE4\xB8\xBB\xE7\x81\xAF+\xE4\xBD\x8E\xE4\xBA\xAE\xE5\xA4\x9C\xE7\x81\xAF", "Main lights off",
+      0x3B82F6 },
+    { IOT_SCENE_MOVIE, SCENE_ACTION_SCENE,  ICON_STAR,      "scene_movie.png",
+      "\xE8\xA7\x82\xE5\xBD\xB1", "Movie",
+      "\xE5\x85\xB3\xE9\x97\xAD\xE4\xB8\xBB\xE7\x81\xAF+\xE5\xBD\xB1\xE9\x99\xA2\xE8\x93\x9D", "Cinema blue",
+      0x6554FF },
+    { IOT_SCENE_NIGHT, SCENE_ACTION_SCENE,  ICON_LIGHTBULB, "scene_night.png",
+      "\xE8\xB5\xB7\xE5\xA4\x9C", "Night",
+      "\xE5\xBC\x80\xE5\x90\xAF\xE5\x8E\x95\xE6\x89\x80\xE7\x81\xAF+\xE6\xA9\x99\xE8\x89\xB2\xE5\xBC\xB1\xE5\x85\x89", "Bathroom + dim RGB",
+      0xF59E0B },
+    { IOT_SCENE_NONE,  SCENE_ACTION_BRIGHT, ICON_SUN,       "scene_lights.png",
+      "\xE6\x98\x8E\xE4\xBA\xAE", "Bright",
+      "\xE5\xBC\x80\xE5\x90\xAF\xE5\xB8\xB8\xE7\x94\xA8\xE7\x81\xAF\xE5\x85\x89", "Common lights on",
+      0xF59E0B },
+    { IOT_SCENE_AWAY,  SCENE_ACTION_SCENE,  ICON_LOCK,      "scene_away.png",
+      "\xE7\xA6\xBB\xE5\xAE\xB6", "Away",
+      "\xE5\x85\xA8\xE5\xB1\x8B\xE7\x81\xAF\xE5\x85\x89+\xE8\xBE\x93\xE5\x87\xBA\xE5\x85\xB3\xE9\x97\xAD", "All outputs off",
+      0x6554FF },
+    { IOT_SCENE_FIRE,  SCENE_ACTION_SCENE,  ICON_FIRE,      "scene_fire.png",
+      "\xE7\x81\xAB\xE7\x81\xBE", "Fire",
+      "\xE4\xBC\xA0\xE6\x84\x9F\xE5\x99\xA8\xE8\xA7\xA6\xE5\x8F\x91\xE5\x9C\xBA\xE6\x99\xAF", "Sensor-triggered",
+      0xC62828 },
+    { IOT_SCENE_RAIN,  SCENE_ACTION_SCENE,  ICON_WATER,     "scene_rain.png",
+      "\xE9\x9B\xA8\xE5\xA4\xA9", "Rain",
+      "\xE4\xBC\xA0\xE6\x84\x9F\xE5\x99\xA8\xE8\xA7\xA6\xE5\x8F\x91\xE5\x9C\xBA\xE6\x99\xAF", "Sensor-triggered",
+      0x3B82F6 },
 };
 
 #define SCENE_COUNT (sizeof(s_scenes) / sizeof(s_scenes[0]))
@@ -67,7 +76,7 @@ static const scene_item_t s_scenes[] = {
 typedef struct {
     lv_obj_t *card;
     uint8_t scene_id;
-    bool danger;
+    scene_action_t action;
 } scene_card_info_t;
 
 typedef struct {
@@ -81,10 +90,85 @@ static const char *tr(const char *zh, const char *en)
     return ui_i18n_get_lang() == UI_LANG_ZH ? zh : en;
 }
 
+static lv_color_t scene_accent(const scene_item_t *item)
+{
+    return lv_color_hex(item ? item->accent_hex : 0x2F6BFF);
+}
+
+static bool any_light_on(void)
+{
+    for (uint16_t i = 0; i < device_model_count(); i++) {
+        const rc_device_t *d = device_model_at(i);
+        if (d && d->connected && d->power_on &&
+            (d->type == RC_DEVICE_LIGHT || d->type == RC_DEVICE_RGB_LIGHT)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static lv_obj_t *create_row(lv_obj_t *parent, int gap)
+{
+    lv_obj_t *row = lv_obj_create(parent);
+    lv_obj_remove_style_all(row);
+    lv_obj_set_width(row, lv_pct(100));
+    lv_obj_set_height(row, LV_SIZE_CONTENT);
+    lv_obj_set_style_pad_all(row, 0, 0);
+    lv_obj_set_layout(row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_column(row, gap, 0);
+    lv_obj_set_style_pad_row(row, gap, 0);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+    return row;
+}
+
+static void add_scene_image(lv_obj_t *parent, const scene_item_t *item)
+{
+    lv_obj_t *box = lv_obj_create(parent);
+    lv_obj_remove_style_all(box);
+    lv_obj_set_size(box, 48, 48);
+    lv_color_t accent = scene_accent(item);
+    lv_obj_set_style_bg_color(box, lv_color_mix(accent, UI_COLOR_CARD, 18), 0);
+    lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(box, 10, 0);
+    lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *img = ui_asset_image_create(box, item->asset);
+    if (img) {
+        lv_obj_center(img);
+        return;
+    }
+
+    lv_obj_t *ico = ui_create_icon(box, item->icon, ui_font_icon(23), accent);
+    lv_obj_center(ico);
+}
+
+static void send_bright_mode(void)
+{
+    mqtt_send_broadcast(IOT_CMD_BROADCAST_LIGHTS_ON);
+    mqtt_send_rgb_light(2, 0, 255, 210, 150, 58, IOT_LIGHT_EFFECT_STATIC, 20);
+}
+
 static void on_scene_click(lv_event_t *e)
 {
-    uint8_t scene_id = (uint8_t)(uintptr_t)lv_event_get_user_data(e);
-    mqtt_send_scene(scene_id);
+    const scene_item_t *item = (const scene_item_t *)lv_event_get_user_data(e);
+    if (!item) return;
+
+    if (item->action == SCENE_ACTION_BRIGHT) {
+        send_bright_mode();
+    } else {
+        mqtt_send_scene(item->id);
+    }
+}
+
+static void set_card_active(lv_obj_t *card, lv_color_t accent, bool active)
+{
+    if (!card) return;
+    lv_obj_set_style_border_color(card, active ? accent : UI_COLOR_BORDER, 0);
+    lv_obj_set_style_border_width(card, active ? 2 : 1, 0);
+    lv_obj_set_style_bg_color(card, active ? lv_color_mix(accent, UI_COLOR_CARD, 12) : UI_COLOR_CARD, 0);
 }
 
 static void refresh_scene(scene_ctx_t *ctx)
@@ -92,24 +176,15 @@ static void refresh_scene(scene_ctx_t *ctx)
     if (!ctx || ctx->deleted) return;
     const mqtt_device_model_t *m = device_model_get();
 
-    /* Update card active states by tweaking border/bg styles */
     for (uint32_t i = 0; i < SCENE_COUNT; i++) {
-        lv_obj_t *card = ctx->cards[i].card;
-        if (!card) continue;
-
-        bool active = (m->current_scene == ctx->cards[i].scene_id);
-        bool danger = ctx->cards[i].danger;
-        lv_color_t accent = danger ? UI_COLOR_RED : UI_COLOR_ACCENT;
-
-        if (active) {
-            lv_obj_set_style_border_color(card, accent, 0);
-            lv_obj_set_style_border_width(card, 2, 0);
-            lv_obj_set_style_bg_color(card, lv_color_mix(accent, UI_COLOR_CARD, 12), 0);
-        } else {
-            lv_obj_set_style_border_color(card, UI_COLOR_BORDER, 0);
-            lv_obj_set_style_border_width(card, 1, 0);
-            lv_obj_set_style_bg_color(card, UI_COLOR_CARD, 0);
+        const scene_item_t *item = &s_scenes[i];
+        bool active = false;
+        if (item->action == SCENE_ACTION_SCENE) {
+            active = (m->current_scene == item->id);
+        } else if (item->action == SCENE_ACTION_BRIGHT) {
+            active = any_light_on();
         }
+        set_card_active(ctx->cards[i].card, scene_accent(item), active);
     }
 }
 
@@ -133,42 +208,46 @@ static void on_delete(lv_event_t *e)
     lv_free(ctx);
 }
 
-static lv_obj_t *create_card_grid(lv_obj_t *parent, int gap)
-{
-    lv_obj_t *grid = lv_obj_create(parent);
-    lv_obj_remove_style_all(grid);
-    lv_obj_set_width(grid, lv_pct(100));
-    lv_obj_set_height(grid, LV_SIZE_CONTENT);
-    lv_obj_set_style_pad_all(grid, 0, 0);
-    lv_obj_set_layout(grid, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
-    lv_obj_set_flex_align(grid, LV_FLEX_ALIGN_START,
-        LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    lv_obj_set_style_pad_column(grid, gap, 0);
-    lv_obj_set_style_pad_row(grid, gap, 0);
-    lv_obj_clear_flag(grid, LV_OBJ_FLAG_SCROLLABLE);
-    return grid;
-}
-
-static void create_scene_card(lv_obj_t *grid, scene_ctx_t *ctx, int index)
+static lv_obj_t *create_scene_card(lv_obj_t *grid, scene_ctx_t *ctx, uint32_t index)
 {
     const scene_item_t *item = &s_scenes[index];
-    const mqtt_device_model_t *m = device_model_get();
-    bool active = (m->current_scene == item->id);
 
-    lv_obj_t *card = ui_kit_scene_card(grid,
-        item->icon,
-        tr(item->zh, item->en),
-        tr(item->desc_zh, item->desc_en),
-        active, item->danger,
-        on_scene_click, (void *)(uintptr_t)item->id);
-
+    lv_obj_t *card = ui_create_card(grid);
     lv_obj_set_width(card, lv_pct(31));
-    lv_obj_set_style_min_height(card, 108, 0);
+    lv_obj_set_style_min_height(card, 116, 0);
+    lv_obj_set_style_pad_all(card, 14, 0);
+    lv_obj_set_style_pad_column(card, 12, 0);
+    lv_obj_set_style_bg_color(card, UI_COLOR_CARD, 0);
+    lv_obj_add_flag(card, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(card, on_scene_click, LV_EVENT_CLICKED, (void *)item);
+    ui_apply_press_feedback(card, scene_accent(item));
+
+    add_scene_image(card, item);
+
+    lv_obj_t *col = lv_obj_create(card);
+    lv_obj_remove_style_all(col);
+    lv_obj_set_width(col, 0);
+    lv_obj_set_flex_grow(col, 1);
+    lv_obj_set_height(col, LV_SIZE_CONTENT);
+    lv_obj_set_layout(col, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(col, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(col, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_row(col, 5, 0);
+    lv_obj_clear_flag(col, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *name = ui_create_label(col, tr(item->zh, item->en), ui_font_cn(19), UI_COLOR_TEXT_STRONG);
+    lv_label_set_long_mode(name, LV_LABEL_LONG_CLIP);
+    lv_obj_set_width(name, lv_pct(100));
+
+    lv_obj_t *desc = ui_create_label(col, tr(item->desc_zh, item->desc_en), ui_font_cn(13), UI_COLOR_TEXT_SEC);
+    lv_label_set_long_mode(desc, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(desc, lv_pct(100));
 
     ctx->cards[index].card = card;
     ctx->cards[index].scene_id = item->id;
-    ctx->cards[index].danger = item->danger;
+    ctx->cards[index].action = item->action;
+    return card;
 }
 
 lv_obj_t *page_scene_create(lv_obj_t *parent)
@@ -179,29 +258,16 @@ lv_obj_t *page_scene_create(lv_obj_t *parent)
     lv_obj_t *page = ui_create_page(parent, on_delete, ctx);
     ctx->page = page;
 
-    /* Page title: icon + title (no subtitle per spec) */
     ui_kit_page_title(page, ICON_STAR,
-        tr(STR_TITLE_ZH, STR_TITLE_EN), NULL);
+        tr("\xE5\x9C\xBA\xE6\x99\xAF\xE6\xA8\xA1\xE5\xBC\x8F", "Scene Mode"),
+        tr("\xE6\x89\x8B\xE5\x8A\xA8\xE5\x9C\xBA\xE6\x99\xAF\xE5\xBF\xAB\xE6\x8D\xB7\xE5\x88\x87\xE6\x8D\xA2", "Quick scene switching"));
 
-    lv_obj_t *grid = create_card_grid(page, 12);
-    for (int i = 0; i < 6; i++) {
+    /* UTF-8: 手动场景 = E6898BE58AA8E59CBAE699AF */
+    ui_kit_group_title(page, tr("\xE6\x89\x8B\xE5\x8A\xA8\xE5\x9C\xBA\xE6\x99\xAF", "Manual Scenes"));
+    lv_obj_t *grid = create_row(page, 12);
+    for (uint32_t i = 0; i < SCENE_COUNT; i++) {
         create_scene_card(grid, ctx, i);
     }
-
-    /* Row 3: fire demo card (full width, danger=true) */
-    const scene_item_t *fire = &s_scenes[6];
-    const mqtt_device_model_t *m = device_model_get();
-    bool fire_active = (m->current_scene == fire->id);
-    lv_obj_t *fire_card = ui_kit_scene_card(page,
-        fire->icon,
-        tr(fire->zh, fire->en),
-        tr(fire->desc_zh, fire->desc_en),
-        fire_active, fire->danger,
-        on_scene_click, (void *)(uintptr_t)fire->id);
-    lv_obj_set_style_min_height(fire_card, 108, 0);
-    ctx->cards[6].card = fire_card;
-    ctx->cards[6].scene_id = fire->id;
-    ctx->cards[6].danger = fire->danger;
 
     ui_event_subscribe(UI_EVENT_MODEL_UPDATED, on_model_updated, ctx);
     ui_event_subscribe(UI_EVENT_SCENE_CHANGED, on_scene_changed, ctx);

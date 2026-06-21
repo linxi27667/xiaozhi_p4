@@ -141,7 +141,7 @@ lv_obj_t *ui_kit_metric_card(lv_obj_t *parent, const char *icon,
     lv_obj_set_style_min_height(card, 104, 0);
 
     if (label) {
-        lv_obj_t *lbl = ui_create_label(card, label, ui_font_cn(13), UI_COLOR_TEXT_SEC);
+        lv_obj_t *lbl = ui_create_label(card, label, ui_font_cn(12), UI_COLOR_TEXT_SEC);
         lv_label_set_long_mode(lbl, LV_LABEL_LONG_DOT);
         lv_obj_set_width(lbl, lv_pct(100));
     }

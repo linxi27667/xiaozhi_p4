@@ -243,6 +243,7 @@ void UI_Manager_Init(lv_obj_t *parent)
     ui_styles_init();
     ui_i18n_init();
     ui_asset_service_init();
+    ui_asset_service_diagnose();
     device_model_init();
     smart_home_alarm_ui_init();
     ui_welcome_popup_init();

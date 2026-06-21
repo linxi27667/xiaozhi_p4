@@ -2,6 +2,7 @@
 
 #include "mqtt_device_model.h"
 #include "mqtt_iot_protocol.h"
+#include "ui_asset_service.h"
 #include "ui_events.h"
 #include "ui_font.h"
 #include "ui_i18n.h"
@@ -561,6 +562,12 @@ lv_obj_t *page_light_create(lv_obj_t *parent)
     lv_obj_set_style_radius(wheel_box, 120, 0);
     lv_obj_clear_flag(wheel_box, LV_OBJ_FLAG_SCROLLABLE);
 
+    /* Color wheel PNG background (from TF card), fallback to solid bg */
+    lv_obj_t *wheel_bg = ui_asset_image_create(wheel_box, "color_wheel_220.png");
+    if (wheel_bg) {
+        lv_obj_center(wheel_bg);
+    }
+
     /* Arc (color wheel): range 0-360 representing hue */
     ctx->arc = lv_arc_create(wheel_box);
     lv_obj_center(ctx->arc);
@@ -570,9 +577,10 @@ lv_obj_t *page_light_create(lv_obj_t *parent)
     lv_arc_set_value(ctx->arc, 0);
     lv_obj_clear_flag(ctx->arc, LV_OBJ_FLAG_SCROLLABLE);
 
-    /* Arc styling: bg ring (light gray), indicator (current color), knob (current color) */
+    /* Arc styling: transparent bg ring (PNG provides visual), indicator = current color */
     lv_obj_set_style_arc_width(ctx->arc, 14, LV_PART_MAIN);
-    lv_obj_set_style_arc_color(ctx->arc, UI_COLOR_INPUT_BG, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(ctx->arc, wheel_bg ? lv_color_white() : UI_COLOR_INPUT_BG, LV_PART_MAIN);
+    lv_obj_set_style_arc_opa(ctx->arc, wheel_bg ? LV_OPA_TRANSP : LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_arc_width(ctx->arc, 14, LV_PART_INDICATOR);
     lv_obj_set_style_arc_color(ctx->arc, UI_COLOR_ACCENT, LV_PART_INDICATOR);
     lv_obj_set_style_pad_all(ctx->arc, 6, LV_PART_KNOB);

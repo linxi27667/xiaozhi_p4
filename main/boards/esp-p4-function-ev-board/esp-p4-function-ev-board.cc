@@ -10,25 +10,18 @@
 #include "application.h"
 #include "button.h"
 #include "config.h"
+#include "esp_p4_tf_card.h"
 #include "esp_video.h"
+#include "ui_asset_service.h"
 
 #include <esp_log.h>
-#include <inttypes.h>
+#include <driver/gpio.h>
 #include <driver/i2c_master.h>
 #include <esp_lvgl_port.h>
 #include <soc/clk_tree_defs.h>
-// SD card
-#include <esp_vfs_fat.h>
-#include <sdmmc_cmd.h>
-#include <driver/sdmmc_host.h>
-#include <driver/sdspi_host.h>
-// SD power control (on-chip LDO)
-#include "sd_pwr_ctrl_by_on_chip_ldo.h"
-
 // MIPI-DSI / LCD vendor includes (library may replace some)
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_mipi_dsi.h"
-#include "esp_ldo_regulator.h"
 #include "esp_lcd_ek79007.h"
 #include "esp_lcd_touch_gt911.h"
 
@@ -47,6 +40,7 @@ private:
     esp_lcd_touch_handle_t tp_ = nullptr;
     lv_indev_t *touch_indev_ = nullptr;
     EspVideo* camera_ = nullptr;
+    EspP4TfCard tf_card_;
 
     void InitializeI2cBuses()
     {
@@ -108,13 +102,12 @@ private:
 
     void InitializeSdCard()
     {
-        ESP_LOGI(TAG, "Initializing SD card");
-        esp_err_t ret = bsp_sdcard_mount();
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to mount SD card: %s", esp_err_to_name(ret));
-        } else {
-            ESP_LOGI(TAG, "SD card mounted successfully");
+        esp_err_t ret = tf_card_.Mount();
+        if (ret == ESP_OK) {
+            return;
         }
+
+        ESP_LOGE(TAG, "TF card is unavailable; UI assets will degrade: %s", esp_err_to_name(ret));
     }
 
     void InitializeCamera()
@@ -202,6 +195,7 @@ public:
         InitializeButtons();
         InitializeTouch();
         InitializeSdCard();
+        ui_asset_service_preload_required();
         InitializeCamera();
         InitializeFonts();
         GetBacklight()->RestoreBrightness();
@@ -220,11 +214,6 @@ public:
         // Clean up display pointer
         delete display_;
         display_ = nullptr;
-        // Unmount SD card
-        esp_err_t ret = bsp_sdcard_unmount();
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to unmount SD card: %s", esp_err_to_name(ret));
-        }
         // If other resources need cleanup, add here
     }
 

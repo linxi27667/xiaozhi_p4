@@ -2,10 +2,19 @@
 # CMakeLists in this exact order for cmake to work correctly
 cmake_minimum_required(VERSION 3.16)
 
+# Skip component manager network check to avoid build hanging
+if(NOT DEFINED ENV{IDF_COMPONENT_CHECK_OR_UPDATE})
+    set(ENV{IDF_COMPONENT_CHECK_OR_UPDATE} "0")
+endif()
+
 # Add this line to disable the specific warning
 add_compile_options(-Wno-missing-field-initializers)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+include($ENV{IDF_PATH}/tools/cmake/version.cmake)
+if(NOT DEFINED ENV{ESP_IDF_VERSION})
+    set(ENV{ESP_IDF_VERSION} "${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}")
+endif()
 # "Trim" the build. Include the minimal set of components, main, and anything it depends on.
 idf_build_set_property(MINIMAL_BUILD ON)
 

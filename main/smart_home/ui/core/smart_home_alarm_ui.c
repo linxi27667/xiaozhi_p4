@@ -1,62 +1,40 @@
 #include "smart_home_alarm_ui.h"
 
+#include "mqtt_device_model.h"
+#include "ui_asset_service.h"
 #include "ui_events.h"
 #include "ui_font.h"
 #include "ui_icons.h"
 #include "ui_styles.h"
 #include "ui_theme.h"
 
+#include "esp_log.h"
 #include "lvgl.h"
+
+static const char *TAG = "ALARM_UI";
 
 static lv_obj_t *s_modal;
 static uint8_t s_fire_floor_id;
 static bool s_fire_active;
 static bool s_fire_acknowledged;
 static bool s_initialized;
-
-static lv_obj_t *modal_label(lv_obj_t *parent, const char *text, int size,
-    lv_color_t color, int x, int y, int w)
-{
-    lv_obj_t *lbl = lv_label_create(parent);
-    lv_label_set_text(lbl, text);
-    lv_obj_set_style_text_font(lbl, ui_font_cn((uint8_t)size), 0);
-    lv_obj_set_style_text_color(lbl, color, 0);
-    lv_obj_set_pos(lbl, x, y);
-    lv_obj_set_width(lbl, w);
-    lv_label_set_long_mode(lbl, LV_LABEL_LONG_WRAP);
-    return lbl;
-}
-
-static lv_obj_t *modal_panel(lv_obj_t *parent, int x, int y, int w, int h)
-{
-    lv_obj_t *obj = lv_obj_create(parent);
-    lv_obj_remove_style_all(obj);
-    lv_obj_set_pos(obj, x, y);
-    lv_obj_set_size(obj, w, h);
-    lv_obj_set_style_bg_color(obj, UI_COLOR_CARD, 0);
-    lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(obj, 8, 0);
-    lv_obj_set_style_border_width(obj, 1, 0);
-    lv_obj_set_style_border_color(obj, UI_COLOR_RED, 0);
-    lv_obj_set_style_pad_all(obj, 0, 0);
-    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
-    return obj;
-}
+static lv_timer_t *s_poll_timer;
 
 static const char *floor_name(uint8_t floor_id)
 {
     switch (floor_id) {
-        case 1: return "一楼";
-        case 2: return "二楼";
-        case 3: return "三楼";
-        default: return "未知楼层";
+        case 1: return "\xE4\xB8\x80\xE6\xA5\xBC"; /* 一楼 */
+        case 2: return "\xE4\xBA\x8C\xE6\xA5\xBC"; /* 二楼 */
+        case 3: return "\xE4\xB8\x89\xE6\xA5\xBC"; /* 三楼 */
+        default: return "\xE6\x9C\xAA\xE7\x9F\xA5\xE6\xA5\xBC\xE5\xB1\x82"; /* 未知楼层 */
     }
 }
 
 static void close_modal(void)
 {
     if (s_modal) {
-        lv_obj_delete(s_modal);
+        /* Use async close to safely release msgbox + backdrop from event callbacks */
+        lv_msgbox_close_async(s_modal);
         s_modal = NULL;
     }
 }
@@ -76,43 +54,149 @@ static void show_fire_modal(void)
     }
 
     if (s_modal) {
-        return;
+        return;  /* already showing */
     }
 
-    s_modal = lv_obj_create(lv_screen_active());
-    lv_obj_remove_style_all(s_modal);
-    lv_obj_set_size(s_modal, lv_pct(100), lv_pct(100));
-    lv_obj_add_flag(s_modal, LV_OBJ_FLAG_FLOATING);
-    lv_obj_set_style_bg_color(s_modal, lv_color_black(), 0);
-    lv_obj_set_style_bg_opa(s_modal, LV_OPA_50, 0);
-    lv_obj_clear_flag(s_modal, LV_OBJ_FLAG_SCROLLABLE);
+    /* Create modal msgbox on active screen (parent=NULL => modal with backdrop) */
+    s_modal = lv_msgbox_create(NULL);
 
-    lv_obj_t *box = modal_panel(s_modal, 312, 160, 400, 250);
-    lv_obj_t *icon = ui_create_icon(box, ICON_FIRE, ui_font_icon(30), UI_COLOR_RED);
-    lv_obj_set_pos(icon, 28, 28);
+    /* Title: 火灾警报 */
+    /* UTF-8: 火灾警报 = E781ABE781BEE8ADA6E68AA5 */
+    lv_msgbox_add_title(s_modal, "\xE7\x81\xAB\xE7\x81\xBE\xE8\xAD\xA6\xE6\x8A\xA5");
 
-    modal_label(box, "火灾警报", 24, UI_COLOR_RED, 76, 25, 260);
+    /* Add flame icon to header, move before title for visual hierarchy.
+     * 优先加载 TF 卡中的 alarm_siren.png,缺失时回退到 Font Awesome ICON_FIRE 图标。 */
+    lv_obj_t *header = lv_msgbox_get_header(s_modal);
+    if (header) {
+        lv_obj_t *icon = ui_asset_image_create(header, "alarm_siren.png");
+        if (!icon) {
+            icon = ui_create_icon(header, ICON_FIRE, ui_font_icon(24), lv_color_white());
+        }
+        if (icon) {
+            lv_obj_move_to_index(icon, 0);
+        }
+    }
 
-    char body[128];
-    lv_snprintf(body, sizeof(body), "检测到%s发生火灾风险，请立即检查烟雾/火焰传感器和现场设备。", floor_name(s_fire_floor_id));
-    modal_label(box, body, 16, UI_COLOR_TEXT_STRONG, 28, 84, 344);
+    /* Body text: 检测到%s发生火灾风险，请立即检查烟雾/火焰传感器和现场设备。 */
+    char body[160];
+    lv_snprintf(body, sizeof(body),
+        "\xE6\xA3\x80\xE6\xB5\x8B\xE5\x88\xB0%s\xE5\x8F\x91\xE7\x94\x9F\xE7\x81\xAB\xE7\x81\xBE\xE9\xA3\x8E\xE9\x99\xA9\xEF\xBC\x8C\xE8\xAF\xB7\xE7\xAB\x8B\xE5\x8D\xB3\xE6\xA3\x80\xE6\x9F\xA5\xE7\x83\x9F\xE9\x9B\xBE/\xE7\x81\xAB\xE7\x84\xB0\xE4\xBC\xA0\xE6\x84\x9F\xE5\x99\xA8\xE5\x92\x8C\xE7\x8E\xB0\xE5\x9C\xBA\xE8\xAE\xBE\xE5\xA4\x87\xE3\x80\x82",
+        floor_name(s_fire_floor_id));
+    lv_msgbox_add_text(s_modal, body);
 
-    lv_obj_t *btn = lv_btn_create(box);
-    lv_obj_remove_style_all(btn);
-    lv_obj_set_pos(btn, 112, 178);
-    lv_obj_set_size(btn, 176, 44);
-    lv_obj_set_style_bg_color(btn, UI_COLOR_RED, 0);
-    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(btn, 6, 0);
-    lv_obj_add_event_cb(btn, on_alarm_ack, LV_EVENT_CLICKED, NULL);
-    lv_obj_t *btn_label = modal_label(btn, "解除警报", 16, lv_color_white(), 0, 11, 176);
-    lv_obj_set_style_text_align(btn_label, LV_TEXT_ALIGN_CENTER, 0);
+    /* Footer button: 紧急处理 */
+    /* UTF-8: 紧急处理 = E7B4A7E680A5E5A484E79086 */
+    lv_obj_t *btn = lv_msgbox_add_footer_button(s_modal, "\xE7\xB4\xA7\xE6\x80\xA5\xE5\xA4\x84\xE7\x90\x86");
+    if (btn) {
+        lv_obj_add_event_cb(btn, on_alarm_ack, LV_EVENT_CLICKED, NULL);
+    }
+
+    /* Style: striking red background */
+    lv_color_t red = lv_color_hex(0xC62828);
+    lv_color_t dark_red = lv_color_hex(0xB71C1C);
+
+    lv_obj_set_style_bg_color(s_modal, red, 0);
+    lv_obj_set_style_bg_opa(s_modal, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(s_modal, dark_red, 0);
+    lv_obj_set_style_border_width(s_modal, 2, 0);
+    lv_obj_set_style_radius(s_modal, 12, 0);
+    lv_obj_set_style_pad_all(s_modal, 20, 0);
+
+    /* Style header: transparent bg, white title */
+    if (header) {
+        lv_obj_set_style_bg_opa(header, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_pad_column(header, 8, 0);
+        lv_obj_t *title_label = lv_msgbox_get_title(s_modal);
+        if (title_label) {
+            lv_obj_set_style_text_color(title_label, lv_color_white(), 0);
+            lv_obj_set_style_text_font(title_label, ui_font_cn(24), 0);
+        }
+    }
+
+    /* Style content: transparent bg, white text */
+    lv_obj_t *content = lv_msgbox_get_content(s_modal);
+    if (content) {
+        lv_obj_set_style_bg_opa(content, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_pad_ver(content, 8, 0);
+        uint32_t cnt = lv_obj_get_child_count(content);
+        for (uint32_t i = 0; i < cnt; i++) {
+            lv_obj_t *child = lv_obj_get_child(content, i);
+            lv_obj_set_style_text_color(child, lv_color_white(), 0);
+            lv_obj_set_style_text_font(child, ui_font_cn(16), 0);
+        }
+    }
+
+    /* Style footer: transparent bg, white button with red text */
+    lv_obj_t *footer = lv_msgbox_get_footer(s_modal);
+    if (footer) {
+        lv_obj_set_style_bg_opa(footer, LV_OPA_TRANSP, 0);
+        uint32_t cnt = lv_obj_get_child_count(footer);
+        for (uint32_t i = 0; i < cnt; i++) {
+            lv_obj_t *child = lv_obj_get_child(footer, i);
+            lv_obj_set_style_bg_color(child, lv_color_white(), 0);
+            lv_obj_set_style_bg_opa(child, LV_OPA_COVER, 0);
+            lv_obj_set_style_text_color(child, red, 0);
+            lv_obj_set_style_text_font(child, ui_font_cn(16), 0);
+            lv_obj_set_style_radius(child, 6, 0);
+            lv_obj_set_style_pad_hor(child, 24, 0);
+            lv_obj_set_style_pad_ver(child, 10, 0);
+        }
+    }
+
+    ESP_LOGW(TAG, "Fire modal shown for floor %d", s_fire_floor_id);
 }
 
 static void on_fire_alarm_event(void *user_data)
 {
     (void)user_data;
     show_fire_modal();
+}
+
+/* ---- Polling: check device model for fire status every 500ms ---- */
+static void poll_fire_status(lv_timer_t *timer)
+{
+    (void)timer;
+    if (s_fire_acknowledged) {
+        /* Re-arm when fire clears */
+        const mqtt_device_model_t *m = device_model_get();
+        bool any_fire = false;
+        for (int i = 0; i < 3; i++) {
+            if (m->fire_floor_valid[i] && m->fire_floor_status[i] >= 2) {
+                any_fire = true;
+                break;
+            }
+        }
+        if (!any_fire) {
+            s_fire_acknowledged = false;
+            s_fire_active = false;
+        }
+        return;
+    }
+
+    /* Check all floors for fire status >= 2 (alert) */
+    const mqtt_device_model_t *m = device_model_get();
+    for (int i = 0; i < 3; i++) {
+        if (m->fire_floor_valid[i] && m->fire_floor_status[i] >= 2) {
+            if (!s_fire_active || s_fire_floor_id != (uint8_t)(i + 1)) {
+                /* Close existing modal first so text refreshes with new floor */
+                if (s_fire_active) {
+                    close_modal();
+                }
+                s_fire_floor_id = (uint8_t)(i + 1);
+                s_fire_active = true;
+                ESP_LOGW(TAG, "Fire detected on floor %d, showing global modal", s_fire_floor_id);
+                show_fire_modal();
+            }
+            return;
+        }
+    }
+
+    /* No fire detected — clear state and close modal if open */
+    if (s_fire_active) {
+        s_fire_active = false;
+        close_modal();
+        ESP_LOGI(TAG, "Fire cleared, modal closed");
+    }
 }
 
 void smart_home_alarm_ui_init(void)
@@ -122,6 +206,10 @@ void smart_home_alarm_ui_init(void)
     }
     s_initialized = true;
     ui_event_subscribe(UI_EVENT_FIRE_ALARM, on_fire_alarm_event, NULL);
+
+    /* Start polling timer: checks device model every 500ms (<=500ms requirement) */
+    s_poll_timer = lv_timer_create(poll_fire_status, 500, NULL);
+    ESP_LOGI(TAG, "Fire alarm UI initialized with 500ms polling");
 }
 
 void smart_home_alarm_ui_set_fire(uint8_t floor_id, bool active)
