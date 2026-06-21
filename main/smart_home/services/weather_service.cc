@@ -101,8 +101,11 @@ static bool parse_forecast(const std::string& body, weather_sample_t* sample)
              json_number(current, "weather_code", &weather_code) &&
              json_number(current, "wind_speed_10m", &wind_speed);
         if (ok) {
+            int humidity_int = (int)(humidity + 0.5);
             sample->temp = (float)temp;
-            sample->humidity = humidity < 0 ? 0 : (humidity > 100 ? 100 : (uint8_t)humidity);
+            if (humidity_int < 0) humidity_int = 0;
+            if (humidity_int > 100) humidity_int = 100;
+            sample->humidity = (uint8_t)humidity_int;
             sample->precipitation = (float)precipitation;
             sample->weather_code = weather_code < 0 ? 0 : (uint16_t)weather_code;
             sample->wind_speed = (float)wind_speed;

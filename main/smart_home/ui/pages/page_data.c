@@ -55,6 +55,56 @@ static const char *scene_display_name(const mqtt_device_model_t *m)
     return device_model_scene_name(m->current_scene);
 }
 
+static uint8_t scene_display_id(const mqtt_device_model_t *m)
+{
+    if (!m) return IOT_SCENE_NONE;
+    if (m->current_scene == IOT_SCENE_FIRE && is_safe()) return IOT_SCENE_NONE;
+    return m->current_scene;
+}
+
+static const char *scene_display_asset(uint8_t scene_id)
+{
+    switch (scene_id) {
+        case IOT_SCENE_SLEEP: return "scene_sleep.png";
+        case IOT_SCENE_MOVIE: return "scene_movie.png";
+        case IOT_SCENE_NIGHT: return "scene_night.png";
+        case IOT_SCENE_FIRE: return "scene_fire.png";
+        case IOT_SCENE_RAIN: return "scene_rain.png";
+        case IOT_SCENE_AWAY: return "scene_away.png";
+        case IOT_SCENE_HOME: return "scene_home.png";
+        case IOT_SCENE_BRIGHT: return "scene_lights.png";
+        default: return NULL;
+    }
+}
+
+static const char *scene_display_icon(uint8_t scene_id)
+{
+    switch (scene_id) {
+        case IOT_SCENE_SLEEP: return ICON_MOON;
+        case IOT_SCENE_MOVIE: return ICON_STAR;
+        case IOT_SCENE_NIGHT: return ICON_LIGHTBULB;
+        case IOT_SCENE_FIRE: return ICON_FIRE;
+        case IOT_SCENE_RAIN: return ICON_WATER;
+        case IOT_SCENE_AWAY: return ICON_LOCK;
+        case IOT_SCENE_HOME: return ICON_HOME;
+        case IOT_SCENE_BRIGHT: return ICON_SUN;
+        default: return ICON_STAR;
+    }
+}
+
+static lv_color_t scene_display_color(uint8_t scene_id)
+{
+    switch (scene_id) {
+        case IOT_SCENE_FIRE: return UI_COLOR_RED;
+        case IOT_SCENE_RAIN: return UI_COLOR_BLUE;
+        case IOT_SCENE_AWAY: return UI_COLOR_PURPLE;
+        case IOT_SCENE_SLEEP: return UI_COLOR_BLUE;
+        case IOT_SCENE_MOVIE: return UI_COLOR_PURPLE;
+        case IOT_SCENE_BRIGHT: return UI_COLOR_ORANGE;
+        default: return UI_COLOR_ACCENT;
+    }
+}
+
 static void floor_stats(uint8_t floor, uint16_t *total, uint16_t *online)
 {
     *total = 0;
@@ -234,34 +284,82 @@ static lv_obj_t *create_action_button(lv_obj_t *parent, const char *icon, const 
     return btn;
 }
 
+static lv_obj_t *create_scene_metric_card(lv_obj_t *parent, const mqtt_device_model_t *m)
+{
+    uint8_t scene_id = scene_display_id(m);
+    lv_color_t accent = scene_display_color(scene_id);
+
+    lv_obj_t *card = make_card(parent, 104);
+    lv_obj_set_style_pad_all(card, 14, 0);
+    lv_obj_set_style_pad_column(card, 10, 0);
+
+    add_asset_or_icon(card, scene_display_asset(scene_id), scene_display_icon(scene_id),
+                      42, 42, accent);
+
+    lv_obj_t *col = make_flex_col(card, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_width(col, 0);
+    lv_obj_set_flex_grow(col, 1);
+    lv_obj_set_style_pad_row(col, 3, 0);
+
+    lv_obj_t *label = ui_create_label(col,
+                                      tr("\xE5\xBD\x93\xE5\x89\x8D\xE6\xA8\xA1\xE5\xBC\x8F", "Current Mode"),
+                                      ui_font_cn(12), UI_COLOR_TEXT_SEC);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(label, lv_pct(100));
+
+    lv_obj_t *value = ui_create_label(col, scene_display_name(m),
+                                      ui_font_cn(21), UI_COLOR_TEXT_STRONG);
+    lv_label_set_long_mode(value, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(value, lv_pct(100));
+    return card;
+}
+
 static void add_weather_detail_line(lv_obj_t *parent, const mqtt_device_model_t *m)
 {
-    char buf[80];
+    char buf[96];
 
     if (!m || !m->weather_valid) {
-        ui_create_label(parent,
-                        tr("\xE5\xB9\xBF\xE5\xB7\x9E\xE5\xAE\xA4\xE5\xA4\x96\xEF\xBC\x9A\xE5\x90\x8C\xE6\xAD\xA5\xE4\xB8\xAD", "Guangzhou: syncing"),
-                        ui_font_cn(14), UI_COLOR_TEXT_SEC);
+        lv_obj_t *sync = ui_create_label(parent,
+                                         tr("\xE5\xB9\xBF\xE5\xB7\x9E\xE5\xAE\xA4\xE5\xA4\x96\xEF\xBC\x9A\xE5\x90\x8C\xE6\xAD\xA5\xE4\xB8\xAD", "Guangzhou: syncing"),
+                                         ui_font_cn(14), UI_COLOR_TEXT_SEC);
+        lv_label_set_long_mode(sync, LV_LABEL_LONG_DOT);
+        lv_obj_set_width(sync, lv_pct(100));
         return;
     }
 
     int temp_int = (int)(m->outdoor_temp + (m->outdoor_temp >= 0 ? 0.5f : -0.5f));
     lv_snprintf(buf, sizeof(buf), "\xE5\xB9\xBF\xE5\xB7\x9E \xC2\xB7 %s  %d\xC2\xB0""C",
                 weather_desc(m->weather_code), temp_int);
-    ui_create_label(parent, buf, ui_font_cn(17), UI_COLOR_ACCENT);
+    lv_obj_t *summary = ui_create_label(parent, buf, ui_font_cn(17), UI_COLOR_ACCENT);
+    lv_label_set_long_mode(summary, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(summary, lv_pct(100));
 
     int rain_tenths = (int)(m->precipitation_mm * 10.0f + 0.5f);
+    const char *rain_text = tr("\xE6\x97\xA0\xE9\x99\x8D\xE6\xB0\xB4", "No rain");
+    char rain_buf[24];
+    if (rain_tenths > 0) {
+        lv_snprintf(rain_buf, sizeof(rain_buf), "\xE9\x99\x8D\xE6\xB0\xB4 %d.%dmm",
+                    rain_tenths / 10, rain_tenths % 10);
+        rain_text = rain_buf;
+    }
+
+    lv_snprintf(buf, sizeof(buf), "\xE6\xB9\xBF\xE5\xBA\xA6 %u%%  %s",
+                (unsigned)m->outdoor_humidity, rain_text);
+    lv_obj_t *humidity = ui_create_label(parent, buf, ui_font_cn(13), UI_COLOR_TEXT_SEC);
+    lv_label_set_long_mode(humidity, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(humidity, lv_pct(100));
+
     if (m->air_quality_valid) {
         int pm25_int = (int)(m->pm25_outdoor + 0.5f);
-        lv_snprintf(buf, sizeof(buf),
-                    "\xE6\xB9\xBF\xE5\xBA\xA6 %u%%  \xE9\x99\x8D\xE6\xB0\xB4 %d.%dmm  PM2.5 %d",
-                    (unsigned)m->outdoor_humidity, rain_tenths / 10, rain_tenths % 10, pm25_int);
+        lv_snprintf(buf, sizeof(buf), "\xE7\xA9\xBA\xE6\xB0\x94 PM2.5 %d  AQI %u",
+                    pm25_int, (unsigned)m->aqi);
     } else {
-        lv_snprintf(buf, sizeof(buf),
-                    "\xE6\xB9\xBF\xE5\xBA\xA6 %u%%  \xE9\x99\x8D\xE6\xB0\xB4 %d.%dmm  PM2.5 --",
-                    (unsigned)m->outdoor_humidity, rain_tenths / 10, rain_tenths % 10);
+        lv_snprintf(buf, sizeof(buf), "%s",
+                    tr("\xE7\xA9\xBA\xE6\xB0\x94\xE8\xB4\xA8\xE9\x87\x8F\xE5\x90\x8C\xE6\xAD\xA5\xE4\xB8\xAD", "Air quality syncing"));
     }
-    ui_create_label(parent, buf, ui_font_cn(12), UI_COLOR_TEXT_SEC);
+    lv_obj_t *air = ui_create_label(parent, buf, ui_font_cn(12), UI_COLOR_TEXT_SEC);
+    lv_label_set_long_mode(air, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(air, lv_pct(100));
 }
 
 /* ---- Dynamic section builders ---- */
@@ -311,7 +409,7 @@ static void build_pills(data_ctx_t *ctx)
         lv_snprintf(buf, sizeof(buf), "--:--");
     }
     ui_kit_status_pill(row_bot, buf, UI_COLOR_ACCENT, UI_COLOR_ACCENT_SOFT);
-    ui_kit_status_pill(row_bot, tr("\xE5\xB9\xBF\xE5\xB7\x9E\xE5\xA4\xA9\xE6\xB0\x94", "Guangzhou"),
+    ui_kit_status_pill(row_bot, tr("\xE5\xB9\xBF\xE5\xB7\x9E", "Guangzhou"),
                        m->weather_valid ? UI_COLOR_GREEN : UI_COLOR_ORANGE,
                        m->weather_valid ? UI_COLOR_GREEN_SOFT : UI_COLOR_CARD_SOFT);
 }
@@ -350,10 +448,13 @@ static void build_visual(data_ctx_t *ctx)
     add_asset_or_icon(weather, "weather_guangzhou.png", ICON_LOCATION, 88, 70, UI_COLOR_ACCENT);
 
     lv_obj_t *weather_col = make_flex_col(weather, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_width(weather_col, 0);
     lv_obj_set_flex_grow(weather_col, 1);
     lv_obj_set_style_pad_row(weather_col, 4, 0);
-    ui_create_label(weather_col, tr("\xE5\xB9\xBF\xE5\xB7\x9E\xE5\xAE\x9E\xE6\x97\xB6\xE5\xA4\xA9\xE6\xB0\x94", "Guangzhou Weather"),
-                    ui_font_cn(17), UI_COLOR_TEXT_STRONG);
+    lv_obj_t *weather_title = ui_create_label(weather_col, tr("\xE5\xB9\xBF\xE5\xB7\x9E\xE5\xA4\xA9\xE6\xB0\x94", "Guangzhou Weather"),
+                                              ui_font_cn(17), UI_COLOR_TEXT_STRONG);
+    lv_label_set_long_mode(weather_title, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(weather_title, lv_pct(100));
     add_weather_detail_line(weather_col, m);
 }
 
@@ -366,12 +467,7 @@ static void build_metrics(data_ctx_t *ctx)
     char buf[32];
 
     /* Scene state */
-    const char *scene_name = scene_display_name(m);
-    lv_obj_t *c1 = ui_kit_metric_card(ctx->metrics_row, ICON_STAR,
-                                       tr("\xE5\xBD\x93\xE5\x89\x8D\xE6\xA8\xA1\xE5\xBC\x8F", "Current Mode"),
-                                       scene_name,
-                                       "",
-                                       true);
+    lv_obj_t *c1 = create_scene_metric_card(ctx->metrics_row, m);
     lv_obj_set_width(c1, 0);
     lv_obj_set_flex_grow(c1, 1);
 
