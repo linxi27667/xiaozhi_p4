@@ -300,8 +300,6 @@ static void *fs_open_cb(lv_fs_drv_t *drv, const char *path, lv_fs_mode_t mode)
     FILE *f = fopen(host_path, flags);
     if (!f) {
         ESP_LOGW(TAG, "fs_open FAIL: %s (mode=%d errno=%d)", host_path, mode, errno);
-    } else {
-        ESP_LOGI(TAG, "fs_open OK: %s", host_path);
     }
     return f;
 }
@@ -415,7 +413,7 @@ int ui_asset_service_preload_required(void)
         s_asset_cache[i].valid = true;
         s_preload_count++;
         s_preload_bytes += data_size;
-        ESP_LOGI(TAG, "preload OK: %s (%lu bytes)", name, (unsigned long)data_size);
+        ESP_LOGD(TAG, "preload OK: %s (%lu bytes)", name, (unsigned long)data_size);
     }
 
     s_preload_done = true;
@@ -436,7 +434,7 @@ bool ui_asset_available(const char *name)
 
     const ui_asset_cache_entry_t *cached = find_valid_cache_entry(name);
     if (cached) {
-        ESP_LOGI(TAG, "asset OK(cache): %s (%lu bytes)", name, (unsigned long)cached->data_size);
+        ESP_LOGD(TAG, "asset OK(cache): %s (%lu bytes)", name, (unsigned long)cached->data_size);
         return true;
     }
 
@@ -548,7 +546,7 @@ lv_obj_t *ui_asset_image_create(lv_obj_t *parent, const char *name)
 
                 lv_obj_t *img = asset_image_obj_create(parent, payload, &payload->dsc);
 
-                ESP_LOGI(TAG, "asset image pre-decoded: %s size=%ldx%ld bytes=%lu",
+                ESP_LOGD(TAG, "asset image pre-decoded: %s size=%ldx%ld bytes=%lu",
                          payload->name, (long)decoded_w, (long)decoded_h, (unsigned long)decoded_size);
                 return img;
             }
@@ -573,101 +571,29 @@ lv_obj_t *ui_asset_image_create(lv_obj_t *parent, const char *name)
 
     lv_obj_t *img = asset_image_obj_create(parent, payload, &payload->dsc);
 
-    ESP_LOGI(TAG, "asset image ready (raw): %s size=%ldx%ld bytes=%lu",
+    ESP_LOGD(TAG, "asset image ready (raw): %s size=%ldx%ld bytes=%lu",
              payload->name, (long)header.w, (long)header.h, (unsigned long)data_size);
     return img;
 }
 
 void ui_asset_service_diagnose(void)
 {
-    ESP_LOGI(TAG, "=== TF Card Asset Diagnosis ===");
-    ESP_LOGI(TAG, "UI_ASSET_ROOT = %s", UI_ASSET_ROOT);
-    ESP_LOGI(TAG, "Drive letter = %c", UI_ASSET_DRIVE_LETTER);
-    ESP_LOGI(TAG, "Preload state: done=%d count=%d bytes=%lu",
-             s_preload_done, s_preload_count, (unsigned long)s_preload_bytes);
-    ESP_LOGI(TAG, "Unavailable state: %d", s_assets_unavailable);
+    ESP_LOGI(TAG, "Asset service: preload=%d files, %lu bytes, unavailable=%d",
+             s_preload_count, (unsigned long)s_preload_bytes, s_assets_unavailable);
 
-    if (s_preload_count > 0) {
-        ESP_LOGI(TAG, "Using preloaded TF assets; runtime UI will not read TF card");
-        for (size_t i = 0; i < sizeof(s_asset_cache) / sizeof(s_asset_cache[0]); i++) {
-            ESP_LOGI(TAG, "  cache[%u] %s %s (%lu bytes)",
-                     (unsigned)i,
-                     s_asset_cache[i].name ? s_asset_cache[i].name : "(null)",
-                     s_asset_cache[i].valid ? "OK" : "MISS",
-                     (unsigned long)s_asset_cache[i].data_size);
-        }
+    if (s_assets_unavailable || s_preload_count == 0) {
+        /* Only print detailed diagnosis when something is wrong */
+        ESP_LOGW(TAG, "=== TF Card Asset Diagnosis (problems detected) ===");
+        ESP_LOGI(TAG, "UI_ASSET_ROOT = %s", UI_ASSET_ROOT);
+        ESP_LOGI(TAG, "Drive letter = %c", UI_ASSET_DRIVE_LETTER);
+        ESP_LOGI(TAG, "Preload state: done=%d count=%d bytes=%lu",
+                 s_preload_done, s_preload_count, (unsigned long)s_preload_bytes);
+        ESP_LOGI(TAG, "Unavailable state: %d", s_assets_unavailable);
+        diagnose_sdcard_root();
         ESP_LOGI(TAG, "=== Diagnosis Complete ===");
         return;
     }
 
-    if (s_assets_unavailable) {
-        ESP_LOGW(TAG, "TF assets unavailable; runtime UI will not read TF card");
-        ESP_LOGI(TAG, "=== Diagnosis Complete ===");
-        return;
-    }
-
-    ensure_sdcard_mounted();
-
-    /* Check /sdcard first. If the asset folder is missing, root listing tells
-     * whether the TF card mounted but the xiaozhi_ui folder was copied wrong. */
-    diagnose_sdcard_root();
-
-    /* Check if asset root directory exists */
-    struct stat st;
-    if (stat(UI_ASSET_ROOT, &st) != 0) {
-        ESP_LOGE(TAG, "ROOT DIR MISSING: %s (errno=%d)", UI_ASSET_ROOT, errno);
-        ESP_LOGE(TAG, "-> Expected TF layout: /sdcard/xiaozhi_ui/*.png");
-        diagnose_possible_nested_path("/sdcard/xiaozhi_ui/xiaozhi_ui",
-                                      "Copy the inner xiaozhi_ui folder to TF root, not xiaozhi_ui/xiaozhi_ui.");
-        diagnose_possible_nested_path("/sdcard/tf_card_assets/xiaozhi_ui",
-                                      "Copy tf_card_assets/xiaozhi_ui to TF root as /xiaozhi_ui.");
-        return;
-    }
-    ESP_LOGI(TAG, "Root dir exists: %s", UI_ASSET_ROOT);
-
-    /* Try listing files via opendir */
-    DIR *dir = opendir(UI_ASSET_ROOT);
-    if (!dir) {
-        ESP_LOGE(TAG, "opendir FAIL: %s (errno=%d)", UI_ASSET_ROOT, errno);
-        return;
-    }
-    ESP_LOGI(TAG, "Listing %s:", UI_ASSET_ROOT);
-    struct dirent *ent;
-    int count = 0;
-    /* d_name can be up to 256 bytes; size buffer to fit ROOT + "/" + d_name + NUL */
-    char full[300];
-    while ((ent = readdir(dir)) != NULL) {
-        snprintf(full, sizeof(full), "%s/%s", UI_ASSET_ROOT, ent->d_name);
-        struct stat fst;
-        long sz = (stat(full, &fst) == 0) ? (long)fst.st_size : -1;
-        ESP_LOGI(TAG, "  [%d] %s (%ld bytes)", count, ent->d_name, sz);
-        count++;
-    }
-    closedir(dir);
-    ESP_LOGI(TAG, "Total files: %d", count);
-
-    for (size_t i = 0; i < sizeof(s_required_assets) / sizeof(s_required_assets[0]); i++) {
-        const char *name = s_required_assets[i];
-        build_host_path(name, full, sizeof(full));
-        if (stat(full, &st) != 0) {
-            ESP_LOGE(TAG, "required asset MISSING: %s (expected %s errno=%d)", name, full, errno);
-            continue;
-        }
-
-        uint8_t *data = NULL;
-        uint32_t data_size = 0;
-        if (!read_asset_file(name, &data, &data_size)) {
-            ESP_LOGE(TAG, "required asset READ FAIL: %s", name);
-            continue;
-        }
-
-        if (!asset_is_png(data, data_size)) {
-            ESP_LOGE(TAG, "required asset NOT PNG: %s (%lu bytes)", name, (unsigned long)data_size);
-        } else {
-            ESP_LOGI(TAG, "required asset OK: %s (%lu bytes)", name, (unsigned long)data_size);
-        }
-        heap_caps_free(data);
-    }
-
-    ESP_LOGI(TAG, "=== Diagnosis Complete ===");
+    /* Normal case: just log a summary, skip per-file listing */
+    ESP_LOGI(TAG, "All %d TF assets preloaded OK", s_preload_count);
 }
