@@ -102,6 +102,12 @@ static lv_color_t scene_accent(const scene_item_t *item)
     return lv_color_hex(item ? item->accent_hex : 0x2F6BFF);
 }
 
+static bool scene_is_auto_trigger_only(const scene_item_t *item)
+{
+    return item && item->action == SCENE_ACTION_SCENE &&
+           (item->id == IOT_SCENE_FIRE || item->id == IOT_SCENE_RAIN);
+}
+
 static lv_obj_t *create_row(lv_obj_t *parent, int gap)
 {
     lv_obj_t *row = lv_obj_create(parent);
@@ -119,12 +125,12 @@ static lv_obj_t *create_row(lv_obj_t *parent, int gap)
     return row;
 }
 
-static void add_scene_image(lv_obj_t *parent, const scene_item_t *item)
+static void add_scene_image(lv_obj_t *parent, const scene_item_t *item, bool disabled)
 {
     lv_obj_t *box = lv_obj_create(parent);
     lv_obj_remove_style_all(box);
     lv_obj_set_size(box, 48, 48);
-    lv_color_t accent = scene_accent(item);
+    lv_color_t accent = disabled ? UI_COLOR_TEXT_SEC : scene_accent(item);
     lv_obj_set_style_bg_color(box, lv_color_mix(accent, UI_COLOR_CARD, 18), 0);
     lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
     lv_obj_set_style_radius(box, 10, 0);
@@ -132,6 +138,11 @@ static void add_scene_image(lv_obj_t *parent, const scene_item_t *item)
 
     lv_obj_t *img = ui_asset_image_create(box, item->asset);
     if (img) {
+        if (disabled) {
+            lv_obj_set_style_image_recolor(img, UI_COLOR_TEXT_SEC, 0);
+            lv_obj_set_style_image_recolor_opa(img, LV_OPA_70, 0);
+            lv_obj_set_style_opa(img, LV_OPA_60, 0);
+        }
         lv_obj_center(img);
         return;
     }
@@ -170,6 +181,15 @@ static void set_card_active(lv_obj_t *card, lv_color_t accent, bool active)
     lv_obj_set_style_bg_color(card, active ? lv_color_mix(accent, UI_COLOR_CARD, 12) : UI_COLOR_CARD, 0);
 }
 
+static void set_card_disabled(lv_obj_t *card)
+{
+    if (!card) return;
+    lv_obj_set_style_border_color(card, UI_COLOR_BORDER, 0);
+    lv_obj_set_style_border_width(card, 1, 0);
+    lv_obj_set_style_bg_color(card, UI_COLOR_INPUT_BG, 0);
+    lv_obj_clear_state(card, LV_STATE_PRESSED);
+}
+
 static void refresh_scene(scene_ctx_t *ctx)
 {
     if (!ctx || ctx->deleted) return;
@@ -177,6 +197,11 @@ static void refresh_scene(scene_ctx_t *ctx)
 
     for (uint32_t i = 0; i < SCENE_COUNT; i++) {
         const scene_item_t *item = &s_scenes[i];
+        if (scene_is_auto_trigger_only(item)) {
+            set_card_disabled(ctx->cards[i].card);
+            continue;
+        }
+
         bool active = false;
         if (item->action == SCENE_ACTION_SCENE) {
             active = (m->current_scene == item->id);
@@ -216,18 +241,24 @@ static void on_delete(lv_event_t *e)
 static lv_obj_t *create_scene_card(lv_obj_t *grid, scene_ctx_t *ctx, uint32_t index)
 {
     const scene_item_t *item = &s_scenes[index];
+    bool disabled = scene_is_auto_trigger_only(item);
 
     lv_obj_t *card = ui_create_card(grid);
     lv_obj_set_width(card, lv_pct(31));
     lv_obj_set_style_min_height(card, 116, 0);
     lv_obj_set_style_pad_all(card, 14, 0);
     lv_obj_set_style_pad_column(card, 12, 0);
-    lv_obj_set_style_bg_color(card, UI_COLOR_CARD, 0);
-    lv_obj_add_flag(card, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(card, on_scene_click, LV_EVENT_CLICKED, (void *)item);
-    ui_apply_press_feedback(card, scene_accent(item));
+    lv_obj_set_style_bg_color(card, disabled ? UI_COLOR_INPUT_BG : UI_COLOR_CARD, 0);
+    if (!disabled) {
+        lv_obj_add_flag(card, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_event_cb(card, on_scene_click, LV_EVENT_CLICKED, (void *)item);
+        ui_apply_press_feedback(card, scene_accent(item));
+    } else {
+        lv_obj_clear_flag(card, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_style_border_color(card, UI_COLOR_BORDER, 0);
+    }
 
-    add_scene_image(card, item);
+    add_scene_image(card, item, disabled);
 
     lv_obj_t *col = lv_obj_create(card);
     lv_obj_remove_style_all(col);
@@ -241,7 +272,8 @@ static lv_obj_t *create_scene_card(lv_obj_t *grid, scene_ctx_t *ctx, uint32_t in
     lv_obj_set_style_pad_row(col, 5, 0);
     lv_obj_clear_flag(col, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t *name = ui_create_label(col, tr(item->zh, item->en), ui_font_cn(19), UI_COLOR_TEXT_STRONG);
+    lv_obj_t *name = ui_create_label(col, tr(item->zh, item->en), ui_font_cn(19),
+                                     disabled ? UI_COLOR_TEXT_SEC : UI_COLOR_TEXT_STRONG);
     lv_label_set_long_mode(name, LV_LABEL_LONG_CLIP);
     lv_obj_set_width(name, lv_pct(100));
 
