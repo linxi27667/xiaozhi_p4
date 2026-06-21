@@ -1,4 +1,4 @@
-#include "wifi_manager.h"
+#include "wifi_compat.h"
 
 #include "mqtt_device_model.h"
 #include "ui_events.h"

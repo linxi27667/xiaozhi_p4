@@ -1,5 +1,6 @@
 #include "page_scene.h"
 
+#include "../../services/auto_mode.h"
 #include "mqtt_device_model.h"
 #include "mqtt_iot_protocol.h"
 #include "ui_asset_service.h"
@@ -21,7 +22,7 @@ static const char *TAG = "PAGE_SCENE";
 
 typedef enum {
     SCENE_ACTION_SCENE = 0,
-    SCENE_ACTION_BRIGHT,
+    SCENE_ACTION_AUTO,
 } scene_action_t;
 
 typedef struct {
@@ -53,7 +54,7 @@ static const scene_item_t s_scenes[] = {
       "\xE8\xB5\xB7\xE5\xA4\x9C", "Night",
       "\xE5\xBC\x80\xE5\x90\xAF\xE5\x8E\x95\xE6\x89\x80\xE7\x81\xAF+\xE6\xA9\x99\xE8\x89\xB2\xE5\xBC\xB1\xE5\x85\x89", "Bathroom + dim RGB",
       0xF59E0B },
-    { IOT_SCENE_NONE,  SCENE_ACTION_BRIGHT, ICON_SUN,       "scene_lights.png",
+    { IOT_SCENE_BRIGHT, SCENE_ACTION_SCENE,  ICON_SUN,       "scene_lights.png",
       "\xE6\x98\x8E\xE4\xBA\xAE", "Bright",
       "\xE5\xBC\x80\xE5\x90\xAF\xE5\xB8\xB8\xE7\x94\xA8\xE7\x81\xAF\xE5\x85\x89", "Common lights on",
       0xF59E0B },
@@ -69,6 +70,11 @@ static const scene_item_t s_scenes[] = {
       "\xE9\x9B\xA8\xE5\xA4\xA9", "Rain",
       "\xE4\xBC\xA0\xE6\x84\x9F\xE5\x99\xA8\xE8\xA7\xA6\xE5\x8F\x91\xE5\x9C\xBA\xE6\x99\xAF", "Sensor-triggered",
       0x3B82F6 },
+    /* Auto mode toggle (id=0xFF, not a real scene) */
+    { 0xFF,            SCENE_ACTION_AUTO,   ICON_SETTINGS,  NULL,
+      "\xE8\x87\xAA\xE5\x8A\xA8", "Auto",
+      "\xE6\x99\xBA\xE8\x83\xBD\xE8\x87\xAA\xE5\x8A\xA8\xE6\x8E\xA7\xE5\x88\xB6", "Smart auto control",
+      0x10B981 },
 };
 
 #define SCENE_COUNT (sizeof(s_scenes) / sizeof(s_scenes[0]))
@@ -81,6 +87,7 @@ typedef struct {
 
 typedef struct {
     lv_obj_t *page;
+    lv_obj_t *current_scene_label;  /* top-right badge showing active scene */
     scene_card_info_t cards[SCENE_COUNT];
     bool deleted;
 } scene_ctx_t;
@@ -93,18 +100,6 @@ static const char *tr(const char *zh, const char *en)
 static lv_color_t scene_accent(const scene_item_t *item)
 {
     return lv_color_hex(item ? item->accent_hex : 0x2F6BFF);
-}
-
-static bool any_light_on(void)
-{
-    for (uint16_t i = 0; i < device_model_count(); i++) {
-        const rc_device_t *d = device_model_at(i);
-        if (d && d->connected && d->power_on &&
-            (d->type == RC_DEVICE_LIGHT || d->type == RC_DEVICE_RGB_LIGHT)) {
-            return true;
-        }
-    }
-    return false;
 }
 
 static lv_obj_t *create_row(lv_obj_t *parent, int gap)
@@ -156,10 +151,14 @@ static void on_scene_click(lv_event_t *e)
     const scene_item_t *item = (const scene_item_t *)lv_event_get_user_data(e);
     if (!item) return;
 
-    if (item->action == SCENE_ACTION_BRIGHT) {
-        send_bright_mode();
+    if (item->action == SCENE_ACTION_AUTO) {
+        auto_mode_set_global(!auto_mode_get_global());
     } else {
         mqtt_send_scene(item->id);
+        /* Bright scene also sends broadcast to turn lights on */
+        if (item->id == IOT_SCENE_BRIGHT) {
+            send_bright_mode();
+        }
     }
 }
 
@@ -181,10 +180,16 @@ static void refresh_scene(scene_ctx_t *ctx)
         bool active = false;
         if (item->action == SCENE_ACTION_SCENE) {
             active = (m->current_scene == item->id);
-        } else if (item->action == SCENE_ACTION_BRIGHT) {
-            active = any_light_on();
+        } else if (item->action == SCENE_ACTION_AUTO) {
+            active = auto_mode_get_global();
         }
         set_card_active(ctx->cards[i].card, scene_accent(item), active);
+    }
+
+    /* Update current scene badge */
+    if (ctx->current_scene_label) {
+        const char *name = device_model_scene_name(m->current_scene);
+        lv_label_set_text(ctx->current_scene_label, name);
     }
 }
 
@@ -258,9 +263,43 @@ lv_obj_t *page_scene_create(lv_obj_t *parent)
     lv_obj_t *page = ui_create_page(parent, on_delete, ctx);
     ctx->page = page;
 
-    ui_kit_page_title(page, ICON_STAR,
+    /* Title row with current scene badge on the right */
+    lv_obj_t *title_row = lv_obj_create(page);
+    lv_obj_remove_style_all(title_row);
+    lv_obj_set_width(title_row, lv_pct(100));
+    lv_obj_set_height(title_row, LV_SIZE_CONTENT);
+    lv_obj_set_style_pad_all(title_row, 0, 0);
+    lv_obj_set_layout(title_row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(title_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(title_row, LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(title_row, LV_OBJ_FLAG_SCROLLABLE);
+
+    /* Left: title (grows to fill) */
+    lv_obj_t *title_left = lv_obj_create(title_row);
+    lv_obj_remove_style_all(title_left);
+    lv_obj_set_width(title_left, 0);
+    lv_obj_set_flex_grow(title_left, 1);
+    lv_obj_set_height(title_left, LV_SIZE_CONTENT);
+    lv_obj_set_style_pad_all(title_left, 0, 0);
+    lv_obj_clear_flag(title_left, LV_OBJ_FLAG_SCROLLABLE);
+
+    ui_kit_page_title(title_left, ICON_STAR,
         tr("\xE5\x9C\xBA\xE6\x99\xAF\xE6\xA8\xA1\xE5\xBC\x8F", "Scene Mode"),
         tr("\xE6\x89\x8B\xE5\x8A\xA8\xE5\x9C\xBA\xE6\x99\xAF\xE5\xBF\xAB\xE6\x8D\xB7\xE5\x88\x87\xE6\x8D\xA2", "Quick scene switching"));
+
+    /* Right: current scene badge */
+    lv_obj_t *badge = lv_obj_create(title_row);
+    lv_obj_remove_style_all(badge);
+    lv_obj_set_height(badge, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(badge, UI_COLOR_ACCENT_SOFT, 0);
+    lv_obj_set_style_bg_opa(badge, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(badge, 12, 0);
+    lv_obj_set_style_pad_hor(badge, 12, 0);
+    lv_obj_set_style_pad_ver(badge, 4, 0);
+    lv_obj_clear_flag(badge, LV_OBJ_FLAG_SCROLLABLE);
+    ctx->current_scene_label = ui_create_label(badge, "未启用",
+        ui_font_cn(13), UI_COLOR_ACCENT);
 
     /* UTF-8: 手动场景 = E6898BE58AA8E59CBAE699AF */
     ui_kit_group_title(page, tr("\xE6\x89\x8B\xE5\x8A\xA8\xE5\x9C\xBA\xE6\x99\xAF", "Manual Scenes"));

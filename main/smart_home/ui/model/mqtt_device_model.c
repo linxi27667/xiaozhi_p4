@@ -21,6 +21,20 @@ void smart_home_alarm_on_fire_status(uint8_t floor_id, bool active)
     (void)active;
 }
 
+void smart_home_alarm_on_rain_status(uint8_t floor_id, bool active) __attribute__((weak));
+void smart_home_alarm_on_rain_status(uint8_t floor_id, bool active)
+{
+    (void)floor_id;
+    (void)active;
+}
+
+void smart_home_alarm_on_help_status(uint8_t floor_id, bool active) __attribute__((weak));
+void smart_home_alarm_on_help_status(uint8_t floor_id, bool active)
+{
+    (void)floor_id;
+    (void)active;
+}
+
 static void publish_update(void)
 {
     s_model.refresh_seq++;
@@ -373,6 +387,7 @@ void device_model_apply_heartbeat(const iot_heartbeat_v2_packet_t *heartbeat)
         s_model.rain_floor_valid[floor_idx] = true;
         s_model.rain_floor_status[floor_idx] = heartbeat->rain_status;
         s_model.rain_status_floor_valid[floor_idx] = true;
+        smart_home_alarm_on_rain_status(floor_id, heartbeat->rain_status != 0);
         /* 全局字段: 仅作为兼容性保留, 取告警最严重的楼层值 */
         if (heartbeat->rain_mv > s_model.rain_value || !s_model.rain_valid) {
             s_model.rain_value = heartbeat->rain_mv;
@@ -400,6 +415,7 @@ void device_model_apply_heartbeat(const iot_heartbeat_v2_packet_t *heartbeat)
     if (heartbeat->sensor_count >= 3 || heartbeat->help_status != 0) {
         s_model.help_floor_status[floor_idx] = heartbeat->help_status;
         s_model.help_floor_valid[floor_idx] = true;
+        smart_home_alarm_on_help_status(floor_id, heartbeat->help_status != 0);
     }
 
     s_model.sensor_rx_count++;
@@ -569,6 +585,7 @@ void device_model_update_sensor_value(uint8_t floor_id, uint8_t sensor_type, uin
             if (floor_id >= 1 && floor_id <= 3) {
                 s_model.rain_floor_status[idx] = (uint8_t)value;
                 s_model.rain_status_floor_valid[idx] = true;
+                smart_home_alarm_on_rain_status(floor_id, value != 0);
             }
             break;
         case IOT_SENSOR_FIRE_STATUS:
@@ -586,6 +603,7 @@ void device_model_update_sensor_value(uint8_t floor_id, uint8_t sensor_type, uin
             if (floor_id >= 1 && floor_id <= 3) {
                 s_model.help_floor_status[idx] = (uint8_t)value;
                 s_model.help_floor_valid[idx] = true;
+                smart_home_alarm_on_help_status(floor_id, value != 0);
             }
             break;
         default:

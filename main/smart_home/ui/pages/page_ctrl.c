@@ -24,7 +24,7 @@ typedef struct {
     lv_obj_t *page;
     lv_obj_t *tab_row;       /* tab button container */
     lv_obj_t *devices_col;   /* device cards grid container (scrollable) */
-    int active_floor;        /* 1, 2, or 3 */
+    int active_floor;        /* 0=all, 1, 2, or 3 */
     uint32_t last_hash;      /* for change detection */
     bool deleted;
 } ctrl_ctx_t;
@@ -89,7 +89,7 @@ static uint32_t floor_state_hash(int floor)
     for (uint16_t i = 0; i < device_model_count(); i++) {
         const rc_device_t *d = device_model_at(i);
         if (!d || !d->controllable) continue;
-        if (d->floor != (rc_floor_t)floor) continue;
+        if (floor != 0 && d->floor != (rc_floor_t)floor) continue;
         if (d->type == RC_DEVICE_RGB_LIGHT) continue;
         h ^= ((uint32_t)d->power_on << 8) ^ ((uint32_t)d->connected << 7) ^ (uint32_t)i;
         h *= 16777619u;
@@ -121,7 +121,7 @@ static void on_tab_click(lv_event_t *e)
     if (!ctx || ctx->deleted) return;
     lv_obj_t *btn = lv_event_get_current_target(e);
     int floor = (int)(intptr_t)lv_obj_get_user_data(btn);
-    if (floor < 1 || floor > 3) return;
+    if (floor < 0 || floor > 3) return;
     if (ctx->active_floor == floor) return;
     ctx->active_floor = floor;
     ctx->last_hash = 0;  /* force rebuild */
@@ -165,12 +165,12 @@ static void rebuild_tabs(ctrl_ctx_t *ctx)
     if (!ctx || !ctx->tab_row) return;
     lv_obj_clean(ctx->tab_row);
 
-    /* UTF-8: 一楼=E4B880E6A5BC, 二楼=E4BA8CE6A5BC, 三楼=E4B889E6A5BC */
-    const char *names_zh[] = { "\xE4\xB8\x80\xE6\xA5\xBC", "\xE4\xBA\x8C\xE6\xA5\xBC", "\xE4\xB8\x89\xE6\xA5\xBC" };
-    const char *names_en[] = { "1F", "2F", "3F" };
+    /* UTF-8: 全部=E585A8E983A8, 一楼=E4B880E6A5BC, 二楼=E4BA8CE6A5BC, 三楼=E4B889E6A5BC */
+    const char *names_zh[] = { "\xE5\x85\xA8\xE9\x83\xA8", "\xE4\xB8\x80\xE6\xA5\xBC", "\xE4\xBA\x8C\xE6\xA5\xBC", "\xE4\xB8\x89\xE6\xA5\xBC" };
+    const char *names_en[] = { "All", "1F", "2F", "3F" };
 
-    for (int i = 0; i < 3; i++) {
-        int floor = i + 1;
+    for (int i = 0; i < 4; i++) {
+        int floor = i;  /* 0=all, 1=1F, 2=2F, 3=3F */
         bool active = (ctx->active_floor == floor);
         create_tab_btn(ctx->tab_row, tr(names_zh[i], names_en[i]),
                        active, floor, ctx);
@@ -190,7 +190,7 @@ static void rebuild_devices(ctrl_ctx_t *ctx)
     for (uint16_t i = 0; i < device_model_count(); i++) {
         const rc_device_t *d = device_model_at(i);
         if (!d || !d->controllable) continue;
-        if (d->floor != (rc_floor_t)floor) continue;
+        if (floor != 0 && d->floor != (rc_floor_t)floor) continue;
         /* RGB_LIGHT (master bedroom light) is exclusive to the lighting page */
         if (d->type == RC_DEVICE_RGB_LIGHT) continue;
 
@@ -263,7 +263,7 @@ lv_obj_t *page_ctrl_create(lv_obj_t *parent)
 {
     ctrl_ctx_t *ctx = lv_malloc(sizeof(ctrl_ctx_t));
     memset(ctx, 0, sizeof(*ctx));
-    ctx->active_floor = 1;
+    ctx->active_floor = 0;  /* default: show all */
 
     ctx->page = ui_create_page(parent, on_delete, ctx);
     /* Fill parent height so devices column can scroll */

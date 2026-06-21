@@ -417,7 +417,7 @@ static void OnShellLanguageChanged(void* user_data) {
 
 static void OnShellPageSwitched(void* user_data) {
     auto* self = static_cast<LcdDisplay*>(user_data);
-    if (self) self->SyncShellNavFromInnerPage();
+    if (self) self->SyncShellNav();
 }
 
 void LcdDisplay::RefreshShellLabels() {
@@ -433,6 +433,10 @@ void LcdDisplay::RefreshShellLabels() {
     if (shell_network_label_) lv_label_set_text(shell_network_label_, zh ? "网络" : "Net");
     if (shell_settings_label_) lv_label_set_text(shell_settings_label_, zh ? "设置" : "Settings");
     if (shell_wake_label_) lv_label_set_text(shell_wake_label_, zh ? "唤醒" : "Wake");
+}
+
+void LcdDisplay::SyncShellNav() {
+    SyncShellNavFromInnerPage();
 }
 
 void LcdDisplay::RefreshShellNav(ShellPage page) {

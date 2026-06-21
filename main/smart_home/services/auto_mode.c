@@ -112,7 +112,7 @@ static void do_trigger(auto_target_t target, uint8_t floor_id, uint8_t cmd, uint
 {
     s_state.trigger_count[target]++;
     s_state.last_trigger_ms[target] = now_ms();
-    mqtt_send_command_v3(floor_id, cmd, gpio, value, IOT_SOURCE_RULE);
+    mqtt_send_command(floor_id, cmd, gpio, value);
 }
 
 void auto_mode_on_event(const smart_home_event_t *event)
@@ -120,9 +120,9 @@ void auto_mode_on_event(const smart_home_event_t *event)
     if (!event) return;
 
     if (event->type == SH_EVENT_FIRE_ALARM) {
-        mqtt_send_command_v3(event->floor_id, IOT_CMD_BROADCAST_ALL_OFF, 0, 0, IOT_SOURCE_RULE);
-        mqtt_send_command_v3(2, IOT_CMD_SET_AMBIENT_SCENE, 0, IOT_AMBIENT_SCENE_WARNING, IOT_SOURCE_RULE);
-        mqtt_send_command_v3(2, IOT_CMD_SET_AMBIENT_SCENE, 1, IOT_AMBIENT_SCENE_WARNING, IOT_SOURCE_RULE);
+        mqtt_send_broadcast(IOT_CMD_BROADCAST_ALL_OFF);
+        mqtt_send_ambient_scene(2, 0, IOT_AMBIENT_SCENE_WARNING);
+        mqtt_send_ambient_scene(2, 1, IOT_AMBIENT_SCENE_WARNING);
         return;
     }
 
@@ -134,7 +134,9 @@ void auto_mode_on_event(const smart_home_event_t *event)
             do_trigger(AUTO_TARGET_FLOOR3_HANGER, 3, IOT_CMD_SET_SERVO, 8, 0);
         }
         if (can_trigger(AUTO_TARGET_FLOOR2_LIVING_AMBIENT)) {
-            do_trigger(AUTO_TARGET_FLOOR2_LIVING_AMBIENT, 2, IOT_CMD_SET_AMBIENT_SCENE, 1, IOT_AMBIENT_SCENE_RAIN);
+            s_state.trigger_count[AUTO_TARGET_FLOOR2_LIVING_AMBIENT]++;
+            s_state.last_trigger_ms[AUTO_TARGET_FLOOR2_LIVING_AMBIENT] = now_ms();
+            mqtt_send_ambient_scene(2, 1, IOT_AMBIENT_SCENE_RAIN);
         }
         if (can_trigger(AUTO_TARGET_FLOOR3_SKYLIGHT)) {
             do_trigger(AUTO_TARGET_FLOOR3_SKYLIGHT, 3, IOT_CMD_SET_SERVO, 6, 0);
@@ -151,10 +153,14 @@ void auto_mode_on_event(const smart_home_event_t *event)
 
     if (event->type == SH_EVENT_HELP_ALARM) {
         if (can_trigger(AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT)) {
-            do_trigger(AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT, event->floor_id, IOT_CMD_SET_AMBIENT_SCENE, 0, IOT_AMBIENT_SCENE_WARNING);
+            s_state.trigger_count[AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT]++;
+            s_state.last_trigger_ms[AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT] = now_ms();
+            mqtt_send_ambient_scene(event->floor_id, 0, IOT_AMBIENT_SCENE_WARNING);
         }
         if (can_trigger(AUTO_TARGET_FLOOR2_LIVING_AMBIENT)) {
-            do_trigger(AUTO_TARGET_FLOOR2_LIVING_AMBIENT, event->floor_id, IOT_CMD_SET_AMBIENT_SCENE, 1, IOT_AMBIENT_SCENE_WARNING);
+            s_state.trigger_count[AUTO_TARGET_FLOOR2_LIVING_AMBIENT]++;
+            s_state.last_trigger_ms[AUTO_TARGET_FLOOR2_LIVING_AMBIENT] = now_ms();
+            mqtt_send_ambient_scene(event->floor_id, 1, IOT_AMBIENT_SCENE_WARNING);
         }
         return;
     }
@@ -174,14 +180,20 @@ void auto_mode_tick(void)
     if (hour == s_last_triggered_hour) return;
 
     if (hour == 23 && can_trigger(AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT)) {
-        do_trigger(AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT, 2, IOT_CMD_SET_AMBIENT_SCENE, 0, IOT_AMBIENT_SCENE_SLEEP);
+        s_state.trigger_count[AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT]++;
+        s_state.last_trigger_ms[AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT] = now_ms();
+        mqtt_send_ambient_scene(2, 0, IOT_AMBIENT_SCENE_SLEEP);
         if (can_trigger(AUTO_TARGET_FLOOR2_LIVING_AMBIENT)) {
-            do_trigger(AUTO_TARGET_FLOOR2_LIVING_AMBIENT, 2, IOT_CMD_SET_AMBIENT_SCENE, 1, IOT_AMBIENT_SCENE_OFF);
+            s_state.trigger_count[AUTO_TARGET_FLOOR2_LIVING_AMBIENT]++;
+            s_state.last_trigger_ms[AUTO_TARGET_FLOOR2_LIVING_AMBIENT] = now_ms();
+            mqtt_send_ambient_scene(2, 1, IOT_AMBIENT_SCENE_OFF);
         }
-        mqtt_send_command_v3(2, IOT_CMD_BROADCAST_LIGHTS_OFF, 0, 0, IOT_SOURCE_RULE);
+        mqtt_send_broadcast(IOT_CMD_BROADCAST_LIGHTS_OFF);
         s_last_triggered_hour = hour;
     } else if (hour == 18 && can_trigger(AUTO_TARGET_FLOOR2_LIVING_AMBIENT)) {
-        do_trigger(AUTO_TARGET_FLOOR2_LIVING_AMBIENT, 2, IOT_CMD_SET_AMBIENT_SCENE, 1, IOT_AMBIENT_SCENE_WARM_HOME);
+        s_state.trigger_count[AUTO_TARGET_FLOOR2_LIVING_AMBIENT]++;
+        s_state.last_trigger_ms[AUTO_TARGET_FLOOR2_LIVING_AMBIENT] = now_ms();
+        mqtt_send_ambient_scene(2, 1, IOT_AMBIENT_SCENE_WARM_HOME);
         s_last_triggered_hour = hour;
     }
 }

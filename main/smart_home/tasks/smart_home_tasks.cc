@@ -2,6 +2,9 @@
 
 #include "mqtt_device_model.h"
 #include "ui_events.h"
+#include "../services/auto_mode.h"
+#include "../services/rule_engine.h"
+#include "../services/smart_home_event_center.h"
 #include "../services/xiaozhi_mqtt.h"
 #include "../services/weather_service.h"
 
@@ -26,6 +29,7 @@ static void smart_home_mqtt_task(void* arg) {
             mqtt_client_poll();
         }
         weather_service_poll();
+        auto_mode_tick();
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
@@ -38,6 +42,9 @@ void SmartHomeTasksStart(void) {
 
     ui_events_init();
     device_model_init();
+    smart_home_event_center_init();
+    auto_mode_init();
+    rule_engine_init();
     mqtt_client_init();
     weather_service_init();
     weather_service_start();

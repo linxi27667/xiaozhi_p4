@@ -91,6 +91,7 @@ public:
     virtual void SetTheme(Theme* theme) override;
     
     void RefreshShellLabels();
+    void SyncShellNav();
 
     // Set whether to hide chat messages/subtitles
     void SetHideSubtitle(bool hide);

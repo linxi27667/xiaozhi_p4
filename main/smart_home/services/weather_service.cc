@@ -2,7 +2,7 @@
 
 #include "board.h"
 #include "mqtt_device_model.h"
-#include "wifi_manager.h"
+#include "wifi_compat.h"
 
 #include <cJSON.h>
 #include <esp_log.h>

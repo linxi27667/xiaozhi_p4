@@ -189,7 +189,7 @@ static const rc_device_t *find_master_light(uint8_t *floor_id, uint8_t *gpio_ind
 /* ===== Send current state via MQTT ===== */
 static void send_current(light_ctx_t *ctx)
 {
-    if (!ctx || !ctx->dev_found || !ctx->dev_connected) return;
+    if (!ctx || !ctx->dev_found) return;
     mqtt_send_rgb_light(ctx->dev_floor_id, ctx->dev_gpio_index,
                         ctx->red, ctx->green, ctx->blue,
                         ctx->brightness, ctx->effect, 50);
@@ -278,7 +278,7 @@ static void update_preset_active(light_ctx_t *ctx)
 static void on_arc_changed(lv_event_t *e)
 {
     light_ctx_t *ctx = (light_ctx_t *)lv_event_get_user_data(e);
-    if (!ctx || ctx->updating || ctx->deleted || !ctx->dev_connected) return;
+    if (!ctx || ctx->updating || ctx->deleted) return;
 
     int16_t angle = lv_arc_get_value(ctx->arc);
     if (angle < 0) angle = 0;
@@ -298,7 +298,7 @@ static void on_arc_changed(lv_event_t *e)
 static void on_brightness_changed(lv_event_t *e)
 {
     light_ctx_t *ctx = (light_ctx_t *)lv_event_get_user_data(e);
-    if (!ctx || ctx->updating || ctx->deleted || !ctx->dev_connected) return;
+    if (!ctx || ctx->updating || ctx->deleted) return;
 
     ctx->brightness = (uint8_t)lv_slider_get_value(ctx->brightness_slider);
 
@@ -314,7 +314,7 @@ static void on_brightness_changed(lv_event_t *e)
 static void on_effect_click(lv_event_t *e)
 {
     light_ctx_t *ctx = (light_ctx_t *)lv_event_get_user_data(e);
-    if (!ctx || ctx->updating || ctx->deleted || !ctx->dev_connected) return;
+    if (!ctx || ctx->updating || ctx->deleted) return;
 
     uint8_t new_effect = (uint8_t)(uintptr_t)lv_obj_get_user_data(lv_event_get_current_target(e));
     ctx->effect = new_effect;
@@ -329,7 +329,7 @@ static void on_effect_click(lv_event_t *e)
 static void on_preset_click(lv_event_t *e)
 {
     light_ctx_t *ctx = (light_ctx_t *)lv_event_get_user_data(e);
-    if (!ctx || ctx->updating || ctx->deleted || !ctx->dev_connected) return;
+    if (!ctx || ctx->updating || ctx->deleted) return;
 
     uint8_t idx = (uint8_t)(uintptr_t)lv_obj_get_user_data(lv_event_get_current_target(e));
 
@@ -422,41 +422,6 @@ static void refresh_light(light_ctx_t *ctx)
 
     /* Update preset blocks */
     update_preset_active(ctx);
-
-    /* Enable/disable controls based on connection state */
-    bool enabled = ctx->dev_connected;
-    if (ctx->arc) {
-        if (enabled) {
-            lv_obj_remove_state(ctx->arc, LV_STATE_DISABLED);
-        } else {
-            lv_obj_add_state(ctx->arc, LV_STATE_DISABLED);
-        }
-    }
-    if (ctx->brightness_slider) {
-        if (enabled) {
-            lv_obj_remove_state(ctx->brightness_slider, LV_STATE_DISABLED);
-        } else {
-            lv_obj_add_state(ctx->brightness_slider, LV_STATE_DISABLED);
-        }
-    }
-    for (int i = 0; i < NUM_EFFECTS; i++) {
-        if (ctx->effect_chips[i]) {
-            if (enabled) {
-                lv_obj_add_flag(ctx->effect_chips[i], LV_OBJ_FLAG_CLICKABLE);
-            } else {
-                lv_obj_clear_flag(ctx->effect_chips[i], LV_OBJ_FLAG_CLICKABLE);
-            }
-        }
-    }
-    for (int i = 0; i < NUM_PRESETS; i++) {
-        if (ctx->preset_blocks[i]) {
-            if (enabled) {
-                lv_obj_add_flag(ctx->preset_blocks[i], LV_OBJ_FLAG_CLICKABLE);
-            } else {
-                lv_obj_clear_flag(ctx->preset_blocks[i], LV_OBJ_FLAG_CLICKABLE);
-            }
-        }
-    }
 
     ctx->updating = false;
 }
