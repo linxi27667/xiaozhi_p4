@@ -73,6 +73,65 @@ static void Send_Announce(void) {
     ESP_LOGI(TAG, "Announce V2 sent: %s (%s)", DEVICE_NAME, DEVICE_NAME_CN);
 }
 
+/* ================= 场景命令本地处理 ================= */
+static void Apply_Local_Scene(uint8_t scene_id) {
+    switch (scene_id) {
+        case IOT_SCENE_SLEEP:
+            /* 睡眠: 关阳台灯, 关天窗, 收衣 */
+            for (int i = 0; i < LIGHT_COUNT; i++) g_device_flags.light[i] = OFF;
+            g_device_flags.servo[0] = SERVO_0;
+            g_device_flags.servo[1] = SERVO_0;
+            g_device_flags.servo[2] = SERVO_0;
+            break;
+        case IOT_SCENE_MOVIE:
+            /* 观影: 关阳台灯, 关天窗 */
+            for (int i = 0; i < LIGHT_COUNT; i++) g_device_flags.light[i] = OFF;
+            g_device_flags.servo[0] = SERVO_0;
+            g_device_flags.servo[1] = SERVO_0;
+            break;
+        case IOT_SCENE_NIGHT:
+            /* 起夜: 开阳台灯(弱光) */
+            g_device_flags.light[0] = ON;
+            break;
+        case IOT_SCENE_FIRE:
+            /* 火警: 开阳台灯, 开天窗(排烟), 收衣 */
+            g_device_flags.light[0] = ON;
+            g_device_flags.servo[0] = SERVO_135;
+            g_device_flags.servo[1] = SERVO_135;
+            g_device_flags.servo[2] = SERVO_0;
+            break;
+        case IOT_SCENE_RAIN:
+            /* 雨天: 收衣, 关天窗 */
+            g_device_flags.servo[0] = SERVO_0;
+            g_device_flags.servo[1] = SERVO_0;
+            g_device_flags.servo[2] = SERVO_0;
+            break;
+        case IOT_SCENE_AWAY:
+            /* 离家: 全关 */
+            for (int i = 0; i < LIGHT_COUNT; i++) g_device_flags.light[i] = OFF;
+            for (int i = 0; i < RELAY_COUNT; i++) g_device_flags.relay[i] = OFF;
+            for (int i = 0; i < SERVO_COUNT; i++) g_device_flags.servo[i] = SERVO_0;
+            break;
+        case IOT_SCENE_HOME:
+            /* 回家: 开阳台灯 */
+            g_device_flags.light[0] = ON;
+            break;
+        case IOT_SCENE_BRIGHT:
+            /* 明亮: 全开 */
+            for (int i = 0; i < LIGHT_COUNT; i++) g_device_flags.light[i] = ON;
+            break;
+        default:
+            break;
+    }
+}
+
+static void Process_Scene_Command(const iot_scene_packet_t* cmd) {
+    if (!cmd) return;
+    Apply_Local_Scene(cmd->scene_id);
+    ESP_LOGI(TAG, "Scene applied: %u", cmd->scene_id);
+    MQTT_Heartbeat_Publish_Now();
+}
+
 /* ================= 命令处理（只更新标志位） ================= */
 static void Process_Command(const iot_command_packet_t* cmd) {
     ESP_LOGI(TAG, "Command: cmd=%d, gpio=%d, value=%d",
@@ -210,7 +269,10 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
             break;
 
         case MQTT_EVENT_DATA:
-            if (event->data_len >= (int)sizeof(iot_command_packet_t)) {
+            if (event->data_len >= (int)sizeof(iot_scene_packet_t) &&
+                ((const iot_scene_packet_t*)event->data)->command == IOT_CMD_SET_SCENE) {
+                Process_Scene_Command((const iot_scene_packet_t*)event->data);
+            } else if (event->data_len >= (int)sizeof(iot_command_packet_t)) {
                 const iot_command_packet_t* cmd = (const iot_command_packet_t*)event->data;
                 Process_Command(cmd);
             } else {

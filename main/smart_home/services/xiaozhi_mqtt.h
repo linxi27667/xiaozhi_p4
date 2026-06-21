@@ -21,6 +21,8 @@ void mqtt_client_poll(void);
  * @param value     0/1 for on/off, 0-180 for servo angle
  */
 void mqtt_send_command(uint8_t floor_id, uint8_t cmd_type, uint8_t gpio_index, uint8_t value);
+void mqtt_send_command_v3(uint8_t floor_id, uint8_t cmd_type, uint8_t gpio_index, uint8_t value, uint8_t source);
+void mqtt_send_ambient_scene(uint8_t floor_id, uint8_t index, uint8_t ambient_scene);
 void mqtt_send_rgb_light(uint8_t floor_id, uint8_t index, uint8_t red, uint8_t green,
                          uint8_t blue, uint8_t brightness, uint8_t effect, uint8_t speed);
 void mqtt_send_scene(uint8_t scene_id);

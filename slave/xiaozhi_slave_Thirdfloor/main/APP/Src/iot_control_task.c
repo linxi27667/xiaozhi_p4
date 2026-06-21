@@ -95,18 +95,12 @@ static void HW_Servo_Set_Angle(ledc_channel_t channel, int16_t angle) {
     ledc_update_duty(LEDC_MODE, channel);
 }
 
-/* ================= 2. GPIO 绾兛娆㈢€规矮绠?(娴滃搫浼愰崣顖涙暭) ================= */
-#define LIGHT_GPIO_1     GPIO_NUM_2
-#define LIGHT_GPIO_2     GPIO_NUM_4
-#define LIGHT_GPIO_3     GPIO_NUM_5
+/* ================= 2. GPIO 绾兒娆㈢€规矮绠?(娴滃搫浼愰崣顖涙暭) ================= */
+#define LIGHT_GPIO_1     GPIO_NUM_2   /* 阳台灯 */
 
-#define RELAY_GPIO_1     GPIO_NUM_6
-#define RELAY_GPIO_2     GPIO_NUM_7
-#define RELAY_GPIO_3     GPIO_NUM_15
-
-#define SERVO_GPIO_1     GPIO_NUM_18
-#define SERVO_GPIO_2     GPIO_NUM_21
-#define SERVO_GPIO_3     GPIO_NUM_40
+#define SERVO_GPIO_1     GPIO_NUM_18  /* 左天窗 */
+#define SERVO_GPIO_2     GPIO_NUM_21  /* 右天窗 */
+#define SERVO_GPIO_3     GPIO_NUM_40  /* 晾衣杆 */
 
 #define REFRESH_INTERVAL_MS     100
 
@@ -131,20 +125,18 @@ static const int16_t g_servo_angle_map[5] = {
 
 /* ================= 4. 对象实例化 ================= */
 static gpio_num_t g_light_gpios[LIGHT_COUNT] = {
-    LIGHT_GPIO_1, LIGHT_GPIO_2, LIGHT_GPIO_3
+    LIGHT_GPIO_1
 };
 
-static gpio_num_t g_relay_gpios[RELAY_COUNT] = {
-    RELAY_GPIO_1, RELAY_GPIO_2, RELAY_GPIO_3
-};
+static gpio_num_t g_relay_gpios[(RELAY_COUNT > 0) ? RELAY_COUNT : 1] = {0};
 
 static gpio_num_t g_servo_gpios[SERVO_COUNT] = {
     SERVO_GPIO_1, SERVO_GPIO_2, SERVO_GPIO_3
 };
 
 volatile device_flags_enum_t g_device_flags = {
-    .light = {OFF, OFF, OFF},
-    .relay = {OFF, OFF, OFF},
+    .light = {OFF},
+    .relay = {OFF},
     .servo = {SERVO_25, SERVO_25, SERVO_25},
     .fire_status = FIRE_STATUS_NORMAL,
     .rain_status = RAIN_STATUS_DRY,

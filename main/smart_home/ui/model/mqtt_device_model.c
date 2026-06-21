@@ -103,7 +103,7 @@ void device_model_init(void)
     /*                    floor   type            id                      name       ctrl  floor_id  cmd_type           gpio_idx */
     add_device(RC_FLOOR_1, RC_DEVICE_DOOR,   "floor1_gate",         "\xE5\xA4\xA7\xE9\x97\xA8",     true, 1, IOT_CMD_SET_SERVO, 6);   /* 大门 */
     add_device(RC_FLOOR_1, RC_DEVICE_LIGHT,  "floor1_hall_light",   "\xE5\xA4\xA7\xE5\x8E\x85\xE7\x81\xAF", true, 1, IOT_CMD_SET_LIGHT, 0); /* 大厅灯 */
-    add_device(RC_FLOOR_2, RC_DEVICE_RGB_LIGHT, "floor2_master_light", "\xE4\xB8\xBB\xE5\x8D\xA7\xE7\x81\xAF", true, 2, IOT_CMD_SET_LIGHT, 0); /* 主卧灯 */
+    add_device(RC_FLOOR_2, RC_DEVICE_RGB_LIGHT, "floor2_master_light", "\xE4\xB8\xBB\xE5\x8D\xA7\xE7\x81\xAF", true, 2, IOT_CMD_SET_RGB_LIGHT, 0); /* 主卧灯(RGB, 由WS2812B驱动) */
     add_device(RC_FLOOR_2, RC_DEVICE_LIGHT,  "floor2_living_light", "\xE5\xAE\xA2\xE5\x8E\x85\xE7\x81\xAF", true, 2, IOT_CMD_SET_LIGHT, 1); /* 客厅灯 */
     add_device(RC_FLOOR_2, RC_DEVICE_LIGHT,  "floor2_toilet_light", "\xE5\x8E\x95\xE6\x89\x80\xE7\x81\xAF", true, 2, IOT_CMD_SET_LIGHT, 2); /* 厕所灯 */
     add_device(RC_FLOOR_2, RC_DEVICE_FAN,    "floor2_fan",          "\xE9\xA3\x8E\xE6\x89\x87",     true, 2, IOT_CMD_SET_RELAY, 0);   /* 风扇 */
@@ -194,13 +194,24 @@ static void set_power_internal(uint16_t index, bool on, bool publish_mqtt)
     if (!d->controllable) return;
 
     if (publish_mqtt) {
-        uint8_t value = 0;
-        if (d->cmd_type == IOT_CMD_SET_SERVO) {
-            value = on ? 180 : 0;
+        if (d->cmd_type == IOT_CMD_SET_RGB_LIGHT) {
+            /* RGB 灯走专用通道: 开=恢复颜色, 关=全黑 */
+            if (on) {
+                uint8_t r = d->red   ? d->red   : 255;
+                uint8_t g = d->green ? d->green : 160;
+                uint8_t b = d->blue  ? d->blue  : 80;
+                uint8_t br = d->brightness ? d->brightness : 60;
+                mqtt_send_rgb_light(d->floor_id, d->gpio_index, r, g, b, br, d->effect, 0);
+            } else {
+                mqtt_send_rgb_light(d->floor_id, d->gpio_index, 0, 0, 0, 0, IOT_LIGHT_EFFECT_STATIC, 0);
+            }
+        } else if (d->cmd_type == IOT_CMD_SET_SERVO) {
+            uint8_t value = on ? 180 : 0;
+            mqtt_send_command(d->floor_id, d->cmd_type, d->gpio_index, value);
         } else {
-            value = on ? 1 : 0;  /* light/relay: on=1, off=0 */
+            uint8_t value = on ? 1 : 0;  /* light/relay: on=1, off=0 */
+            mqtt_send_command(d->floor_id, d->cmd_type, d->gpio_index, value);
         }
-        mqtt_send_command(d->floor_id, d->cmd_type, d->gpio_index, value);
         return;
     }
 
@@ -320,6 +331,11 @@ void device_model_apply_heartbeat(const iot_heartbeat_v2_packet_t *heartbeat)
             continue;
         }
 
+        /* RGB 灯跳过 V2 心跳匹配, 由 V3 扩展字段(device_model_apply_heartbeat_v3)处理 */
+        if (d->cmd_type == IOT_CMD_SET_RGB_LIGHT) {
+            continue;
+        }
+
         bool known = false;
         uint8_t value = 0;
         if (d->cmd_type == IOT_CMD_SET_LIGHT && d->gpio_index < heartbeat->light_count &&
@@ -333,7 +349,12 @@ void device_model_apply_heartbeat(const iot_heartbeat_v2_packet_t *heartbeat)
         } else if (d->cmd_type == IOT_CMD_SET_SERVO && d->gpio_index >= 6) {
             uint8_t servo_index = d->gpio_index - 6;
             if (servo_index < heartbeat->servo_count && servo_index < IOT_MAX_SERVOS) {
-                value = heartbeat->servos[servo_index];
+                /* 从机心跳上报的是 servo_angle_enum_t 枚举值(0~4), 需映射回角度 */
+                uint8_t servo_enum = heartbeat->servos[servo_index];
+                static const uint8_t servo_angle_map_45[5]  = {0, 45, 90, 135, 180};  /* 一楼/二楼: 45度分档 */
+                static const uint8_t servo_angle_map_3f[5]  = {0, 25, 70, 135, 180};  /* 三楼天窗: 25/70度分档 */
+                const uint8_t *map = (floor_id == 3) ? servo_angle_map_3f : servo_angle_map_45;
+                value = (servo_enum < 5) ? map[servo_enum] : 0;
                 known = true;
             }
         }
@@ -342,33 +363,38 @@ void device_model_apply_heartbeat(const iot_heartbeat_v2_packet_t *heartbeat)
             d->connected = true;
             d->power_on = value != 0;
             d->value = value;
-            if (d->type == RC_DEVICE_RGB_LIGHT) {
-                d->brightness = value ? (d->brightness ? d->brightness : 60) : 0;
-                if (value && d->red == 0 && d->green == 0 && d->blue == 0) {
-                    d->red = 255;
-                    d->green = 160;
-                    d->blue = 80;
-                }
-            }
             refresh_device_value(d);
         }
     }
 
     if (heartbeat->sensor_count > 0) {
+        /* 按楼层存储传感器数据 */
         s_model.rain_floor_value[floor_idx] = heartbeat->rain_mv;
         s_model.rain_floor_valid[floor_idx] = true;
         s_model.rain_floor_status[floor_idx] = heartbeat->rain_status;
         s_model.rain_status_floor_valid[floor_idx] = true;
+        /* 全局字段: 仅作为兼容性保留, 取告警最严重的楼层值 */
+        if (heartbeat->rain_mv > s_model.rain_value || !s_model.rain_valid) {
+            s_model.rain_value = heartbeat->rain_mv;
+            s_model.rain_valid = true;
+        }
     }
     if (heartbeat->sensor_count >= 3 || heartbeat->smoke_mv != 0 || heartbeat->fire_status != 0) {
-        s_model.smoke_value = heartbeat->smoke_mv;
-        s_model.smoke_valid = true;
         s_model.smoke_floor_value[floor_idx] = heartbeat->smoke_mv;
         s_model.smoke_floor_valid[floor_idx] = true;
         s_model.fire_floor_status[floor_idx] = heartbeat->fire_status;
         s_model.fire_floor_valid[floor_idx] = true;
-        s_model.flame_value = heartbeat->fire_status;
-        s_model.flame_valid = true;
+        s_model.flame_floor_value[floor_idx] = heartbeat->fire_status;
+        s_model.flame_floor_valid[floor_idx] = true;
+        /* 全局字段: 取告警最严重的楼层值 */
+        if (heartbeat->smoke_mv > s_model.smoke_value || !s_model.smoke_valid) {
+            s_model.smoke_value = heartbeat->smoke_mv;
+            s_model.smoke_valid = true;
+        }
+        if (heartbeat->fire_status > s_model.flame_value || !s_model.flame_valid) {
+            s_model.flame_value = heartbeat->fire_status;
+            s_model.flame_valid = true;
+        }
         smart_home_alarm_on_fire_status(floor_id, heartbeat->fire_status >= 2);
     }
     if (heartbeat->sensor_count >= 3 || heartbeat->help_status != 0) {
@@ -420,6 +446,7 @@ const char *device_model_scene_name(uint8_t scene_id)
         case IOT_SCENE_RAIN:  return "雨天收衣";
         case IOT_SCENE_AWAY:  return "离家";
         case IOT_SCENE_HOME:  return "回家";
+        case IOT_SCENE_BRIGHT: return "明亮";
         default: return "未启用";
     }
 }

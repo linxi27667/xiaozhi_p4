@@ -7,7 +7,7 @@
 
 #include <esp_log.h>
 #include <esp_timer.h>
-#include "wifi_manager.h"
+#include "wifi_compat.h"
 
 #include <cstdio>
 #include <cstring>
@@ -31,11 +31,21 @@ static int64_t s_last_heartbeat[4] = {0};
 static bool s_controller_online[4] = {false};
 static int64_t s_last_network_wait_log_ms = 0;
 
+/* MAC->楼层映射表: 从机 announce/heartbeat 时注册, 用于 response topic 反查楼层 */
+static char s_floor_mac[4][13] = {{0}};
+
 static bool topic_starts_with(const std::string& topic, const char* prefix) {
     return topic.rfind(prefix, 0) == 0;
 }
 
-static void process_announce(const std::string& payload) {
+static void register_floor_mac(uint8_t floor_id, const char* mac_str) {
+    if (floor_id >= 1 && floor_id <= 3 && mac_str) {
+        strncpy(s_floor_mac[floor_id], mac_str, 12);
+        s_floor_mac[floor_id][12] = '\0';
+    }
+}
+
+static void process_announce(const std::string& topic, const std::string& payload) {
     if (payload.size() < sizeof(iot_announce_v2_packet_t)) {
         return;
     }
@@ -48,35 +58,46 @@ static void process_announce(const std::string& payload) {
              pkt->device_id, name, pkt->gpio_index);
 
     if (pkt->device_id >= 1 && pkt->device_id <= 3) {
+        /* 从 topic 提取 MAC 并注册 */
+        if (topic.size() > strlen(MQTT_TOPIC_ANNOUNCE_PREFIX)) {
+            std::string mac = topic.substr(strlen(MQTT_TOPIC_ANNOUNCE_PREFIX));
+            register_floor_mac(pkt->device_id, mac.c_str());
+        }
         device_model_set_controller_online(pkt->device_id, true);
         s_controller_online[pkt->device_id] = true;
         s_last_heartbeat[pkt->device_id] = esp_timer_get_time() / 1000000;
     }
 }
 
-static void process_heartbeat(const std::string& payload) {
-    if (payload.size() >= sizeof(iot_heartbeat_v3_packet_t)) {
-        const auto* pkt = reinterpret_cast<const iot_heartbeat_v3_packet_t*>(payload.data());
-        if (pkt->v2.command == IOT_CMD_HEARTBEAT &&
-            pkt->v2.protocol_version == IOT_PROTOCOL_VERSION_V3 &&
-            pkt->v2.device_id >= 1 && pkt->v2.device_id <= 3) {
-            ESP_LOGD(TAG, "Heartbeat V3: device_id=%u rgb_count=%u scene=%u",
-                     pkt->v2.device_id, pkt->rgb_count, pkt->current_scene);
-            device_model_apply_heartbeat_v3(pkt);
-            s_controller_online[pkt->v2.device_id] = true;
-            s_last_heartbeat[pkt->v2.device_id] = esp_timer_get_time() / 1000000;
-            return;
-        }
-    }
-
+static void process_heartbeat(const std::string& topic, const std::string& payload) {
+    /* 先检查 V2 心跳(小包), 再检查 V3(大包), 避免 V2 被误判为 V3 */
     if (payload.size() >= sizeof(iot_heartbeat_v2_packet_t)) {
         const auto* pkt = reinterpret_cast<const iot_heartbeat_v2_packet_t*>(payload.data());
         if (pkt->command == IOT_CMD_HEARTBEAT &&
-            pkt->protocol_version == IOT_PROTOCOL_VERSION &&
             pkt->device_id >= 1 && pkt->device_id <= 3) {
-            ESP_LOGD(TAG, "Heartbeat V2: device_id=%u name=%.*s mac=%s",
-                     pkt->device_id, (int)sizeof(pkt->device_name), pkt->device_name, pkt->mac_str);
-            device_model_apply_heartbeat(pkt);
+            /* 从 topic 提取 MAC 并注册 */
+            if (topic.size() > strlen(MQTT_TOPIC_HEARTBEAT_PREFIX)) {
+                std::string mac = topic.substr(strlen(MQTT_TOPIC_HEARTBEAT_PREFIX));
+                register_floor_mac(pkt->device_id, mac.c_str());
+            }
+
+            if (pkt->protocol_version == IOT_PROTOCOL_VERSION_V3 &&
+                payload.size() >= sizeof(iot_heartbeat_v3_packet_t)) {
+                /* V3 心跳: 含 RGB 扩展字段 */
+                const auto* v3 = reinterpret_cast<const iot_heartbeat_v3_packet_t*>(payload.data());
+                ESP_LOGD(TAG, "Heartbeat V3: device_id=%u rgb_count=%u scene=%u",
+                         pkt->device_id, v3->rgb_count, v3->current_scene);
+                device_model_apply_heartbeat_v3(v3);
+            } else if (pkt->protocol_version == IOT_PROTOCOL_VERSION) {
+                /* V2 心跳: 基础字段 */
+                ESP_LOGD(TAG, "Heartbeat V2: device_id=%u name=%.*s mac=%s",
+                         pkt->device_id, (int)sizeof(pkt->device_name), pkt->device_name, pkt->mac_str);
+                device_model_apply_heartbeat(pkt);
+            } else {
+                /* 旧版 V1 心跳: 仅更新在线状态 */
+                ESP_LOGD(TAG, "Heartbeat V1: device_id=%u", pkt->device_id);
+                device_model_set_controller_online(pkt->device_id, true);
+            }
             s_controller_online[pkt->device_id] = true;
             s_last_heartbeat[pkt->device_id] = esp_timer_get_time() / 1000000;
             return;
@@ -88,7 +109,7 @@ static void process_heartbeat(const std::string& payload) {
     }
 
     const auto* pkt = reinterpret_cast<const iot_heartbeat_packet_t*>(payload.data());
-    ESP_LOGD(TAG, "Heartbeat: device_id=%u mac=%s", pkt->device_id, pkt->mac_str);
+    ESP_LOGD(TAG, "Heartbeat(legacy): device_id=%u mac=%s", pkt->device_id, pkt->mac_str);
 
     if (pkt->device_id >= 1 && pkt->device_id <= 3) {
         device_model_set_controller_online(pkt->device_id, true);
@@ -100,6 +121,13 @@ static void process_heartbeat(const std::string& payload) {
 static uint8_t floor_id_from_response_topic(const std::string& topic) {
     if (!topic_starts_with(topic, MQTT_TOPIC_RESP_PREFIX)) {
         return 0;
+    }
+    /* 从 topic "xiaozhi/iot/resp/{mac}" 提取 MAC, 查 MAC->楼层映射表 */
+    std::string mac = topic.substr(strlen(MQTT_TOPIC_RESP_PREFIX));
+    for (uint8_t floor_id = 1; floor_id <= 3; floor_id++) {
+        if (s_floor_mac[floor_id][0] != '\0' && mac == s_floor_mac[floor_id]) {
+            return floor_id;
+        }
     }
     return 0;
 }
@@ -205,9 +233,9 @@ static void ensure_client_created(void) {
 
         if (topic_starts_with(topic, MQTT_TOPIC_ANNOUNCE_PREFIX) ||
             topic == MQTT_TOPIC_ANNOUNCE) {
-            process_announce(payload);
+            process_announce(topic, payload);
         } else if (topic_starts_with(topic, MQTT_TOPIC_HEARTBEAT_PREFIX)) {
-            process_heartbeat(payload);
+            process_heartbeat(topic, payload);
         } else if (topic_starts_with(topic, MQTT_TOPIC_RESP_PREFIX)) {
             process_response(topic, payload);
         } else if (topic_starts_with(topic, MQTT_TOPIC_SENSOR_PREFIX)) {
@@ -309,6 +337,40 @@ extern "C" void mqtt_send_command(uint8_t floor_id, uint8_t cmd_type, uint8_t gp
     std::string payload(reinterpret_cast<const char*>(&pkt), sizeof(pkt));
     s_mqtt->Publish(topic, payload, 0);
     ESP_LOGI(TAG, "CMD -> %s: cmd=0x%02X gpio=%u val=%u", topic, cmd_type, gpio_index, value);
+}
+
+extern "C" void mqtt_send_command_v3(uint8_t floor_id, uint8_t cmd_type, uint8_t gpio_index, uint8_t value, uint8_t source) {
+    // For broadcast commands, use mqtt_send_broadcast; for others, delegate to mqtt_send_command
+    (void)source;
+    if (cmd_type >= 0x30 && cmd_type <= 0x34) {
+        mqtt_send_broadcast(cmd_type);
+    } else {
+        mqtt_send_command(floor_id, cmd_type, gpio_index, value);
+    }
+}
+
+extern "C" void mqtt_send_ambient_scene(uint8_t floor_id, uint8_t index, uint8_t ambient_scene) {
+    // Map ambient scene presets to RGB light parameters
+    switch (ambient_scene) {
+        case IOT_AMBIENT_SCENE_OFF:
+            mqtt_send_rgb_light(floor_id, index, 0, 0, 0, 0, IOT_LIGHT_EFFECT_STATIC, 0);
+            break;
+        case IOT_AMBIENT_SCENE_SLEEP:
+            mqtt_send_rgb_light(floor_id, index, 24, 30, 96, 18, IOT_LIGHT_EFFECT_STATIC, 20);
+            break;
+        case IOT_AMBIENT_SCENE_RAIN:
+            mqtt_send_rgb_light(floor_id, index, 0, 120, 255, 35, IOT_LIGHT_EFFECT_BREATHE, 15);
+            break;
+        case IOT_AMBIENT_SCENE_WARNING:
+            mqtt_send_rgb_light(floor_id, index, 255, 0, 0, 80, IOT_LIGHT_EFFECT_WARNING, 5);
+            break;
+        case IOT_AMBIENT_SCENE_WARM_HOME:
+            mqtt_send_rgb_light(floor_id, index, 255, 166, 82, 45, IOT_LIGHT_EFFECT_BREATHE, 18);
+            break;
+        default:
+            break;
+    }
+    ESP_LOGI(TAG, "AMBIENT -> floor=%u idx=%u scene=%u", floor_id, index, ambient_scene);
 }
 
 extern "C" void mqtt_send_rgb_light(uint8_t floor_id, uint8_t index, uint8_t red, uint8_t green,

@@ -21,6 +21,7 @@ void UI_Manager_Init(lv_obj_t *parent);
 void UI_Manager_Switch_Page(ui_page_id_t page);
 void UI_Manager_Rebuild_Current(void);
 void UI_Manager_Poll(void);
+ui_page_id_t UI_Manager_Get_Current_Page(void);
 
 #ifdef __cplusplus
 }

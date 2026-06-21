@@ -303,3 +303,8 @@ void UI_Manager_Poll(void)
         do_switch_page();
     }
 }
+
+ui_page_id_t UI_Manager_Get_Current_Page(void)
+{
+    return s_app_ctx.current_page;
+}

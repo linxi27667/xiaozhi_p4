@@ -108,10 +108,21 @@ void InitializeIot() {
 |------|-----|------|
 | IOT_CMD_SET_GPIO | 0x01 | 设置 GPIO 输出（LED开/关） |
 | IOT_CMD_GET_GPIO | 0x02 | 读取 GPIO 状态 |
-| IOT_CMD_SET_SERVO | 0x10 | 设置舵机角度（0-180度） |
-| IOT_CMD_DISCOVER | 0x06 | 发现设备 |
-| IOT_CMD_ANNOUNCE | 0x07 | 设备公告 |
+| IOT_CMD_GET_ALL_GPIO | 0x03 | 读取所有 GPIO 状态 |
 | IOT_CMD_HEARTBEAT | 0x04 | 心跳检测 |
+| IOT_CMD_RESPONSE | 0x05 | 命令响应 |
+| IOT_CMD_DISCOVER | 0x06 | 发现设备 |
+| IOT_CMD_ANNOUNCE_V2 | 0x08 | 设备公告 V2 |
+| IOT_CMD_SET_SERVO | 0x10 | 设置舵机角度（0-180度） |
+| IOT_CMD_SET_LIGHT | 0x11 | 设置灯光开关 |
+| IOT_CMD_SET_RELAY | 0x12 | 设置继电器开关 |
+| IOT_CMD_SENSOR_REPORT | 0x13 | 传感器数据上报 |
+| IOT_CMD_BROADCAST_ALL_OFF | 0x30 | 广播: 全关 |
+| IOT_CMD_BROADCAST_ALL_ON | 0x31 | 广播: 全开 |
+| IOT_CMD_BROADCAST_LIGHTS_OFF | 0x32 | 广播: 灯全关 |
+| IOT_CMD_BROADCAST_LIGHTS_ON | 0x33 | 广播: 灯全开 |
+| IOT_CMD_EMERGENCY | 0x34 | 紧急情况 |
+| IOT_CMD_SET_SCENE | 0x41 | 设置场景 |
 
 ## 项目结构
 

@@ -34,8 +34,25 @@ typedef enum {
     IOT_CMD_BROADCAST_LIGHTS_ON = 0x33,
     IOT_CMD_EMERGENCY = 0x34,
     IOT_CMD_SET_RGB_LIGHT = 0x40,
-    IOT_CMD_SET_SCENE = 0x41
+    IOT_CMD_SET_SCENE = 0x41,
+    IOT_CMD_SET_AMBIENT_SCENE = 0x42
 } iot_command_t;
+
+/* Source identifiers for scene/command origin */
+typedef enum {
+    IOT_SOURCE_USER = 0,
+    IOT_SOURCE_RULE = 1,
+    IOT_SOURCE_VOICE = 2
+} iot_source_t;
+
+/* Ambient scene presets for RGB lights (host-side only, not sent to slave) */
+typedef enum {
+    IOT_AMBIENT_SCENE_OFF = 0,
+    IOT_AMBIENT_SCENE_SLEEP = 1,
+    IOT_AMBIENT_SCENE_RAIN = 2,
+    IOT_AMBIENT_SCENE_WARNING = 3,
+    IOT_AMBIENT_SCENE_WARM_HOME = 4
+} iot_ambient_scene_t;
 
 typedef struct {
     uint8_t command;
@@ -84,6 +101,7 @@ typedef enum {
     IOT_SCENE_RAIN = 5,
     IOT_SCENE_AWAY = 6,
     IOT_SCENE_HOME = 7,
+    IOT_SCENE_BRIGHT = 8,
 } iot_scene_id_t;
 
 typedef struct {

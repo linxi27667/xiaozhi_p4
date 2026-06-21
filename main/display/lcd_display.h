@@ -73,6 +73,7 @@ protected:
     void EnsureSmartHomeUi();
     void SwitchShellPage(ShellPage page);
     void RefreshShellNav(ShellPage page);
+    void SyncShellNavFromInnerPage();
     static void OnShellNavClicked(lv_event_t* e);
 
 protected:

@@ -415,6 +415,11 @@ static void OnShellLanguageChanged(void* user_data) {
     if (self) self->RefreshShellLabels();
 }
 
+static void OnShellPageSwitched(void* user_data) {
+    auto* self = static_cast<LcdDisplay*>(user_data);
+    if (self) self->SyncShellNavFromInnerPage();
+}
+
 void LcdDisplay::RefreshShellLabels() {
     if (!shell_chat_label_ && !shell_overview_label_) return;
 
@@ -464,6 +469,22 @@ void LcdDisplay::RefreshShellNav(ShellPage page) {
             lv_obj_set_style_text_color(lv_obj_get_child(item.btn, child_index), text_color, 0);
         }
     }
+}
+
+void LcdDisplay::SyncShellNavFromInnerPage() {
+    ui_page_id_t inner = UI_Manager_Get_Current_Page();
+    ShellPage page;
+    switch (inner) {
+        case UI_PAGE_DATA:   page = ShellPage::Overview;    break;
+        case UI_PAGE_CTRL:   page = ShellPage::Control;     break;
+        case UI_PAGE_LIGHT:  page = ShellPage::Lighting;    break;
+        case UI_PAGE_SCENE:  page = ShellPage::Scenes;      break;
+        case UI_PAGE_ENV:    page = ShellPage::Environment; break;
+        case UI_PAGE_NET:    page = ShellPage::Network;     break;
+        case UI_PAGE_SET:    page = ShellPage::Settings;    break;
+        default:             page = ShellPage::Overview;    break;
+    }
+    RefreshShellNav(page);
 }
 
 void LcdDisplay::EnsureSmartHomeUi() {
@@ -707,8 +728,10 @@ void LcdDisplay::CreateSmartHomeShell() {
     lv_obj_set_flex_align(wake_btn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_row(wake_btn, 4, 0);
     lv_obj_add_event_cb(wake_btn, [](lv_event_t* e) {
+        auto* display = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
         Application::GetInstance().ToggleChatState();
-    }, LV_EVENT_CLICKED, nullptr);
+        if (display) display->SwitchShellPage(ShellPage::Chat);
+    }, LV_EVENT_CLICKED, this);
 
     lv_obj_t* wake_icon = lv_label_create(wake_btn);
     lv_label_set_text(wake_icon, FONT_AWESOME_MICROPHONE);
@@ -735,6 +758,7 @@ void LcdDisplay::CreateSmartHomeShell() {
 
     lv_obj_move_foreground(side_bar_);
     ui_event_subscribe(UI_EVENT_LANG_CHANGED, OnShellLanguageChanged, this);
+    ui_event_subscribe(UI_EVENT_PAGE_SWITCHED, OnShellPageSwitched, this);
     RefreshShellNav(ShellPage::Chat);
 }
 

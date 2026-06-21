@@ -167,6 +167,14 @@ static void Process_Command(const iot_command_packet_t* cmd) {
             MQTT_Heartbeat_Publish_Now();
             break;
 
+        case IOT_CMD_EMERGENCY:
+            /* 紧急情况: 开大厅灯 + 开大门(便于疏散) */
+            ESP_LOGW(TAG, "[EMERGENCY] Received emergency command from master!");
+            for (int i = 0; i < LIGHT_COUNT; i++) g_device_flags.light[i] = ON;
+            for (int i = 0; i < SERVO_COUNT; i++) g_device_flags.servo[i] = SERVO_90;
+            MQTT_Heartbeat_Publish_Now();
+            break;
+
         default:
             ESP_LOGW(TAG, "Unknown command: %d", cmd->command);
             break;

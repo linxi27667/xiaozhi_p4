@@ -22,10 +22,14 @@ typedef struct {
     uint8_t blue;
     uint8_t effect;
     uint8_t rainbow_offset;
+    /* 动画状态 */
+    uint8_t breathe_step;       /* 呼吸动画步进 0~255 */
+    int8_t breathe_dir;         /* 呼吸方向 +1/-1 */
+    uint8_t warning_toggle;     /* 警示闪烁计数器 */
 } ambient_strip_t;
 
 static ambient_strip_t s_strips[AMBIENT_STRIP_COUNT] = {
-    { .strip = NULL, .gpio = AMBIENT_BEDROOM_GPIO, .scene = AMBIENT_SCENE_OFF, .last_applied_scene = AMBIENT_SCENE_OFF, .brightness = 60, .red = 255, .green = 160, .blue = 80, .effect = IOT_LIGHT_EFFECT_STATIC, .on = false, .last_on = false, .rainbow_offset = 0 },
+    { .strip = NULL, .gpio = AMBIENT_BEDROOM_GPIO, .scene = AMBIENT_SCENE_OFF, .last_applied_scene = AMBIENT_SCENE_OFF, .brightness = 60, .red = 255, .green = 160, .blue = 80, .effect = IOT_LIGHT_EFFECT_STATIC, .on = false, .last_on = false, .rainbow_offset = 0, .breathe_step = 0, .breathe_dir = 1, .warning_toggle = 0 },
 };
 
 static uint8_t scale(uint8_t brightness, uint8_t v)
@@ -214,10 +218,49 @@ bool App_Ambient_Light_Is_On(uint8_t index)
 void App_Ambient_Light_Tick(void)
 {
     for (int i = 0; i < AMBIENT_STRIP_COUNT; i++) {
-        if (!s_strips[i].on ||
-            (s_strips[i].scene != AMBIENT_SCENE_RAINBOW &&
-             s_strips[i].effect != IOT_LIGHT_EFFECT_RAINBOW)) continue;
-        s_strips[i].rainbow_offset += 4;
-        fill_rainbow(i);
+        if (!s_strips[i].on || !s_strips[i].strip) continue;
+
+        /* 彩虹效果: 每次偏移色相 */
+        if (s_strips[i].scene == AMBIENT_SCENE_RAINBOW ||
+            s_strips[i].effect == IOT_LIGHT_EFFECT_RAINBOW) {
+            s_strips[i].rainbow_offset += 4;
+            fill_rainbow(i);
+            continue;
+        }
+
+        /* 呼吸效果: 亮度在 0~brightness 之间正弦变化 */
+        if (s_strips[i].effect == IOT_LIGHT_EFFECT_BREATHE) {
+            s_strips[i].breathe_step += s_strips[i].breathe_dir * 8;
+            if (s_strips[i].breathe_step >= 200) {
+                s_strips[i].breathe_step = 200;
+                s_strips[i].breathe_dir = -1;
+            } else if (s_strips[i].breathe_step <= 0) {
+                s_strips[i].breathe_step = 0;
+                s_strips[i].breathe_dir = 1;
+            }
+            /* 动态亮度 = 基础亮度 * (breathe_step / 200) */
+            uint8_t dyn_brightness = (uint8_t)((uint16_t)s_strips[i].brightness * s_strips[i].breathe_step / 200);
+            uint8_t saved = s_strips[i].brightness;
+            s_strips[i].brightness = dyn_brightness;
+            fill_rgb(i, s_strips[i].red, s_strips[i].green, s_strips[i].blue);
+            s_strips[i].brightness = saved;
+            continue;
+        }
+
+        /* 警示效果: 红色闪烁 (每5次tick切换一次) */
+        if (s_strips[i].effect == IOT_LIGHT_EFFECT_WARNING ||
+            s_strips[i].scene == AMBIENT_SCENE_WARNING) {
+            s_strips[i].warning_toggle++;
+            if (s_strips[i].warning_toggle >= 5) {
+                s_strips[i].warning_toggle = 0;
+                /* 在红色亮和灭之间切换 */
+                if (s_strips[i].warning_toggle & 1) {
+                    fill_rgb(i, 255, 0, 0);
+                } else {
+                    led_strip_clear(s_strips[i].strip);
+                }
+            }
+            continue;
+        }
     }
 }
