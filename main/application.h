@@ -112,6 +112,13 @@ public:
     AecMode GetAecMode() const { return aec_mode_; }
     void PlaySound(const std::string_view& sound);
     AudioService& GetAudioService() { return audio_service_; }
+    void OnLoginSuccess();
+
+    /**
+     * 锁定设备(显示登录弹窗)
+     * 可从 UI 调用以重新锁定
+     */
+    void LockDevice();
     
     /**
      * Reset protocol resources (thread-safe)
@@ -139,6 +146,8 @@ private:
     bool has_server_time_ = false;
     bool aborted_ = false;
     bool assets_version_checked_ = false;
+    bool activation_done_ = false;
+    bool network_ready_ = false;
     bool play_popup_on_listening_ = false;  // Flag to play popup sound after state changes to listening
     int clock_ticks_ = 0;
     TaskHandle_t activation_task_handle_ = nullptr;

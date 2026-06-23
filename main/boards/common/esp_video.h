@@ -42,7 +42,7 @@ private:
 
 public:
     EspVideo(const esp_video_init_config_t& config);
-    ~EspVideo();
+    virtual ~EspVideo();
 
     virtual void SetExplainUrl(const std::string& url, const std::string& token);
     virtual bool Capture();
@@ -50,4 +50,17 @@ public:
     virtual bool SetHMirror(bool enabled) override;
     virtual bool SetVFlip(bool enabled) override;
     virtual std::string Explain(const std::string& question);
+    bool IsReady() const { return video_fd_ >= 0; }
+    bool IsStreaming() const { return streaming_on_ && video_fd_ >= 0; }
+
+    // 非破坏性采集:不丢弃前 2 帧,不显示预览,不旋转
+    // 用于人脸识别等需要快速获取帧的场景
+    struct CapturedFrame {
+        uint8_t* data = nullptr;   // PSRAM 数据,调用者负责 free
+        size_t len = 0;
+        uint32_t format = 0;       // V4L2 格式
+        int width = 0;
+        int height = 0;
+    };
+    bool CaptureFrame(CapturedFrame& frame);
 };

@@ -1,0 +1,143 @@
+I (86037) esp-x509-crt-bundle: Certificate validated
+I (91442) HttpClient: Established new connection to air-quality-api.open-meteo.com:443
+I (92367) HttpClient: HTTP connection closed
+I (92367) WEATHER: Weather updated for 广州
+I (92752) SystemInfo: free sram: 33527 minimal sram: 23703
+I (102752) SystemInfo: free sram: 33523 minimal sram: 23703
+I (112752) SystemInfo: free sram: 33523 minimal sram: 23703
+I (122752) SystemInfo: free sram: 33523 minimal sram: 23703
+I (126920) Application: Face recognized: id=1 (0.92)
+I (132752) SystemInfo: free sram: 33563 minimal sram: 23703
+I (138187) Application: Face recognized: id=1 (0.81)
+I (142752) SystemInfo: free sram: 33563 minimal sram: 23703
+I (149453) Application: Face recognized: id=1 (0.81)
+I (152752) SystemInfo: free sram: 33563 minimal sram: 23703
+I (162752) SystemInfo: free sram: 33523 minimal sram: 23703
+I (167841) Application: Face recognized: id=1 (0.85)
+I (172752) SystemInfo: free sram: 33563 minimal sram: 23703
+I (179665) LOGIN_UI: Mode set to 0
+I (180308) LOGIN_UI: Mode set to 1
+I (182289) LOGIN_UI: Login success
+I (182752) SystemInfo: free sram: 32831 minimal sram: 23703
+I (182791) LOGIN_UI: Login UI hidden
+I (186105) LcdDisplay: Shell page switch: overview
+I (186105) UI_ASSET: LVGL asset drive S: mapped to /sdcard/xiaozhi_ui
+I (186105) UI_ASSET: Asset service: preload=13 files, 43417 bytes, unavailable=0
+I (186112) UI_ASSET: All 13 TF assets preloaded OK
+I (186116) ALARM_UI: Fire alarm UI initialized with 500ms polling
+I (186123) UI_MGR: UI initialized in embedded content mode, 7 pages
+I (186128) Application: Login success event received
+I (186133) StateMachine: State: locked -> idle
+I (186137) LOGIN_UI: Login success
+I (186224) PAGE_DATA: Data overview page created
+I (186227) Application: Login success event received
+I (186306) AfeWakeWord: Model 0: wn9_nihaoxiaozhi_tts
+I (186307) AFE_CONFIG: Set WakeNet Model: wn9_nihaoxiaozhi_tts
+MC Quantized wakenet9: wakenet9l_tts1h8_你好小智_3_0.631_0.635, tigger:v4, mode:0, p:0, (Dec 16 2025 14:46:33)
+I (186347) AFE: AFE Version: (1MIC_V251128)
+I (186349) AFE: Input PCM Config: total 1 channels(1 microphone, 0 playback), sample rate:16000
+I (186358) AFE: AFE Pipeline: [input] ->  -> |VAD(WebRTC)| -> |WakeNet(wn9_nihaoxiaozhi_tts,)| -> [output]
+I (186367) AfeWakeWord: Audio detection task started, feed size: 512 fetch size: 512
+I (186367) AudioCodec: Set input enable to true
+I (186379) I2S_IF: channel mode 0 bits:16/16 channel:2 mask:1
+W (186384) i2s_common: dma frame num is adjusted to 256 to align the dma buffer with 64, bufsize = 512
+I (186394) I2S_IF: STD Mode 1 bits:16/16 channel:2 sample_rate:24000 mask:1
+I (186400) I2S_IF: channel mode 0 bits:16/16 channel:2 mask:1
+W (186405) i2s_common: dma frame num is adjusted to 256 to align the dma buffer with 64, bufsize = 512
+I (186415) I2S_IF: STD Mode 0 bits:16/16 channel:2 sample_rate:24000 mask:1
+I (186436) Adev_Codec: Open codec device OK
+I (186943) LcdDisplay: Shell page switch: chat
+I (187575) LcdDisplay: Shell page switch: overview
+I (187668) PAGE_DATA: Data overview page created
+I (189039) LcdDisplay: Shell page switch: chat
+I (192313) LcdDisplay: Shell page switch: overview
+I (192405) PAGE_DATA: Data overview page created
+I (195752) SystemInfo: free sram: 21487 minimal sram: 21259
+I (195998) LcdDisplay: Shell page switch: control
+I (196045) PAGE_CTRL: Device control page created (floor=0)
+E (197216) mqtt_client: No PING_RESP, disconnected
+W (197217) SH_MQTT: Disconnected
+I (197375) SH_MQTT: Connecting to mqtt://8.134.167.240:1883
+I (200871) LcdDisplay: Shell page switch: lighting
+I (200933) PAGE_LIGHT: Light page created
+W (201814) SH_MQTT: Cannot send RGB command: MQTT not connected
+W (201852) SH_MQTT: Cannot send RGB command: MQTT not connected
+W (201886) SH_MQTT: Cannot send RGB command: MQTT not connected
+W (201922) SH_MQTT: Cannot send RGB command: MQTT not connected
+W (201957) SH_MQTT: Cannot send RGB command: MQTT not connected
+W (201991) SH_MQTT: Cannot send RGB command: MQTT not connected
+W (202027) SH_MQTT: Cannot send RGB command: MQTT not connected
+W (202061) SH_MQTT: Cannot send RGB command: MQTT not connected
+W (202094) SH_MQTT: Cannot send RGB command: MQTT not connected
+W (202901) SH_MQTT: Cannot send RGB command: MQTT not connected
+I (203883) SH_MQTT: Connected and subscribed to smart-home topics
+I (204146) SH_MQTT: RGB -> xiaozhi/iot/cmd/2: idx=0 rgb=(0,0,0) br=0 effect=2
+I (205231) LcdDisplay: Shell page switch: scenes
+I (205287) PAGE_SCENE: Scene page created
+I (205752) SystemInfo: free sram: 21271 minimal sram: 21007
+I (207590) AUTO_MODE: Global auto mode: OFF
+I (208339) AUTO_MODE: Global auto mode: ON
+I (209265) SH_MQTT: RGB -> xiaozhi/iot/cmd/2: idx=0 rgb=(52,68,210) br=24 effect=0
+I (209266) SH_MQTT: CMD -> xiaozhi/iot/cmd/2: cmd=0x11 gpio=1 val=0
+I (209268) SH_MQTT: SCENE -> broadcast: scene=2
+I (209948) SH_MQTT: RGB -> xiaozhi/iot/cmd/2: idx=0 rgb=(52,68,210) br=24 effect=0
+I (209948) SH_MQTT: CMD -> xiaozhi/iot/cmd/2: cmd=0x11 gpio=1 val=0
+I (209950) SH_MQTT: SCENE -> broadcast: scene=2
+I (210701) SH_MQTT: RGB -> xiaozhi/iot/cmd/2: idx=0 rgb=(24,30,96) br=18 effect=0
+I (210701) SH_MQTT: CMD -> xiaozhi/iot/cmd/2: cmd=0x11 gpio=1 val=0
+I (210703) SH_MQTT: CMD -> xiaozhi/iot/cmd/2: cmd=0x11 gpio=2 val=0
+I (210710) SH_MQTT: CMD -> xiaozhi/iot/cmd/2: cmd=0x12 gpio=0 val=0
+I (210715) SH_MQTT: SCENE -> broadcast: scene=1
+I (211779) SH_MQTT: CMD -> xiaozhi/iot/cmd/1: cmd=0x11 gpio=0 val=1
+I (211780) SH_MQTT: RGB -> xiaozhi/iot/cmd/2: idx=0 rgb=(255,166,82) br=45 effect=1
+I (211782) SH_MQTT: SCENE -> broadcast: scene=7
+I (213745) LcdDisplay: Shell page switch: environment
+I (213794) PAGE_ENV: Environment page created
+I (215390) LcdDisplay: Shell page switch: network
+I (215417) PAGE_NET: Network page created
+I (215752) SystemInfo: free sram: 21331 minimal sram: 21007
+I (216498) LcdDisplay: Shell page switch: settings
+I (216527) PAGE_SET: Settings page created
+I (218494) StateMachine: State: idle -> connecting
+I (218494) LcdDisplay: Shell page switch: chat
+I (219548) MQTT: Session ID: 5386e3ac
+I (219548) WifiStation: Setting WiFi power save level: PERFORMANCE (NONE)
+I (219553) StateMachine: State: connecting -> listening
+I (219556) AFE: AFE Version: (1MIC_V251128)
+I (219556) AFE: Input PCM Config: total 1 channels(1 microphone, 0 playback), sample rate:16000
+I (219564) AFE: AFE Pipeline: [input] -> |VAD(WebRTC)| -> [output]
+I (219570) AfeAudioProcessor: Audio communication task started, feed size: 512 fetch size: 512
+I (223024) StateMachine: State: listening -> speaking
+I (223029) Application: >> 你好你好。
+I (224261) Application: << 你好呀，
+I (224666) AudioCodec: Set output enable to true
+I (225380) Application: << 有什么可以帮你的吗？
+I (227324) StateMachine: State: speaking -> listening
+I (234570) StateMachine: State: listening -> speaking
+I (234571) Application: >> 没事了，你退下吧。
+I (234979) Application: << 好的，
+I (235903) Application: << 那我退下啦，拜拜～
+I (237949) StateMachine: State: speaking -> listening
+I (237950) MQTT: Received goodbye message, session_id: 5386e3ac
+I (238049) MQTT: Closing audio channel, send_goodbye: 0
+I (238050) WifiStation: Setting WiFi power save level: LOW_POWER (MAX_MODEM)
+I (238055) StateMachine: State: listening -> idle
+I (238288) MQTT: Received goodbye message, session_id: 5386e3ac
+I (238289) MQTT: Closing audio channel, send_goodbye: 0
+I (238289) WifiStation: Setting WiFi power save level: LOW_POWER (MAX_MODEM)
+I (242129) StateMachine: State: idle -> connecting
+I (242129) LcdDisplay: Shell page switch: chat
+I (242724) LcdDisplay: Shell page switch: settings
+I (242753) PAGE_SET: Settings page created
+I (242895) MQTT: Session ID: aeabcd03
+I (242896) WifiStation: Setting WiFi power save level: PERFORMANCE (NONE)
+I (242901) StateMachine: State: connecting -> listening
+I (243741) LcdDisplay: Shell page switch: chat
+I (250810) MQTT: Closing audio channel, send_goodbye: 1
+I (250811) WifiStation: Setting WiFi power save level: LOW_POWER (MAX_MODEM)
+I (250812) LcdDisplay: Shell page switch: chat
+I (250825) StateMachine: State: listening -> idle
+I (251805) MQTT: Received goodbye message, session_id: aeabcd03
+I (251805) MQTT: Closing audio channel, send_goodbye: 0
+I (251805) WifiStation: Setting WiFi power save level: LOW_POWER (MAX_MODEM)
+I (260752) SystemInfo: free sram: 16471 minimal sram: 11939

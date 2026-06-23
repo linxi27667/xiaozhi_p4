@@ -62,6 +62,7 @@ typedef struct {
     uint8_t blue;
     uint8_t brightness;
     uint8_t effect;
+    uint8_t servo_open_angle;   /* 舵机打开角度(默认180,3F天窗机械限位135) */
 } rc_device_t;
 
 typedef struct {

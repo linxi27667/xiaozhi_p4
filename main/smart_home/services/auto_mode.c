@@ -122,7 +122,6 @@ void auto_mode_on_event(const smart_home_event_t *event)
     if (event->type == SH_EVENT_FIRE_ALARM) {
         mqtt_send_broadcast(IOT_CMD_BROADCAST_ALL_OFF);
         mqtt_send_ambient_scene(2, 0, IOT_AMBIENT_SCENE_WARNING);
-        mqtt_send_ambient_scene(2, 1, IOT_AMBIENT_SCENE_WARNING);
         return;
     }
 
@@ -133,10 +132,10 @@ void auto_mode_on_event(const smart_home_event_t *event)
         if (can_trigger(AUTO_TARGET_FLOOR3_HANGER)) {
             do_trigger(AUTO_TARGET_FLOOR3_HANGER, 3, IOT_CMD_SET_SERVO, 8, 0);
         }
-        if (can_trigger(AUTO_TARGET_FLOOR2_LIVING_AMBIENT)) {
-            s_state.trigger_count[AUTO_TARGET_FLOOR2_LIVING_AMBIENT]++;
-            s_state.last_trigger_ms[AUTO_TARGET_FLOOR2_LIVING_AMBIENT] = now_ms();
-            mqtt_send_ambient_scene(2, 1, IOT_AMBIENT_SCENE_RAIN);
+        if (can_trigger(AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT)) {
+            s_state.trigger_count[AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT]++;
+            s_state.last_trigger_ms[AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT] = now_ms();
+            mqtt_send_ambient_scene(2, 0, IOT_AMBIENT_SCENE_RAIN);
         }
         if (can_trigger(AUTO_TARGET_FLOOR3_SKYLIGHT)) {
             do_trigger(AUTO_TARGET_FLOOR3_SKYLIGHT, 3, IOT_CMD_SET_SERVO, 6, 0);
@@ -156,11 +155,6 @@ void auto_mode_on_event(const smart_home_event_t *event)
             s_state.trigger_count[AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT]++;
             s_state.last_trigger_ms[AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT] = now_ms();
             mqtt_send_ambient_scene(event->floor_id, 0, IOT_AMBIENT_SCENE_WARNING);
-        }
-        if (can_trigger(AUTO_TARGET_FLOOR2_LIVING_AMBIENT)) {
-            s_state.trigger_count[AUTO_TARGET_FLOOR2_LIVING_AMBIENT]++;
-            s_state.last_trigger_ms[AUTO_TARGET_FLOOR2_LIVING_AMBIENT] = now_ms();
-            mqtt_send_ambient_scene(event->floor_id, 1, IOT_AMBIENT_SCENE_WARNING);
         }
         return;
     }
@@ -183,17 +177,12 @@ void auto_mode_tick(void)
         s_state.trigger_count[AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT]++;
         s_state.last_trigger_ms[AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT] = now_ms();
         mqtt_send_ambient_scene(2, 0, IOT_AMBIENT_SCENE_SLEEP);
-        if (can_trigger(AUTO_TARGET_FLOOR2_LIVING_AMBIENT)) {
-            s_state.trigger_count[AUTO_TARGET_FLOOR2_LIVING_AMBIENT]++;
-            s_state.last_trigger_ms[AUTO_TARGET_FLOOR2_LIVING_AMBIENT] = now_ms();
-            mqtt_send_ambient_scene(2, 1, IOT_AMBIENT_SCENE_OFF);
-        }
         mqtt_send_broadcast(IOT_CMD_BROADCAST_LIGHTS_OFF);
         s_last_triggered_hour = hour;
-    } else if (hour == 18 && can_trigger(AUTO_TARGET_FLOOR2_LIVING_AMBIENT)) {
-        s_state.trigger_count[AUTO_TARGET_FLOOR2_LIVING_AMBIENT]++;
-        s_state.last_trigger_ms[AUTO_TARGET_FLOOR2_LIVING_AMBIENT] = now_ms();
-        mqtt_send_ambient_scene(2, 1, IOT_AMBIENT_SCENE_WARM_HOME);
+    } else if (hour == 18 && can_trigger(AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT)) {
+        s_state.trigger_count[AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT]++;
+        s_state.last_trigger_ms[AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT] = now_ms();
+        mqtt_send_ambient_scene(2, 0, IOT_AMBIENT_SCENE_WARM_HOME);
         s_last_triggered_hour = hour;
     }
 }
@@ -208,8 +197,8 @@ void auto_mode_mark_manual_override(auto_target_t target)
 auto_target_t auto_target_from_device(const char *device_id)
 {
     if (!device_id) return AUTO_TARGET_MAX;
-    if (strcmp(device_id, "floor2_master_ambient") == 0) return AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT;
-    if (strcmp(device_id, "floor2_living_ambient") == 0) return AUTO_TARGET_FLOOR2_LIVING_AMBIENT;
+    if (strcmp(device_id, "floor2_master_light") == 0) return AUTO_TARGET_FLOOR2_BEDROOM_AMBIENT;
+    if (strcmp(device_id, "floor2_living_light") == 0) return AUTO_TARGET_FLOOR2_LIVING_AMBIENT;
     if (strcmp(device_id, "floor2_fan") == 0) return AUTO_TARGET_FLOOR2_FAN;
     if (strcmp(device_id, "floor2_hanger") == 0) return AUTO_TARGET_FLOOR2_HANGER;
     if (strcmp(device_id, "floor3_left_skylight") == 0 || strcmp(device_id, "floor3_right_skylight") == 0) return AUTO_TARGET_FLOOR3_SKYLIGHT;

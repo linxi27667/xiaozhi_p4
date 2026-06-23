@@ -1,0 +1,10 @@
+Command: ninja all
+78/esp_wifi_connect: IDF_VER is v5.5.3-dirty
+78/esp_wifi_connect: idf_component_register for v5 used
+CMake Warning at E:/MCU/esp32/.espressif/v5.5.3/esp-idf/tools/cmake/component.cmake:301 (message):
+  No source files found for SRC_DIRS entry './src/resources'.
+Call Stack (most recent call first):
+  E:/MCU/esp32/.espressif/v5.5.3/esp-idf/tools/cmake/component.cmake:458 (__component_add_sources)
+  managed_components/llgok__cpp_bus_driver/CMakeLists.txt:22 (idf_component_register)
+
+

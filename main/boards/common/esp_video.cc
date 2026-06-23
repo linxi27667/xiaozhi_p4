@@ -212,9 +212,9 @@ EspVideo::EspVideo(const esp_video_init_config_t& config) {
 #else
     auto get_rank = [](uint32_t fmt) -> int {
         switch (fmt) {
-            case V4L2_PIX_FMT_YUV422P:
-                return 10;
             case V4L2_PIX_FMT_RGB565:
+                return 10;
+            case V4L2_PIX_FMT_YUV422P:
                 return 11;
             case V4L2_PIX_FMT_RGB24:
                 return 12;
@@ -1038,4 +1038,66 @@ std::string EspVideo::Explain(const std::string& question) {
     ESP_LOGI(TAG, "Explain image size=%d bytes, compressed size=%d, remain stack size=%d, question=%s\n%s",
              (int)frame_.len, (int)total_sent, (int)remain_stack_size, question.c_str(), result.c_str());
     return result;
+}
+
+bool EspVideo::CaptureFrame(CapturedFrame& frame) {
+    frame.data = nullptr;
+    frame.len = 0;
+    frame.format = 0;
+    frame.width = 0;
+    frame.height = 0;
+
+    // 等待编码线程完成(避免冲突)
+    if (encoder_thread_.joinable()) {
+        encoder_thread_.join();
+    }
+
+    if (!streaming_on_ || video_fd_ < 0) {
+        ESP_LOGE(TAG, "CaptureFrame: stream not on or fd invalid");
+        return false;
+    }
+
+    // 单次 DQBUF(不丢弃前 2 帧)
+    struct v4l2_buffer buf = {};
+    buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    buf.memory = V4L2_MEMORY_MMAP;
+    if (ioctl(video_fd_, VIDIOC_DQBUF, &buf) != 0) {
+        ESP_LOGE(TAG, "CaptureFrame: VIDIOC_DQBUF failed");
+        return false;
+    }
+
+    // 拷贝到 PSRAM
+    frame.len = buf.bytesused;
+    frame.format = sensor_format_;
+    frame.width = frame_.width;
+    frame.height = frame_.height;
+    frame.data = (uint8_t*)heap_caps_malloc(frame.len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!frame.data) {
+        ESP_LOGE(TAG, "CaptureFrame: alloc failed, need %lu bytes", (unsigned long)frame.len);
+        ioctl(video_fd_, VIDIOC_QBUF, &buf);
+        return false;
+    }
+
+#ifdef CONFIG_XIAOZHI_ENABLE_CAMERA_ENDIANNESS_SWAP
+    {
+        auto src16 = (uint16_t*)mmap_buffers_[buf.index].start;
+        auto dst16 = (uint16_t*)frame.data;
+        size_t count = (size_t)mmap_buffers_[buf.index].length / 2;
+        for (size_t i = 0; i < count; i++) {
+            dst16[i] = __builtin_bswap16(src16[i]);
+        }
+    }
+#else
+    memcpy(frame.data, mmap_buffers_[buf.index].start,
+           MIN(mmap_buffers_[buf.index].length, frame.len));
+#endif  // CONFIG_XIAOZHI_ENABLE_CAMERA_ENDIANNESS_SWAP
+
+    // 重新入队
+    if (ioctl(video_fd_, VIDIOC_QBUF, &buf) != 0) {
+        ESP_LOGW(TAG, "CaptureFrame: VIDIOC_QBUF failed");
+    }
+
+    ESP_LOGD(TAG, "CaptureFrame: %dx%d, fmt=0x%x, len=%lu",
+             frame.width, frame.height, (unsigned)frame.format, (unsigned long)frame.len);
+    return true;
 }

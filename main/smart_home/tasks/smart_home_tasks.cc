@@ -9,6 +9,7 @@
 #include "../services/weather_service.h"
 
 #include <esp_log.h>
+#include <esp_sntp.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -16,6 +17,29 @@ static const char* TAG = "SmartHomeTasks";
 
 static TaskHandle_t s_mqtt_task = nullptr;
 static bool s_started = false;
+static bool s_sntp_inited = false;
+
+/* SNTP 时间同步初始化(自动模式依赖时间判断) */
+static void sntp_start(void) {
+    if (s_sntp_inited) return;
+    s_sntp_inited = true;
+
+    ESP_LOGI(TAG, "Initializing SNTP");
+    esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    esp_sntp_setservername(0, "ntp.aliyun.com");
+    esp_sntp_setservername(1, "pool.ntp.org");
+    esp_sntp_setservername(2, "time.windows.com");
+    /* 设置时区为中国标准时间 (CST = UTC+8) */
+    setenv("TZ", "CST-8", 1);
+    tzset();
+    esp_sntp_init();
+
+    ESP_LOGI(TAG, "SNTP started, waiting for time sync...");
+}
+
+void SmartHomeTasksNotifyNetworkReady(void) {
+    sntp_start();
+}
 
 static void smart_home_mqtt_task(void* arg) {
     (void)arg;

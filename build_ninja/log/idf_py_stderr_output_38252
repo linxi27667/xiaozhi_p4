@@ -1,0 +1,10 @@
+Command: cmake -G Ninja -DPYTHON_DEPS_CHECKED=1 -DPYTHON=C:\Users\30817\.espressif\python_env\idf5.5_py3.13_env\Scripts\python.exe -DESP_PLATFORM=1 -DCCACHE_ENABLE=1 E:\MCU\esp32\p4\xiaozhi-for-p4
+78/esp_wifi_connect: IDF_VER is v5.5.3-dirty
+78/esp_wifi_connect: idf_component_register for v5 used
+CMake Warning at E:/MCU/esp32/.espressif/v5.5.3/esp-idf/tools/cmake/component.cmake:301 (message):
+  No source files found for SRC_DIRS entry './src/resources'.
+Call Stack (most recent call first):
+  E:/MCU/esp32/.espressif/v5.5.3/esp-idf/tools/cmake/component.cmake:458 (__component_add_sources)
+  managed_components/llgok__cpp_bus_driver/CMakeLists.txt:22 (idf_component_register)
+
+

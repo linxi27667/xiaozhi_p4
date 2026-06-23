@@ -5,6 +5,8 @@
 #include "../services/ui_icons.h"
 #include "esp_log.h"
 #include "esp_attr.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "lvgl.h"
 #include <stdio.h>
 #include <string.h>
@@ -13,6 +15,17 @@ static const char *TAG = "DEV_MODEL";
 
 static EXT_RAM_BSS_ATTR mqtt_device_model_t s_model;
 static bool s_model_initialized;
+/* 互斥锁: 保护 s_model 读写,防止 MQTT 任务(Core1)与 LVGL 任务并发访问导致数据错乱 */
+static SemaphoreHandle_t s_model_mutex = NULL;
+static StaticSemaphore_t s_model_mutex_buffer;
+
+/* 临界区辅助宏: 保护写操作,读操作(device_model_get 返回 const 指针)依赖最终一致性 */
+static inline void model_lock(void) {
+    if (s_model_mutex) xSemaphoreTake(s_model_mutex, portMAX_DELAY);
+}
+static inline void model_unlock(void) {
+    if (s_model_mutex) xSemaphoreGive(s_model_mutex);
+}
 
 void smart_home_alarm_on_fire_status(uint8_t floor_id, bool active) __attribute__((weak));
 void smart_home_alarm_on_fire_status(uint8_t floor_id, bool active)
@@ -87,6 +100,7 @@ static void add_device(rc_floor_t floor, rc_device_type_t type,
     d->floor_id = floor_id;
     d->cmd_type = cmd_type;
     d->gpio_index = gpio_index;
+    d->servo_open_angle = 180;  /* 默认全开180度,3F天窗会在init中覆盖为135 */
     refresh_device_value(d);
 }
 
@@ -108,6 +122,9 @@ void device_model_init(void)
     }
     s_model_initialized = true;
 
+    /* 创建互斥锁(静态分配,避免内存分配失败) */
+    s_model_mutex = xSemaphoreCreateMutexStatic(&s_model_mutex_buffer);
+
     memset(&s_model, 0, sizeof(s_model));
     s_model.mqtt_state = MQTT_STATE_DISCONNECTED;
     s_model.wifi_state = WIFI_STATE_IDLE;
@@ -126,6 +143,17 @@ void device_model_init(void)
     add_device(RC_FLOOR_3, RC_DEVICE_WINDOW, "floor3_left_skylight","\xE5\xB7\xA6\xE5\xA4\xA9\xE7\xAA\x97", true, 3, IOT_CMD_SET_SERVO, 6); /* 左天窗 */
     add_device(RC_FLOOR_3, RC_DEVICE_WINDOW, "floor3_right_skylight","\xE5\x8F\xB3\xE5\xA4\xA9\xE7\xAA\x97", true, 3, IOT_CMD_SET_SERVO, 7); /* 右天窗 */
     add_device(RC_FLOOR_3, RC_DEVICE_WINDOW, "floor3_hanger",       "\xE4\xB8\x89\xE6\xA5\xBC\xE6\x99\xBE\xE8\xA1\xA3\xE6\x9D\x86", true, 3, IOT_CMD_SET_SERVO, 8); /* 三楼晾衣杆 */
+
+    /* 3F 天窗机械限位: 只接受 0/25/70/135 度, 全开=135 而非 180 */
+    for (uint16_t i = 0; i < s_model.device_count; i++) {
+        rc_device_t *d = &s_model.devices[i];
+        if (d->floor == RC_FLOOR_3 && d->type == RC_DEVICE_WINDOW &&
+            d->cmd_type == IOT_CMD_SET_SERVO &&
+            (strcmp(d->id, "floor3_left_skylight") == 0 ||
+             strcmp(d->id, "floor3_right_skylight") == 0)) {
+            d->servo_open_angle = 135;
+        }
+    }
 
     s_model.current_scene = IOT_SCENE_NONE;
     lv_snprintf(s_model.scene_name, sizeof(s_model.scene_name), "%s", device_model_scene_name(IOT_SCENE_NONE));
@@ -204,8 +232,9 @@ void device_model_toggle_device(uint16_t index)
 static void set_power_internal(uint16_t index, bool on, bool publish_mqtt)
 {
     if (index >= s_model.device_count) return;
+    model_lock();
     rc_device_t *d = &s_model.devices[index];
-    if (!d->controllable) return;
+    if (!d->controllable) { model_unlock(); return; }
 
     if (publish_mqtt) {
         if (d->cmd_type == IOT_CMD_SET_RGB_LIGHT) {
@@ -215,16 +244,28 @@ static void set_power_internal(uint16_t index, bool on, bool publish_mqtt)
                 uint8_t g = d->green ? d->green : 160;
                 uint8_t b = d->blue  ? d->blue  : 80;
                 uint8_t br = d->brightness ? d->brightness : 60;
+                model_unlock();
                 mqtt_send_rgb_light(d->floor_id, d->gpio_index, r, g, b, br, d->effect, 0);
             } else {
-                mqtt_send_rgb_light(d->floor_id, d->gpio_index, 0, 0, 0, 0, IOT_LIGHT_EFFECT_STATIC, 0);
+                uint8_t floor_id = d->floor_id;
+                uint8_t gpio_index = d->gpio_index;
+                model_unlock();
+                mqtt_send_rgb_light(floor_id, gpio_index, 0, 0, 0, 0, IOT_LIGHT_EFFECT_STATIC, 0);
             }
         } else if (d->cmd_type == IOT_CMD_SET_SERVO) {
-            uint8_t value = on ? 180 : 0;
-            mqtt_send_command(d->floor_id, d->cmd_type, d->gpio_index, value);
+            uint8_t value = on ? d->servo_open_angle : 0;
+            uint8_t floor_id = d->floor_id;
+            uint8_t cmd_type = d->cmd_type;
+            uint8_t gpio_index = d->gpio_index;
+            model_unlock();
+            mqtt_send_command(floor_id, cmd_type, gpio_index, value);
         } else {
             uint8_t value = on ? 1 : 0;  /* light/relay: on=1, off=0 */
-            mqtt_send_command(d->floor_id, d->cmd_type, d->gpio_index, value);
+            uint8_t floor_id = d->floor_id;
+            uint8_t cmd_type = d->cmd_type;
+            uint8_t gpio_index = d->gpio_index;
+            model_unlock();
+            mqtt_send_command(floor_id, cmd_type, gpio_index, value);
         }
         return;
     }
@@ -241,6 +282,7 @@ static void set_power_internal(uint16_t index, bool on, bool publish_mqtt)
     }
     refresh_device_value(d);
     publish_update();
+    model_unlock();
 }
 
 void device_model_set_power(uint16_t index, bool on)
@@ -255,19 +297,22 @@ void device_model_apply_power(uint16_t index, bool on)
 
 void device_model_update_from_mqtt(const char *device_id, bool power_on, uint16_t value)
 {
+    model_lock();
     rc_device_t *d = find_device(device_id);
-    if (!d) return;
+    if (!d) { model_unlock(); return; }
     d->power_on = power_on;
     d->value = value;
     d->connected = true;
     s_model.gateway_connected = true;
     refresh_device_value(d);
     publish_update();
+    model_unlock();
 }
 
 void device_model_apply_command_ack(uint8_t floor_id, uint8_t cmd_type, uint8_t gpio_index, uint8_t value)
 {
     bool changed = false;
+    model_lock();
     if (floor_id >= 1 && floor_id <= 3) {
         s_model.controller_online[floor_id - 1] = true;
     }
@@ -296,12 +341,14 @@ void device_model_apply_command_ack(uint8_t floor_id, uint8_t cmd_type, uint8_t 
     if (changed) {
         publish_update();
     }
+    model_unlock();
 }
 
 void device_model_apply_rgb_ack(uint8_t floor_id, uint8_t index, uint8_t red, uint8_t green,
                                 uint8_t blue, uint8_t brightness, uint8_t effect)
 {
     bool changed = false;
+    model_lock();
     if (floor_id >= 1 && floor_id <= 3) {
         s_model.controller_online[floor_id - 1] = true;
     }
@@ -326,6 +373,7 @@ void device_model_apply_rgb_ack(uint8_t floor_id, uint8_t index, uint8_t red, ui
     if (changed) {
         publish_update();
     }
+    model_unlock();
 }
 
 void device_model_apply_heartbeat(const iot_heartbeat_v2_packet_t *heartbeat)
@@ -334,6 +382,7 @@ void device_model_apply_heartbeat(const iot_heartbeat_v2_packet_t *heartbeat)
         return;
     }
 
+    model_lock();
     uint8_t floor_id = heartbeat->device_id;
     uint8_t floor_idx = floor_id - 1;
     s_model.controller_online[floor_idx] = heartbeat->device_status != 0;
@@ -420,6 +469,7 @@ void device_model_apply_heartbeat(const iot_heartbeat_v2_packet_t *heartbeat)
 
     s_model.sensor_rx_count++;
     publish_update();
+    model_unlock();
 }
 
 void device_model_apply_heartbeat_v3(const iot_heartbeat_v3_packet_t *heartbeat)
@@ -469,41 +519,50 @@ const char *device_model_scene_name(uint8_t scene_id)
 
 void device_model_set_scene(uint8_t scene_id)
 {
+    model_lock();
     s_model.current_scene = scene_id;
     s_model.scene_seq++;
     lv_snprintf(s_model.scene_name, sizeof(s_model.scene_name), "%s", device_model_scene_name(scene_id));
     publish_update();
+    model_unlock();
     ui_event_publish(UI_EVENT_SCENE_CHANGED);
 }
 
 void device_model_set_mqtt_state(mqtt_state_t state)
 {
+    model_lock();
     s_model.mqtt_state = state;
     if (state == MQTT_STATE_CONNECTED) {
         s_model.gateway_connected = true;
     }
     publish_update();
+    model_unlock();
 }
 
 void device_model_set_device_online(const char *device_id, bool online)
 {
+    model_lock();
     rc_device_t *d = find_device(device_id);
-    if (!d) return;
+    if (!d) { model_unlock(); return; }
     d->connected = online;
     publish_update();
+    model_unlock();
 }
 
 void device_model_update_wifi_state(wifi_state_t state, const char *ssid)
 {
+    model_lock();
     s_model.wifi_state = state;
     if (ssid) {
         strncpy(s_model.wifi_ssid, ssid, WIFI_SSID_MAX - 1);
     }
     publish_update();
+    model_unlock();
 }
 
 void device_model_update_wifi_aps(const wifi_ap_t *aps, uint16_t count)
 {
+    model_lock();
     if (count > WIFI_AP_MAX) count = WIFI_AP_MAX;
     if (aps && count > 0) {
         memcpy(s_model.wifi_aps, aps, count * sizeof(wifi_ap_t));
@@ -513,11 +572,13 @@ void device_model_update_wifi_aps(const wifi_ap_t *aps, uint16_t count)
     }
     s_model.wifi_ap_count = count;
     publish_update();
+    model_unlock();
 }
 
 void device_model_update_sensors(float temp, float humi, uint16_t pm25,
                                   uint16_t rain, uint16_t flame, uint16_t smoke)
 {
+    model_lock();
     s_model.temperature = temp;
     s_model.humidity = humi;
     s_model.pm25 = pm25;
@@ -532,6 +593,7 @@ void device_model_update_sensors(float temp, float humi, uint16_t pm25,
     s_model.smoke_valid = true;
     s_model.sensor_rx_count++;
     publish_update();
+    model_unlock();
 }
 
 void device_model_update_weather(const char *location, float temp, uint8_t humidity,
@@ -539,6 +601,7 @@ void device_model_update_weather(const char *location, float temp, uint8_t humid
                                   uint16_t weather_code, float pm25, uint16_t aqi,
                                   bool air_quality_valid)
 {
+    model_lock();
     if (location && location[0] != '\0') {
         strncpy(s_model.weather_location, location, sizeof(s_model.weather_location) - 1);
         s_model.weather_location[sizeof(s_model.weather_location) - 1] = '\0';
@@ -554,10 +617,12 @@ void device_model_update_weather(const char *location, float temp, uint8_t humid
     s_model.air_quality_valid = air_quality_valid;
     s_model.weather_last_update_s = (uint32_t)(lv_tick_get() / 1000U);
     publish_update();
+    model_unlock();
 }
 
 void device_model_update_sensor_value(uint8_t floor_id, uint8_t sensor_type, uint16_t value)
 {
+    model_lock();
     uint8_t idx = 0;
     if (floor_id >= 1 && floor_id <= 3) {
         idx = floor_id - 1;
@@ -607,11 +672,13 @@ void device_model_update_sensor_value(uint8_t floor_id, uint8_t sensor_type, uin
             }
             break;
         default:
+            model_unlock();
             return;
     }
 
     s_model.sensor_rx_count++;
     publish_update();
+    model_unlock();
 }
 
 bool device_model_get_rain_value(uint8_t floor_id, uint16_t *value)
@@ -685,22 +752,27 @@ uint16_t device_model_sensor_online_count(void)
 
 void device_model_set_controller_online(uint8_t floor_id, bool online)
 {
+    model_lock();
     if (floor_id >= 1 && floor_id <= 3) {
         s_model.controller_online[floor_id - 1] = online;
         publish_update();
     }
+    model_unlock();
 }
 
 void device_model_set_mqtt_stats(uint32_t rx_count, uint32_t last_seen_sec)
 {
+    model_lock();
     s_model.mqtt_rx_count = rx_count;
     s_model.mqtt_last_seen_sec = last_seen_sec;
     publish_update();
+    model_unlock();
 }
 
 void device_model_set_floor_runtime_offline(uint8_t floor_id)
 {
     if (floor_id < 1 || floor_id > 3) return;
+    model_lock();
     uint8_t idx = floor_id - 1;
     s_model.controller_online[idx] = false;
     s_model.rain_floor_valid[idx] = false;
@@ -717,10 +789,12 @@ void device_model_set_floor_runtime_offline(uint8_t floor_id)
         }
     }
     publish_update();
+    model_unlock();
 }
 
 void device_model_reset_runtime_data(void)
 {
+    model_lock();
     for (uint8_t floor_id = 1; floor_id <= 3; floor_id++) {
         uint8_t idx = floor_id - 1;
         s_model.controller_online[idx] = false;
@@ -745,4 +819,5 @@ void device_model_reset_runtime_data(void)
     s_model.mqtt_rx_count = 0;
     s_model.mqtt_last_seen_sec = 0;
     publish_update();
+    model_unlock();
 }

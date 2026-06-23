@@ -18,6 +18,7 @@ static const char* const STATE_STRINGS[] = {
     "activating",
     "audio_testing",
     "fatal_error",
+    "locked",
     "invalid_state"
 };
 
@@ -25,10 +26,10 @@ DeviceStateMachine::DeviceStateMachine() {
 }
 
 const char* DeviceStateMachine::GetStateName(DeviceState state) {
-    if (state >= 0 && state <= kDeviceStateFatalError) {
+    if (state >= 0 && state <= kDeviceStateLocked) {
         return STATE_STRINGS[state];
     }
-    return STATE_STRINGS[kDeviceStateFatalError + 1];
+    return STATE_STRINGS[kDeviceStateLocked + 1];
 }
 
 bool DeviceStateMachine::IsValidTransition(DeviceState from, DeviceState to) const {
@@ -44,9 +45,10 @@ bool DeviceStateMachine::IsValidTransition(DeviceState from, DeviceState to) con
             return to == kDeviceStateStarting;
 
         case kDeviceStateStarting:
-            // Can go to wifi configuring or activating
+            // Can go to wifi configuring, activating, or locked (login required)
             return to == kDeviceStateWifiConfiguring ||
-                   to == kDeviceStateActivating;
+                   to == kDeviceStateActivating ||
+                   to == kDeviceStateLocked;
 
         case kDeviceStateWifiConfiguring:
             // Can go to activating (after wifi connected) or audio testing
@@ -69,13 +71,14 @@ bool DeviceStateMachine::IsValidTransition(DeviceState from, DeviceState to) con
                    to == kDeviceStateActivating;
 
         case kDeviceStateIdle:
-            // Can go to connecting, listening (manual mode), speaking, activating, upgrading, or wifi configuring
+            // Can go to connecting, listening (manual mode), speaking, activating, upgrading, wifi configuring, or locked (manual lock)
             return to == kDeviceStateConnecting ||
                    to == kDeviceStateListening ||
                    to == kDeviceStateSpeaking ||
                    to == kDeviceStateActivating ||
                    to == kDeviceStateUpgrading ||
-                   to == kDeviceStateWifiConfiguring;
+                   to == kDeviceStateWifiConfiguring ||
+                   to == kDeviceStateLocked;
 
         case kDeviceStateConnecting:
             // Can go to idle (failed) or listening (success)
@@ -95,6 +98,13 @@ bool DeviceStateMachine::IsValidTransition(DeviceState from, DeviceState to) con
         case kDeviceStateFatalError:
             // Cannot transition out of fatal error
             return false;
+
+        case kDeviceStateLocked:
+            // Locked can go to idle (login success), activating (protocol startup),
+            // or wifi configuring (network unavailable/config AP)
+            return to == kDeviceStateIdle ||
+                   to == kDeviceStateActivating ||
+                   to == kDeviceStateWifiConfiguring;
 
         default:
             return false;

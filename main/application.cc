@@ -11,14 +11,21 @@
 #include "settings.h"
 #include "smart_home_tasks.h"
 #include "smart_home_mcp_tool.h"
+#include "smart_home/mcp/face_mcp_tool.h"
 #include "smart_home/ui/model/mqtt_device_model.h"
+#include "smart_home/ui/core/ui_events.h"
+#include "smart_home/ui/services/login_ui.h"
+#include "smart_home/services/face_recognition.h"
+#include "esp_video.h"
 
 #include <cstring>
+#include <esp_heap_caps.h>
 #include <esp_log.h>
 #include <cJSON.h>
 #include <driver/gpio.h>
 #include <arpa/inet.h>
 #include <font_awesome.h>
+#include <linux/videodev2.h>
 
 #define TAG "Application"
 
@@ -61,6 +68,281 @@ bool Application::SetDeviceState(DeviceState state) {
     return state_machine_.TransitionTo(state);
 }
 
+// ============================================================================
+// 登录流程集成
+// ============================================================================
+
+// 登录事件桥接:将 C 事件转换为 Application 任务调度
+static void on_login_success_event(void *user_data)
+{
+    (void)user_data;
+    ESP_LOGI(TAG, "Login success event received");
+    Application::GetInstance().Schedule([]() {
+        Application::GetInstance().OnLoginSuccess();
+    });
+}
+
+static void on_login_failed_event(void *user_data)
+{
+    (void)user_data;
+    // 登录失败时不需要状态转换,UI 会显示错误提示
+}
+
+static constexpr int FACE_PREVIEW_W = 420;
+static constexpr int FACE_PREVIEW_H = 315;
+
+static uint8_t *scale_rgb565_frame(const EspVideo::CapturedFrame &src, int dst_w, int dst_h)
+{
+    if (!src.data || src.width <= 0 || src.height <= 0 || src.format != V4L2_PIX_FMT_RGB565) {
+        return nullptr;
+    }
+
+    const size_t dst_len = (size_t)dst_w * dst_h * 2;
+    auto *dst = (uint8_t *)heap_caps_malloc(dst_len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!dst) {
+        ESP_LOGE(TAG, "Failed to allocate scaled face frame (%u bytes)", (unsigned)dst_len);
+        return nullptr;
+    }
+
+    const auto *src16 = reinterpret_cast<const uint16_t *>(src.data);
+    auto *dst16 = reinterpret_cast<uint16_t *>(dst);
+    for (int y = 0; y < dst_h; ++y) {
+        int sy = (int)((int64_t)y * src.height / dst_h);
+        for (int x = 0; x < dst_w; ++x) {
+            int sx = (int)((int64_t)x * src.width / dst_w);
+            dst16[y * dst_w + x] = src16[sy * src.width + sx];
+        }
+    }
+    return dst;
+}
+
+static uint8_t *copy_face_frame(const uint8_t *src)
+{
+    const size_t len = (size_t)FACE_PREVIEW_W * FACE_PREVIEW_H * 2;
+    auto *dst = (uint8_t *)heap_caps_malloc(len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!dst) {
+        return nullptr;
+    }
+    memcpy(dst, src, len);
+    return dst;
+}
+
+static void publish_ui_event_now(ui_event_type_t event)
+{
+    ui_event_publish(event);
+    ui_events_dispatch_pending();
+}
+
+// 人脸识别任务:在登录 UI 处于人脸模式时,持续采集帧并进行识别
+static void face_recognition_task(void *arg)
+{
+    (void)arg;
+    ESP_LOGI(TAG, "Face recognition task started");
+
+    // 初始化人脸识别引擎
+    auto &face_recog = smart_home::FaceRecognition::GetInstance();
+    bool face_init_ok = face_recog.Initialize();
+    if (!face_init_ok) {
+        ESP_LOGW(TAG, "Face recognition init failed, face login unavailable");
+    }
+
+    const TickType_t frame_interval = pdMS_TO_TICKS(500);
+    const TickType_t detect_interval = pdMS_TO_TICKS(1500);
+    const TickType_t recognize_interval = pdMS_TO_TICKS(3000);
+    int no_face_count = 0;
+    const int max_no_face = 4;  // 约6秒无人脸则提示
+    bool preview_started = false;
+    bool camera_wait_status_shown = false;
+    TickType_t last_detect_tick = 0;
+    TickType_t last_recognize_tick = 0;
+    int registered_face_count = face_init_ok ? face_recog.GetFaceCount() : 0;
+    if (face_init_ok) {
+        ESP_LOGI(TAG, "Face DB contains %d enrolled face(s)", registered_face_count);
+    }
+
+    while (true) {
+        // 只在登录 UI 可见且处于人脸模式时工作
+        if (!login_ui_is_face_mode()) {
+            vTaskDelay(pdMS_TO_TICKS(500));
+            continue;
+        }
+
+        // 获取摄像头
+        auto *board = &Board::GetInstance();
+        auto *camera = board->GetCamera();
+        if (!camera) {
+            ESP_LOGW(TAG, "No camera available");
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
+        }
+
+        // 转换为 EspVideo 以使用 CaptureFrame
+        EspVideo *esp_video = dynamic_cast<EspVideo *>(camera);
+        if (!esp_video) {
+            ESP_LOGW(TAG, "Camera is not EspVideo");
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
+        }
+
+        if (!esp_video->IsStreaming()) {
+            if (!camera_wait_status_shown) {
+                Application::GetInstance().Schedule([]() {
+                    DisplayLockGuard lock(Board::GetInstance().GetDisplay());
+                    if (login_ui_is_face_mode()) {
+                        login_ui_set_status("摄像头启动中...");
+                    }
+                });
+                camera_wait_status_shown = true;
+            }
+            vTaskDelay(pdMS_TO_TICKS(500));
+            continue;
+        }
+        camera_wait_status_shown = false;
+
+        // 采集一帧并缩放到登录预览/模型输入尺寸
+        EspVideo::CapturedFrame frame;
+        if (!esp_video->CaptureFrame(frame)) {
+            ESP_LOGD(TAG, "CaptureFrame failed");
+            vTaskDelay(frame_interval);
+            continue;
+        }
+
+        if (frame.format != V4L2_PIX_FMT_RGB565) {
+            ESP_LOGD(TAG, "Frame format not RGB565: 0x%x", (unsigned)frame.format);
+            free(frame.data);
+            vTaskDelay(frame_interval);
+            continue;
+        }
+
+        uint8_t *face_frame = scale_rgb565_frame(frame, FACE_PREVIEW_W, FACE_PREVIEW_H);
+        free(frame.data);
+        if (!face_frame) {
+            vTaskDelay(frame_interval);
+            continue;
+        }
+
+        uint8_t *preview_frame = copy_face_frame(face_frame);
+        if (preview_frame) {
+            Application::GetInstance().Schedule([preview_frame]() {
+                DisplayLockGuard lock(Board::GetInstance().GetDisplay());
+                if (login_ui_is_face_mode()) {
+                    login_ui_update_face_preview(preview_frame, FACE_PREVIEW_W, FACE_PREVIEW_H);
+                }
+                free(preview_frame);
+            });
+            if (!preview_started) {
+                ESP_LOGI(TAG, "Face preview started (%dx%d)", FACE_PREVIEW_W, FACE_PREVIEW_H);
+                preview_started = true;
+            }
+        }
+
+        if (!face_init_ok) {
+            free(face_frame);
+            vTaskDelay(frame_interval);
+            continue;
+        }
+
+        TickType_t now = xTaskGetTickCount();
+        if ((now - last_detect_tick) < detect_interval) {
+            free(face_frame);
+            vTaskDelay(frame_interval);
+            continue;
+        }
+        last_detect_tick = now;
+
+        // 人脸检测
+        std::vector<smart_home::FaceDetectResult> detect_results;
+        if (!face_recog.DetectFaces(face_frame, FACE_PREVIEW_W, FACE_PREVIEW_H, detect_results)) {
+            // 未检测到人脸
+            no_face_count++;
+            if (no_face_count >= max_no_face) {
+                Application::GetInstance().Schedule([]() {
+                    DisplayLockGuard lock(Board::GetInstance().GetDisplay());
+                    if (login_ui_is_face_mode()) {
+                        login_ui_set_status("未检测到人脸,请将面部对准摄像头");
+                        login_ui_clear_face_detect();
+                    }
+                });
+                no_face_count = 0;
+            }
+            free(face_frame);
+            vTaskDelay(frame_interval);
+            continue;
+        }
+        vTaskDelay(pdMS_TO_TICKS(20));
+
+        // 检测到人脸
+        no_face_count = 0;
+        auto &detect = detect_results[0];
+
+        // 更新检测框(在 LVGL 任务中执行)
+        Application::GetInstance().Schedule([detect]() {
+            DisplayLockGuard lock(Board::GetInstance().GetDisplay());
+            if (login_ui_is_face_mode()) {
+                login_ui_update_face_detect(detect.x, detect.y, detect.width, detect.height);
+                login_ui_set_status("正在识别...");
+                publish_ui_event_now(UI_EVENT_FACE_DETECTED);
+            }
+        });
+
+        if (registered_face_count <= 0) {
+            std::string user_id;
+            if (face_recog.RegisterFace(face_frame, FACE_PREVIEW_W, FACE_PREVIEW_H,
+                                        detect, "default", user_id)) {
+                registered_face_count = face_recog.GetFaceCount();
+                ESP_LOGI(TAG, "Default face enrolled: id=%s, total=%d",
+                         user_id.c_str(), registered_face_count);
+                Application::GetInstance().Schedule([]() {
+                    DisplayLockGuard lock(Board::GetInstance().GetDisplay());
+                    publish_ui_event_now(UI_EVENT_FACE_RECOGNIZED);
+                });
+                free(face_frame);
+                vTaskDelay(pdMS_TO_TICKS(2000));
+                continue;
+            }
+            ESP_LOGW(TAG, "Default face enrollment failed");
+            free(face_frame);
+            vTaskDelay(frame_interval);
+            continue;
+        }
+
+        now = xTaskGetTickCount();
+        if ((now - last_recognize_tick) < recognize_interval) {
+            free(face_frame);
+            vTaskDelay(frame_interval);
+            continue;
+        }
+        last_recognize_tick = now;
+
+        // 人脸识别
+        smart_home::FaceRecognizeResult recog_result;
+        if (face_recog.RecognizeFace(face_frame, FACE_PREVIEW_W, FACE_PREVIEW_H,
+                                      detect, recog_result)) {
+            // 识别成功
+            ESP_LOGI(TAG, "Face recognized: id=%u (%.2f)",
+                     (unsigned)recog_result.id, recog_result.similarity);
+            Application::GetInstance().Schedule([]() {
+                DisplayLockGuard lock(Board::GetInstance().GetDisplay());
+                publish_ui_event_now(UI_EVENT_FACE_RECOGNIZED);
+            });
+            free(face_frame);
+            // 等待登录 UI 隐藏
+            vTaskDelay(pdMS_TO_TICKS(2000));
+            continue;
+        } else {
+            // 识别失败
+            ESP_LOGD(TAG, "Face not recognized: %s", recog_result.error_msg.c_str());
+            Application::GetInstance().Schedule([]() {
+                DisplayLockGuard lock(Board::GetInstance().GetDisplay());
+                publish_ui_event_now(UI_EVENT_FACE_NOT_RECOGNIZED);
+            });
+        }
+
+        free(face_frame);
+        vTaskDelay(frame_interval);
+    }
+}
+
 void Application::Initialize() {
     auto& board = Board::GetInstance();
     SetDeviceState(kDeviceStateStarting);
@@ -99,6 +381,18 @@ void Application::Initialize() {
     mcp_server.AddCommonTools();
     mcp_server.AddUserOnlyTools();
     SmartHomeMcp_RegisterTools();
+    FaceMcp_RegisterTools();
+
+    login_ui_init();
+    ui_event_subscribe(UI_EVENT_LOGIN_SUCCESS, on_login_success_event, NULL);
+    ui_event_subscribe(UI_EVENT_LOGIN_FAILED, on_login_failed_event, NULL);
+
+    xTaskCreatePinnedToCore(face_recognition_task, "face_recog", 12 * 1024,
+                            nullptr, 4, nullptr, 1);
+
+    SetDeviceState(kDeviceStateLocked);
+    login_ui_show();
+    ESP_LOGI(TAG, "Login flow initialized, device locked");
 
     // Set network event callback for UI updates and network state handling
     board.SetNetworkEventCallback([this](NetworkEvent event, const std::string& data) {
@@ -125,7 +419,9 @@ void Application::Initialize() {
                 break;
             }
             case NetworkEvent::Connected: {
+                network_ready_ = true;
                 device_model_update_wifi_state(WIFI_STATE_CONNECTED, data.empty() ? "ESP-Hosted" : data.c_str());
+                SmartHomeTasksNotifyNetworkReady();
                 std::string msg = Lang::Strings::CONNECTED_TO;
                 msg += data;
                 display->ShowNotification(msg.c_str(), 30000);
@@ -133,10 +429,12 @@ void Application::Initialize() {
                 break;
             }
             case NetworkEvent::Disconnected:
+                network_ready_ = false;
                 device_model_update_wifi_state(WIFI_STATE_FAILED, nullptr);
                 xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_DISCONNECTED);
                 break;
             case NetworkEvent::WifiConfigModeEnter:
+                network_ready_ = false;
                 // WiFi config mode enter is handled by WifiBoard internally
                 break;
             case NetworkEvent::WifiConfigModeExit:
@@ -282,9 +580,11 @@ void Application::HandleNetworkConnectedEvent() {
     ESP_LOGI(TAG, "Network connected");
     auto state = GetDeviceState();
 
-    if (state == kDeviceStateStarting || state == kDeviceStateWifiConfiguring) {
+    if (state == kDeviceStateStarting || state == kDeviceStateWifiConfiguring || state == kDeviceStateLocked) {
         // Network is ready, start activation
-        SetDeviceState(kDeviceStateActivating);
+        if (state != kDeviceStateLocked) {
+            SetDeviceState(kDeviceStateActivating);
+        }
         if (activation_task_handle_ != nullptr) {
             ESP_LOGW(TAG, "Activation task already running");
             return;
@@ -318,9 +618,12 @@ void Application::HandleNetworkDisconnectedEvent() {
 
 void Application::HandleActivationDoneEvent() {
     ESP_LOGI(TAG, "Activation done");
+    activation_done_ = true;
 
     SystemInfo::PrintHeapStats();
-    SetDeviceState(kDeviceStateIdle);
+    if (GetDeviceState() != kDeviceStateLocked) {
+        SetDeviceState(kDeviceStateIdle);
+    }
 
     has_server_time_ = ota_->HasServerTime();
 
@@ -336,7 +639,9 @@ void Application::HandleActivationDoneEvent() {
 
     Schedule([this]() {
         // Play the success sound to indicate the device is ready
-        audio_service_.PlaySound(Lang::Sounds::OGG_SUCCESS);
+        if (GetDeviceState() != kDeviceStateLocked) {
+            audio_service_.PlaySound(Lang::Sounds::OGG_SUCCESS);
+        }
     });
 }
 
@@ -453,10 +758,8 @@ void Application::CheckNewVersion() {
         retry_delay = 10; // Reset retry delay
 
         if (ota_->HasNewVersion()) {
-            if (UpgradeFirmware(ota_->GetFirmwareUrl(), ota_->GetFirmwareVersion())) {
-                return; // This line will never be reached after reboot
-            }
-            // If upgrade failed, continue to normal operation
+            ESP_LOGI(TAG, "New version available: %s, but OTA is disabled", ota_->GetFirmwareVersion().c_str());
+            // OTA 已禁用,不执行固件升级
         }
 
         // No new version, mark the current version as valid
@@ -691,8 +994,49 @@ void Application::StopListening() {
     xEventGroupSetBits(event_group_, MAIN_EVENT_STOP_LISTENING);
 }
 
+void Application::LockDevice() {
+    ESP_LOGI(TAG, "Locking device");
+    if (SetDeviceState(kDeviceStateLocked)) {
+        Schedule([]() {
+            ui_event_publish(UI_EVENT_LOGIN_REQUIRED);
+        });
+    }
+}
+
+void Application::OnLoginSuccess() {
+    auto state = GetDeviceState();
+    if (state == kDeviceStateWifiConfiguring) {
+        ESP_LOGI(TAG, "Login succeeded while WiFi is configuring; staying in config mode");
+        return;
+    }
+
+    if (!network_ready_) {
+        ESP_LOGW(TAG, "Login succeeded before network is ready");
+        if (state == kDeviceStateLocked) {
+            SetDeviceState(kDeviceStateWifiConfiguring);
+        }
+        return;
+    }
+
+    if (!activation_done_ || !protocol_) {
+        ESP_LOGI(TAG, "Login succeeded while protocol is still activating");
+        if (state == kDeviceStateLocked) {
+            SetDeviceState(kDeviceStateActivating);
+        }
+        return;
+    }
+
+    SetDeviceState(kDeviceStateIdle);
+}
+
 void Application::HandleToggleChatEvent() {
     auto state = GetDeviceState();
+    
+    // 锁定状态下阻止所有交互
+    if (state == kDeviceStateLocked) {
+        ESP_LOGW(TAG, "Device is locked, ignoring toggle chat");
+        return;
+    }
     
     if (state == kDeviceStateActivating) {
         SetDeviceState(kDeviceStateIdle);
@@ -802,6 +1146,12 @@ void Application::HandleWakeWordDetectedEvent() {
     auto wake_word = audio_service_.GetLastWakeWord();
     ESP_LOGI(TAG, "Wake word detected: %s (state: %d)", wake_word.c_str(), (int)state);
 
+    // 锁定状态下忽略唤醒词
+    if (state == kDeviceStateLocked) {
+        ESP_LOGW(TAG, "Device is locked, ignoring wake word");
+        return;
+    }
+
     if (state == kDeviceStateIdle) {
         audio_service_.EncodeWakeWord();
         auto wake_word = audio_service_.GetLastWakeWord();
@@ -889,6 +1239,13 @@ void Application::HandleStateChangedEvent() {
             display->SetEmotion("neutral"); // Then set emotion (wechat mode checks child count)
             audio_service_.EnableVoiceProcessing(false);
             audio_service_.EnableWakeWordDetection(true);
+            break;
+        case kDeviceStateLocked:
+            // 锁定状态:禁用语音唤醒,显示锁定提示
+            display->SetStatus(Lang::Strings::STANDBY);
+            audio_service_.EnableVoiceProcessing(false);
+            audio_service_.EnableWakeWordDetection(false);
+            ESP_LOGI(TAG, "Device locked, waiting for login");
             break;
         case kDeviceStateConnecting:
             display->SetStatus(Lang::Strings::CONNECTING);
@@ -1134,5 +1491,6 @@ void Application::ResetProtocol() {
         }
         // Reset protocol
         protocol_.reset();
+        activation_done_ = false;
     });
 }

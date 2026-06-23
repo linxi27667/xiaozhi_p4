@@ -153,7 +153,9 @@ void App_Ambient_Light_Set_RGB(uint8_t index, uint8_t red, uint8_t green, uint8_
     if (effect == IOT_LIGHT_EFFECT_WARNING) {
         s_strips[index].scene = AMBIENT_SCENE_WARNING;
     } else if (effect == IOT_LIGHT_EFFECT_BREATHE) {
-        s_strips[index].scene = AMBIENT_SCENE_WARM_HOME;
+        /* 呼吸效果保留用户自定义颜色, scene 设为 OFF 让 apply_scene 显示用户颜色,
+           呼吸动画在 Tick 中处理 */
+        s_strips[index].scene = AMBIENT_SCENE_OFF;
     }
     apply_scene(index);
 }
@@ -251,14 +253,14 @@ void App_Ambient_Light_Tick(void)
         if (s_strips[i].effect == IOT_LIGHT_EFFECT_WARNING ||
             s_strips[i].scene == AMBIENT_SCENE_WARNING) {
             s_strips[i].warning_toggle++;
-            if (s_strips[i].warning_toggle >= 5) {
+            if (s_strips[i].warning_toggle >= 10) {
                 s_strips[i].warning_toggle = 0;
-                /* 在红色亮和灭之间切换 */
-                if (s_strips[i].warning_toggle & 1) {
-                    fill_rgb(i, 255, 0, 0);
-                } else {
-                    led_strip_clear(s_strips[i].strip);
-                }
+            }
+            /* 0-4: 红色亮, 5-9: 灭 (每5个tick切换一次) */
+            if (s_strips[i].warning_toggle < 5) {
+                fill_rgb(i, 255, 0, 0);
+            } else {
+                led_strip_clear(s_strips[i].strip);
             }
             continue;
         }

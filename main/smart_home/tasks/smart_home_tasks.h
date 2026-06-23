@@ -5,6 +5,7 @@ extern "C" {
 #endif
 
 void SmartHomeTasksStart(void);
+void SmartHomeTasksNotifyNetworkReady(void);
 
 #ifdef __cplusplus
 }

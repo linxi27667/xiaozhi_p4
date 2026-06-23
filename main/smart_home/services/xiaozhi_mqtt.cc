@@ -4,6 +4,7 @@
 #include "mqtt.h"
 #include "mqtt_device_model.h"
 #include "mqtt_iot_protocol.h"
+#include "ui_events.h"
 
 #include <esp_log.h>
 #include <esp_timer.h>
@@ -28,6 +29,9 @@ static bool s_initialized = false;
 static uint32_t s_mqtt_rx_count = 0;
 static int64_t s_last_rx_time_s = 0;
 static int64_t s_last_heartbeat[4] = {0};
+/* mqtt_stats UI 刷新节流: 避免每条 MQTT 消息都触发 UI 全量刷新 */
+static int64_t s_last_stats_publish_ms = 0;
+static constexpr int64_t kStatsPublishIntervalMs = 5000;  /* 5秒最多刷新一次 */
 static bool s_controller_online[4] = {false};
 static int64_t s_last_network_wait_log_ms = 0;
 
@@ -208,6 +212,9 @@ static void ensure_client_created(void) {
         s_mqtt->Subscribe("xiaozhi/iot/sensor/#", 0);
         publish_discover();
 
+        /* 通知 UI MQTT 已连接(网络页实时刷新) */
+        ui_event_publish(UI_EVENT_MQTT_CONNECTED);
+
         ESP_LOGI(TAG, "Connected and subscribed to smart-home topics");
     });
 
@@ -218,6 +225,8 @@ static void ensure_client_created(void) {
         memset(s_controller_online, 0, sizeof(s_controller_online));
         device_model_set_mqtt_state(MQTT_STATE_DISCONNECTED);
         device_model_reset_runtime_data();
+        /* 通知 UI MQTT 已断开 */
+        ui_event_publish(UI_EVENT_MQTT_DISCONNECTED);
         ESP_LOGW(TAG, "Disconnected");
     });
 
@@ -229,7 +238,13 @@ static void ensure_client_created(void) {
     s_mqtt->OnMessage([](const std::string& topic, const std::string& payload) {
         s_mqtt_rx_count++;
         s_last_rx_time_s = esp_timer_get_time() / 1000000;
-        device_model_set_mqtt_stats(s_mqtt_rx_count, 0);
+
+        /* mqtt_stats 节流: 每 5 秒最多触发一次 UI 刷新,避免高频心跳导致 UI 卡顿 */
+        int64_t now_ms = esp_timer_get_time() / 1000;
+        if (now_ms - s_last_stats_publish_ms >= kStatsPublishIntervalMs) {
+            s_last_stats_publish_ms = now_ms;
+            device_model_set_mqtt_stats(s_mqtt_rx_count, 0);
+        }
 
         if (topic_starts_with(topic, MQTT_TOPIC_ANNOUNCE_PREFIX) ||
             topic == MQTT_TOPIC_ANNOUNCE) {
@@ -303,7 +318,11 @@ extern "C" void mqtt_client_poll(void) {
     }
 
     int64_t now = esp_timer_get_time() / 1000000;
-    if (s_last_rx_time_s > 0) {
+    /* poll 中也节流 mqtt_stats 更新,与 OnMessage 共享节流变量,避免重复刷新 */
+    int64_t now_ms = esp_timer_get_time() / 1000;
+    if (s_last_rx_time_s > 0 &&
+        now_ms - s_last_stats_publish_ms >= kStatsPublishIntervalMs) {
+        s_last_stats_publish_ms = now_ms;
         device_model_set_mqtt_stats(s_mqtt_rx_count, static_cast<uint32_t>(now - s_last_rx_time_s));
     }
 

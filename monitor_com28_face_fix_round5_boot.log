@@ -1,0 +1,64 @@
+I (10202) esp_wifi_remote: esp_wifi_internal_reg_rxcb: sta: 0x482cc270
+I (11512) SystemInfo: free sram: 54171 minimal sram: 36067
+I (12093) esp_netif_handlers: sta ip: 192.168.137.203, mask: 255.255.255.0, gw: 192.168.137.1
+I (12093) WifiStation: Got IP: 192.168.137.203
+I (12094) WifiBoard: Connected to WiFi: Ll
+I (12098) SmartHomeTasks: Initializing SNTP
+I (12102) SmartHomeTasks: SNTP started, waiting for time sync...
+I (12108) Application: Network connected
+create static modelsI (12112) MODEL_LOADER: Successfully load srmodels
+I (12118) Assets: Refreshing display theme...
+I (12125) Ota: Current version: 2.2.4
+I (12871) SH_MQTT: Connecting to mqtt://8.134.167.240:1883
+I (15711) SH_MQTT: Connected and subscribed to smart-home topics
+I (15769) esp-x509-crt-bundle: Certificate validated
+I (16323) HttpClient: Established new connection to api.tenclass.net:443
+I (16427) HttpClient: HTTP connection closed
+I (16429) Ota: Current is the latest version
+I (16429) Ota: Running partition: app
+E (16430) Ota: Failed to get state of partition
+I (16436) MQTT: Connecting to endpoint mqtt.xiaozhi.me
+I (17011) esp-x509-crt-bundle: Certificate validated
+I (17092) esp-x509-crt-bundle: Certificate validated
+I (18155) MQTT: Connected to endpoint
+I (18155) Application: Activation done
+I (18155) SystemInfo: free sram: 24947 minimal sram: 23543
+I (18157) WifiStation: Setting WiFi power save level: LOW_POWER (MAX_MODEM)
+I (18160) HttpClient: Established new connection to api.open-meteo.com:443
+I (18463) HttpClient: HTTP connection closed
+I (21512) SystemInfo: free sram: 33107 minimal sram: 19259
+I (22275) esp-x509-crt-bundle: Certificate validated
+I (23993) HttpClient: Established new connection to air-quality-api.open-meteo.com:443
+I (24946) HttpClient: HTTP connection closed
+I (24947) WEATHER: Weather updated for 广州
+I (27338) LOGIN_UI: Mode set to 2
+I (27586) Application: Face preview started (420x315)
+I (31512) SystemInfo: free sram: 36499 minimal sram: 19259
+I (38702) Application: Default face enrolled: id=1, total=1
+I (41512) SystemInfo: free sram: 36399 minimal sram: 19259
+I (51512) SystemInfo: free sram: 36367 minimal sram: 19259
+I (53521) Application: Face recognized: id=1 (0.65)
+I (57675) Application: Face recognized: id=1 (0.54)
+I (61512) SystemInfo: free sram: 36171 minimal sram: 19259
+I (67154) Application: Face recognized: id=1 (0.69)
+I (71310) Application: Face recognized: id=1 (0.54)
+I (71512) SystemInfo: free sram: 35931 minimal sram: 19259
+I (80807) Application: Face recognized: id=1 (0.73)
+I (81512) SystemInfo: free sram: 35955 minimal sram: 19259
+I (86723) Application: Face recognized: id=1 (0.60)
+I (91512) SystemInfo: free sram: 36171 minimal sram: 19259
+I (97984) Application: Face recognized: id=1 (0.74)
+I (101512) SystemInfo: free sram: 34503 minimal sram: 19259
+I (103894) Application: Face recognized: id=1 (0.73)
+I (111512) SystemInfo: free sram: 34471 minimal sram: 19259
+I (121512) SystemInfo: free sram: 34471 minimal sram: 19259
+I (129406) Application: Face recognized: id=1 (0.65)
+I (131513) SystemInfo: free sram: 34059 minimal sram: 19259
+I (135342) Application: Face recognized: id=1 (0.63)
+I (141512) SystemInfo: free sram: 34503 minimal sram: 19259
+I (151512) SystemInfo: free sram: 34471 minimal sram: 19259
+I (161512) SystemInfo: free sram: 34471 minimal sram: 19259
+I (169758) Application: Face recognized: id=1 (0.71)
+I (171512) SystemInfo: free sram: 34287 minimal sram: 19259
+I (181019) Application: Face recognized: id=1 (0.56)
+I (181512) SystemInfo: free sram: 34287 minimal sram: 19259

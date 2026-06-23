@@ -66,6 +66,13 @@ dependencies:
   espressif/adc_battery_estimation: ^0.2.0
   espressif/esp_new_jpeg: ^0.6.1
 
+  # 人脸识别组件(仅 P4 使用)
+  # human_face_recognition 会自动依赖 human_face_detect 和 esp-dl
+  espressif/human_face_recognition:
+    version: '~0.3.2'
+    rules:
+    - if: target in [esp32p4]
+
   # SenseCAP Watcher Board
   wvirgil123/sscma_client:
     version: 1.0.2

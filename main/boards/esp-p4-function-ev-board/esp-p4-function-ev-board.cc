@@ -112,58 +112,33 @@ private:
 
     void InitializeCamera()
     {
-        ESP_LOGI(TAG, "Initializing camera");
+        ESP_LOGI(TAG, "Initializing camera (MIPI-CSI)");
 
-        // Use BSP camera initialization for ESP-P4
-        bsp_camera_cfg_t camera_cfg = {0};
-        esp_err_t ret = bsp_camera_start(&camera_cfg);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to initialize BSP camera: %s", esp_err_to_name(ret));
-            ESP_LOGI(TAG, "Attempting alternative camera initialization");
+        /* P4 EV Board 原生支持 MIPI-CSI 摄像头接口(200万像素),
+           SCCB 复用已有 I2C 总线(GPIO7/8,与 ES8311 codec/GT911 触摸共用),
+           数据通过 MIPI-CSI 专用差分通道传输,不占用普通 GPIO。 */
+        esp_video_init_csi_config_t csi_config = {
+            .sccb_config = {
+                .init_sccb = false,       /* 复用已有 I2C 总线,不重复初始化 */
+                .i2c_handle = codec_i2c_bus_,
+                .freq = 400000,
+            },
+            .reset_pin = GPIO_NUM_NC,
+            .pwdn_pin  = GPIO_NUM_NC,
+        };
 
-            // Alternative: Direct EspVideo initialization if BSP fails
-            // This provides more control over camera configuration
-            static esp_cam_ctlr_dvp_pin_config_t dvp_pin_config = {
-                .data_width = CAM_CTLR_DATA_WIDTH_8,
-                .data_io = {
-                    [0] = BSP_I2C_SDA,  // Reuse I2C pins if camera pins not defined
-                    [1] = BSP_I2C_SCL,
-                    [2] = GPIO_NUM_NC,
-                    [3] = GPIO_NUM_NC,
-                    [4] = GPIO_NUM_NC,
-                    [5] = GPIO_NUM_NC,
-                    [6] = GPIO_NUM_NC,
-                    [7] = GPIO_NUM_NC,
-                },
-                .vsync_io = GPIO_NUM_NC,
-                .de_io = GPIO_NUM_NC,
-                .pclk_io = GPIO_NUM_NC,
-                .xclk_io = GPIO_NUM_NC,
-            };
+        esp_video_init_config_t video_config = {
+            .csi = &csi_config,
+        };
 
-            esp_video_init_sccb_config_t sccb_config = {
-                .init_sccb = false,  // Use existing I2C bus
-                .i2c_handle = codec_i2c_bus_,  // Reuse the existing I2C bus
-                .freq = 100000,
-            };
-
-            esp_video_init_dvp_config_t dvp_config = {
-                .sccb_config = sccb_config,
-                .reset_pin = GPIO_NUM_NC,
-                .pwdn_pin = GPIO_NUM_NC,
-                .dvp_pin = dvp_pin_config,
-                .xclk_freq = 20000000,  // 20MHz typical for cameras
-            };
-
-            esp_video_init_config_t video_config = {
-                .dvp = &dvp_config,
-            };
-
-            // Try to create camera with direct configuration
-            camera_ = new EspVideo(video_config);
-            ESP_LOGI(TAG, "Camera initialized with direct configuration");
+        auto *camera = new EspVideo(video_config);
+        if (camera->IsReady()) {
+            camera_ = camera;
+            ESP_LOGI(TAG, "MIPI-CSI camera initialized successfully");
         } else {
-            ESP_LOGI(TAG, "Camera initialized successfully via BSP");
+            delete camera;
+            camera_ = nullptr;
+            ESP_LOGE(TAG, "MIPI-CSI camera initialization failed");
         }
     }
 

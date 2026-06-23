@@ -646,7 +646,7 @@ void LcdDisplay::CreateSmartHomeShell() {
 
     lv_obj_t* nav_col = lv_obj_create(side_bar_);
     lv_obj_remove_style_all(nav_col);
-    lv_obj_set_size(nav_col, kShellSidebarWidth, LV_VER_RES - kShellWakeButtonHeight - kShellWakeBottomOffset - 22);
+    lv_obj_set_size(nav_col, kShellSidebarWidth, LV_VER_RES - kShellWakeButtonHeight - kShellWakeBottomOffset - 16);
     lv_obj_align(nav_col, LV_ALIGN_TOP_MID, 0, 8);
     lv_obj_set_style_pad_row(nav_col, 6, 0);
     lv_obj_set_layout(nav_col, LV_LAYOUT_FLEX);

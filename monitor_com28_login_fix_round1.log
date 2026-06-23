@@ -1,0 +1,972 @@
+ESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0x17 (CHIP_USB_UART_RESET),boot:0xc (SPI_FAST_FLASH_BOOT)
+Core0 Saved PC:0x4ff04de8
+Core1 Saved PC:0x4ff04de8
+SPI mode:DIO, clock div:2
+load:0x4ff33ce0,len:0x5a0
+load:0x4ff29ed0,len:0xd14
+load:0x4ff2cbd0,len:0x32e8
+entry 0x4ff29ed0
+I (46) hex_psram: vendor id    : 0x0d (AP)
+I (46) hex_psram: Latency      : 0x01 (Fixed)
+I (47) hex_psram: DriveStr.    : 0x00 (25 Ohm)
+I (47) hex_psram: dev id       : 0x03 (generation 4)
+I (51) hex_psram: density      : 0x07 (256 Mbit)
+I (56) hex_psram: good-die     : 0x06 (Pass)
+I (60) hex_psram: SRF          : 0x02 (Slow Refresh)
+I (64) hex_psram: BurstType    : 0x00 ( Wrap)
+I (68) hex_psram: BurstLen     : 0x03 (2048 Byte)
+I (73) hex_psram: BitMode      : 0x01 (X16 Mode)
+I (77) hex_psram: Readlatency  : 0x04 (14 cycles@Fixed)
+I (82) hex_psram: DriveStrength: 0x00 (1/1)
+I (86) MSPI Timing: Enter psram timing tuning
+I esp_psram: Found 32MB PSRAM device
+I esp_psram: Speed: 200MHz
+I (516) mmu_psram: .rodata xip on psram
+I (801) mmu_psram: .text xip on psram
+I (801) hex_psram: psram CS IO is dedicated
+I (802) cpu_start: Multicore app
+I (811) cpu_start: GPIO 38 and 37 are used as console UART I/O pins
+I (812) cpu_start: Pro cpu start user code
+I (812) cpu_start: cpu freq: 360000000 Hz
+I (814) app_init: Application information:
+I (817) app_init: Project name:     xiaozhi
+I (821) app_init: App version:      2.2.4
+I (825) app_init: Compile time:     Jun 23 2026 12:30:42
+I (830) app_init: ELF file SHA256:  cacf747b2...
+I (834) app_init: ESP-IDF:          v5.5.3-dirty
+I (839) efuse_init: Min chip rev:     v0.0
+I (843) efuse_init: Max chip rev:     v1.99 
+I (847) efuse_init: Chip rev:         v1.3
+I (850) heap_init: Initializing. RAM available for dynamic allocation:
+I (857) heap_init: At 4FF26F20 len 000140A0 (80 KiB): RETENT_RAM
+I (862) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM
+I (868) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM
+I (873) heap_init: At 30100068 len 00001F98 (7 KiB): TCM
+I (878) esp_psram: Adding pool of 26560K of PSRAM memory to heap allocator
+I (884) esp_psram: Adding pool of 15K of PSRAM memory gap generated due to end address alignment of irom to the heap allocator
+I (896) esp_psram: Adding pool of 60K of PSRAM memory gap generated due to end address alignment of drom to the heap allocator
+I (907) spi_flash: detected chip: gd
+I (910) spi_flash: flash io: qio
+I (953) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (959) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (965) main_task: Started on CPU0
+I (968) esp_psram: Reserving pool of 64K of internal memory for DMA/internal allocations
+I (976) main_task: Calling app_main()
+I (987) Board: UUID=bfba9048-2a61-4c2a-a7b0-1de80e6c0f4d SKU=esp-p4-function-ev-board
+I (987) button: IoT Button Version: 4.1.6
+W (990) i2c.master: Please check pull-up resistances whether be connected properly. Otherwise unexpected behavior would happen. For more detailed information, please read docs
+I (1006) ESP32_P4_EV: MIPI DSI PHY Powered on
+I (1011) ESP32_P4_EV: Install MIPI DSI LCD control panel
+I (1015) ESP32_P4_EV: Install EK79007 LCD control panel
+I (1020) ek79007: version: 1.0.4
+I (1187) ESP32_P4_EV: Display initialized
+I (1187) Display: Power management not supported
+I (1187) LcdDisplay: Initialize LVGL library
+I (1188) LcdDisplay: Initialize LVGL port
+I (1191) LVGL: Starting LVGL task
+I (1194) LcdDisplay: Adding LCD display
+I (1205) GT911: I2C address initialization procedure skipped - using default GT9xx setup
+I (1206) GT911: TouchPad_ID:0x39,0x31,0x31
+I (1210) GT911: TouchPad_Config_Version:89
+I (1213) ESP32P4FuncEV: Touch controller registered with LVGL
+I (1219) ESP32P4_TF: Initializing TF card
+I (1273) ESP32P4_TF: SD card power enabled: GPIO45(SD_PWRn)=0, LDO_VO4=3300mV
+I (1273) ESP32P4_TF: Mounting TF card via SDMMC slot 0, 1-bit, 20000kHz: CLK=43 CMD=44 D0=39
+I (1277) sdmmc_periph: sdmmc_host_init: SDMMC host already initialized, skipping init flow
+I (1329) ESP32P4_TF: TF card mounted successfully at /sdcard (SDMMC slot0, 1-bit)
+Name: SD
+Type: SDHC
+Speed: 20.00 MHz (limit: 20.00 MHz)
+Size: luMB
+CSD: ver=2, sector_size=512, capacity=15613952 read_bl_len=9
+SSR: bus_width=1
+I (1350) ESP32P4_TF: UI asset folder found: /sdcard/xiaozhi_ui
+I (1350) UI_ASSET: Preloading TF UI assets from /sdcard/xiaozhi_ui before Wi-Fi SDIO runtime traffic
+E (1600) sdmmc_cmd: sdmmc_read_sectors_dma: sdmmc_send_cmd returned 0x107, status 0xb00
+E (1600) diskio_sdmmc: sdmmc_read_blocks failed (0x107)
+W (1602) UI_ASSET: asset read FAIL: /sdcard/xiaozhi_ui/siyin_logo.png (4096/9857 errno=5)
+W (1610) UI_ASSET: preload missing/read fail: siyin_logo.png
+E (1615) sdmmc_cmd: sdmmc_read_sectors_dma: sdmmc_send_cmd returned 0x107, status 0x400b00
+E (1623) diskio_sdmmc: sdmmc_read_blocks failed (0x107)
+W (1628) UI_ASSET: asset fopen FAIL: /sdcard/xiaozhi_ui/overview_home.png (errno=5)
+W (1635) UI_ASSET: preload missing/read fail: overview_home.png
+E (1641) sdmmc_cmd: sdmmc_read_sectors_dma: sdmmc_send_cmd returned 0x107, status 0x400900
+E (1649) diskio_sdmmc: sdmmc_read_blocks failed (0x107)
+W (1654) UI_ASSET: asset fopen FAIL: /sdcard/xiaozhi_ui/weather_guangzhou.png (errno=5)
+W (1662) UI_ASSET: preload missing/read fail: weather_guangzhou.png
+W (1671) UI_ASSET: asset fopen FAIL: /sdcard/xiaozhi_ui/weather_cloud.png (errno=2)
+W (1675) UI_ASSET: preload missing/read fail: weather_cloud.png
+W (1684) UI_ASSET: asset fopen FAIL: /sdcard/xiaozhi_ui/floor_1.png (errno=2)
+W (1687) UI_ASSET: preload missing/read fail: floor_1.png
+I (1864) UI_ASSET: TF asset preload complete: 13/18 files, 34559 bytes
+I (1864) ESP32P4FuncEV: Initializing camera (MIPI-CSI)
+I (1865) sc2336: Detected Camera sensor PID=0xcb3a
+W (1896) ISP_AWB: Subwindow feature is not supported on REV < 3.0, subwindow will not be configured
+I (1896) ESP32P4FuncEV: MIPI-CSI camera initialized successfully
+I (1899) ESP32P4FuncEV: Initializing font support
+I (1904) ESP32P4FuncEV: Custom font loaded successfully: line_height=25
+W (1910) ledc: GPIO 26 is not usable, maybe conflict with others
+I (1916) Backlight: Set brightness to 75
+I (1919) StateMachine: State: unknown -> starting
+I (1970) Es8311AudioCodec: Duplex channels created
+I (1976) ES8311: Work in Slave mode
+I (1979) Es8311AudioCodec: Es8311AudioCodec initialized
+I (1979) AudioCodec: Audio codec started
+I (1981) MCP: Add tool: self.get_device_status
+I (1981) MCP: Add tool: self.audio_speaker.set_volume
+I (1986) MCP: Add tool: self.screen.set_brightness
+I (1990) MCP: Add tool: self.screen.set_theme
+I (1994) MCP: Add tool: self.camera.take_photo
+I (1998) MCP: Add tool: self.get_system_info [user]
+I (2003) MCP: Add tool: self.reboot [user]
+I (2007) MCP: Add tool: self.upgrade_firmware [user]
+I (2012) MCP: Add tool: self.screen.get_info [user]
+I (2016) MCP: Add tool: self.screen.snapshot [user]
+I (2021) MCP: Add tool: self.screen.preview_image [user]
+I (2026) Assets: The storage free size is 65536 KB
+I (2030) Assets: The partition size is 3072 KB
+I (2149) Assets: The checksum calculation time is 114 ms
+I (2150) MCP: Add tool: self.assets.set_download_url [user]
+I (2150) MCP: Add tool: self.iot.get_status
+I (2153) MCP: Add tool: self.iot.get_sensors
+I (2157) MCP: Add tool: self.iot.discover
+I (2161) MCP: Add tool: self.iot.set_gpio
+I (2164) MCP: Add tool: self.iot.set_light
+I (2168) MCP: Add tool: self.iot.set_rgb_light
+I (2172) MCP: Add tool: self.iot.set_scene
+I (2176) MCP: Add tool: self.iot.set_relay
+I (2180) MCP: Add tool: self.iot.set_servo_by_index
+I (2184) MCP: Add tool: self.iot.all_off
+I (2188) MCP: Add tool: self.iot.all_on
+I (2192) MCP: Add tool: self.iot.all_lights_off
+I (2196) MCP: Add tool: self.iot.all_lights_on
+I (2200) MCP: Add tool: self.face.list
+I (2204) MCP: Add tool: self.face.delete
+I (2207) MCP: Add tool: self.face.clear_all
+I (2211) MCP: Add tool: self.face.recognize
+I (2215) MCP: Add tool: self.face.capture
+I (2219) MCP: Add tool: self.face.register
+I (2222) FaceMcp: Face MCP tools registered
+I (2226) LOGIN_UI: Login UI initialized
+I (2230) StateMachine: State: starting -> locked
+I (2230) Application: Face recognition task started
+W (2240) FbsLoader: CONFIG_SPIRAM_RODATA or CONFIG_SPIRAM_XIP_FROM_PSRAM option is on, fbs model is copied to PSRAM.
+I (2243) LOGIN_UI: Login UI shown
+I (2252) Application: Login flow initialized, device locked
+I (2258) DEV_MODEL: Model initialized: 11 devices
+I (2262) EVT_CENTER: Event center initialized
+W (2283) dl::Model: Minimize() will delete variables not used in model inference, which will make it impossible to test or debug the model.
+W (2286) FbsLoader: CONFIG_SPIRAM_RODATA or CONFIG_SPIRAM_XIP_FROM_PSRAM option is on, fbs model is copied to PSRAM.
+I (2303) AUTO_MODE: Auto mode initialized, global=1
+I (2304) RULE: Rule engine initialized
+I (2304) SH_MQTT: Smart-home MQTT initialized
+W (2310) dl::Model: Minimize() will delete variables not used in model inference, which will make it impossible to test or debug the model.
+W (2320) FbsLoader: There is only one model in the flatbuffers, ignore the input model name!
+I (2311) SmartHomeTasks: Smart home task layer started
+W (2328) FbsLoader: CONFIG_SPIRAM_RODATA or CONFIG_SPIRAM_XIP_FROM_PSRAM option is on, fbs model is copied to PSRAM.
+I (2333) Application: Device locked, waiting for login
+I (2332) Application: Network start task started
+I (2352) WifiManager: Initializing...
+I (2356) transport: Attempt connection with slave: retry[0]
+I (2360) transport: Reset slave using GPIO[54]
+I (2365) os_wrapper_esp: GPIO [54] configured
+W (2479) dl::Model: Minimize() will delete variables not used in model inference, which will make it impossible to test or debug the model.
+I (2484) FaceRecog: Face recognition initialized (detector + recognizer)
+I (4065) sdio_wrapper: SDIO master: Slot 1, Data-Lines: 4-bit Freq(KHz)[40000 KHz]
+I (4065) sdio_wrapper: GPIOs: CLK[18] CMD[19] D0[14] D1[15] D2[16] D3[17] Slave_Reset[54]
+I (4065) H_SDIO_DRV: Starting SDIO process rx task
+I (4069) sdio_wrapper: Queues: Tx[20] Rx[20] SDIO-Rx-Mode[1]
+Name: 
+Type: SDIO
+Speed: 40.00 MHz (limit: 40.00 MHz)
+Size: luMB
+CSD: ver=1, sector_size=0, capacity=0 read_bl_len=0
+SCR: sd_spec=0, bus_width=0
+TUPLE: DEVICE, size: 3: D9 01 FF 
+TUPLE: MANFID, size: 4
+  MANF: 0092, CARD: 6666
+TUPLE: FUNCID, size: 2: 0C 00 
+TUPLE: FUNCE, size: 4: 00 00 02 32 
+TUPLE: CONFIG, size: 5: 01 01 00 02 07 
+TUPLE: CFTABLE_ENTRY, size: 8
+  INDX: C1, Intface: 1, Default: 1, Conf-Entry-Num: 1
+  IF: 41
+  FS: 30, misc: 0, mem_space: 1, irq: 1, io_space: 0, timing: 0, power: 0
+  IR: 30, mask: 1,   IRQ: FF FF
+  LEN: FFFF
+TUPLE: END
+I (4152) sdio_wrapper: Function 0 Blocksize: 512
+I (4156) sdio_wrapper: Function 1 Blocksize: 512
+I (4160) H_SDIO_DRV: SDIO Host operating in STREAMING MODE
+I (4165) H_SDIO_DRV: generate slave intr
+I (4170) transport: Received INIT event from ESP32 peripheral
+I (4175) transport: EVENT: 12
+I (4177) transport: EVENT: 11
+I (4180) transport: capabilities: 0xd
+I (4183) transport: Features supported are:
+I (4187) transport: 	 * WLAN
+I (4190) transport: 	   - HCI over SDIO
+I (4193) transport: 	   - BLE only
+I (4197) transport: EVENT: 13
+I (4199) transport: ESP board type is : 13 
+
+I (4203) transport: Base transport is set-up
+
+I (4208) transport: Slave chip Id[12]
+I (4211) hci_stub_drv: Host BT Support: Disabled
+I (4215) H_SDIO_DRV: Received INIT event
+I (4219) rpc_wrap: --- ESP Event: Slave ESP Init ---
+I (5081) WifiManager: Initialized
+I (5082) WifiBoard: Starting WiFi connection attempt
+I (5082) WifiManager: Starting station
+I (5180) Application: Network start task finished
+I (5201) rpc_req: Scan start Req
+
+I (5211) WifiBoard: WiFi scanning
+I (6903) EspVideo: Camera init success, captured 150 frames in 5007ms
+I (7630) WifiStation: Found AP: Ll, BSSID: 9a:5f:41:ea:cc:75, RSSI: -28, Channel: 11, Authmode: 3
+I (7630) WifiBoard: WiFi connecting to Ll
+I (7649) H_API: esp_wifi_remote_connect
+I (11380) WifiStation: WiFi disconnected, reason: 2
+I (11380) H_API: esp_wifi_remote_connect
+I (11396) WifiStation: Reconnecting Ll (attempt 1 / 5)
+I (11981) SystemInfo: free sram: 55859 minimal sram: 37487
+I (13800) WifiStation: WiFi disconnected, reason: 205
+I (13801) H_API: esp_wifi_remote_connect
+I (13808) WifiStation: Reconnecting Ll (attempt 2 / 5)
+I (16311) SH_MQTT: Waiting for WiFi before smart-home MQTT connect
+I (17225) WifiStation: WiFi disconnected, reason: 2
+I (17226) H_API: esp_wifi_remote_connect
+I (17241) WifiStation: Reconnecting Ll (attempt 3 / 5)
+I (19646) WifiStation: WiFi disconnected, reason: 205
+I (19646) H_API: esp_wifi_remote_connect
+I (19654) WifiStation: Reconnecting Ll (attempt 4 / 5)
+I (21981) SystemInfo: free sram: 55859 minimal sram: 37487
+I (22364) esp_wifi_remote: esp_wifi_internal_reg_rxcb: sta: 0x482bf3b8
+I (24763) esp_netif_handlers: sta ip: 192.168.137.203, mask: 255.255.255.0, gw: 192.168.137.1
+I (24763) WifiStation: Got IP: 192.168.137.203
+I (24764) WifiBoard: Connected to WiFi: Ll
+I (24768) SmartHomeTasks: Initializing SNTP
+I (24772) SmartHomeTasks: SNTP started, waiting for time sync...
+I (24778) Application: Network connected
+create static modelsI (24782) MODEL_LOADER: Successfully load srmodels
+I (24788) Assets: Refreshing display theme...
+I (24795) Ota: Current version: 2.2.4
+I (25311) SH_MQTT: Connecting to mqtt://8.134.167.240:1883
+I (28394) SH_MQTT: Connected and subscribed to smart-home topics
+I (30214) esp-x509-crt-bundle: Certificate validated
+I (30625) HttpClient: Established new connection to api.tenclass.net:443
+I (30630) esp-x509-crt-bundle: Certificate validated
+I (31138) HttpClient: HTTP connection closed
+I (31143) Ota: Current is the latest version
+I (31143) Ota: Running partition: app
+E (31143) Ota: Failed to get state of partition
+I (31147) MQTT: Connecting to endpoint mqtt.xiaozhi.me
+I (31794) esp-x509-crt-bundle: Certificate validated
+I (31933) HttpClient: Established new connection to api.open-meteo.com:443
+I (31981) SystemInfo: free sram: 20151 minimal sram: 19659
+I (32368) HttpClient: HTTP connection closed
+I (32976) MQTT: Connected to endpoint
+I (32976) Application: Activation done
+I (32976) SystemInfo: free sram: 24631 minimal sram: 19431
+I (32977) WifiStation: Setting WiFi power save level: LOW_POWER (MAX_MODEM)
+I (36180) esp-x509-crt-bundle: Certificate validated
+I (37891) HttpClient: Established new connection to air-quality-api.open-meteo.com:443
+I (38814) HttpClient: HTTP connection closed
+I (38815) WEATHER: Weather updated for 广州
+I (41981) SystemInfo: free sram: 34415 minimal sram: 19431
+I (45920) LOGIN_UI: Mode set to 2
+E (46078) pix_cvt_dispatch: Invalid pix cvt from DL_IMAGE_PIX_TYPE_RGB888 to DL_IMAGE_PIX_TYPE_BGR888_QINT8.
+ESP_ERROR_CHECK failed: esp_err_t 0xffffffff (ESP_FAIL) at 0x48189ade
+file: "./managed_components/espressif__esp-dl/vision/image/dl_image_preprocessor.cpp" line 130
+func: void dl::image::ImagePreprocessor::preprocess(const dl::image::img_t&, const std::vector<int>&)
+expression: m_image_transformer.set_src_img(img).set_src_img_crop_area(crop_area).transform()
+
+abort() was called at PC 0x4ff0b807 on core 1
+Core  1 register dump:
+MEPC    : 0x4ff0bc70  RA      : 0x4ff0b810  SP      : 0x4ff99760  GP      : 0x4ff18780  
+TP      : 0x4ff999c0  T0      : 0x37363534  T1      : 0x7271706f  T2      : 0x33323130  
+S0/FP   : 0x4ff9979c  S1      : 0x4ff9979c  A0      : 0x4ff9979c  A1      : 0x4ff9977e  
+A2      : 0x00000000  A3      : 0x4ff26000  A4      : 0x00000001  A5      : 0x4ff26000  
+A6      : 0x00000000  A7      : 0x76757473  S2      : 0x4ff99780  S3      : 0x4ff99ca8  
+S4      : 0x00000000  S5      : 0x4ff99894  S6      : 0xa01a01a1  S7      : 0x000002d0  
+S8      : 0x00000000  S9      : 0x4ff99910  S10     : 0x48dfa79c  S11     : 0x4ff26000  
+T3      : 0x6e6d6c6b  T4      : 0x6a696867  T5      : 0x66656463  T6      : 0x62613938  
+MSTATUS : 0x00011880  MTVEC   : 0x4ff00003  MCAUSE  : 0x00000002  MTVAL   : 0x00000000  
+MHARTID : 0x00000001  
+
+Stack memory:
+4ff99760: 0x48dfa79c 0x4ff99910 0x4ff9979c 0x4ff15566 0xa01a01a1 0x4ff99894 0x00000000 0x4ff90031
+4ff99780: 0x30666634 0x37303862 0x4ff9a100 0x4ff1e26c 0x4ff99780 0x4ff1e288 0x4ff9977c 0x726f6261
+4ff997a0: 0x20292874 0x20736177 0x6c6c6163 0x61206465 0x43502074 0x34783020 0x62306666 0x20373038
+4ff997c0: 0x63206e6f 0x2065726f 0x00000031 0x48350000 0x4ff99894 0x4ff99834 0x4ff9a16c 0x4ff0b80a
+4ff997e0: 0x4ff99894 0x4ff99834 0x4ff9a16c 0x48189ae2 0x4ff999c0 0x00000500 0xd8fd8fd9 0x8fd8fd8f
+4ff99800: 0x48dfa79c 0x00040998 0x48c327b0 0x48e3b134 0x48c8d701 0x48e371d2 0x00001298 0x4ff99ca8
+4ff99820: 0x000001a4 0x4ff99894 0x4ff99ca4 0x48186ed2 0x00000000 0x00000000 0x00000000 0x00000000
+4ff99840: 0x00000000 0xf2ff2ff3 0x48dfa79c 0x48c327b0 0xfff91085 0x000375f0 0x00000000 0x48146ece
+4ff99860: 0x000001a4 0x0000013b 0x4ff23710 0x48056820 0x4803b6f0 0x4803b636 0x4ff998f0 0x4ff18780
+4ff99880: 0x4ff999c0 0x00000500 0xd8fd8fd9 0x8fd8fd8f 0x00ffffff 0x48c327b0 0x013b01a4 0x00000000
+4ff998a0: 0x00041000 0x00000000 0x00000000 0x00000000 0x48e39894 0x000db100 0x38138139 0x00000000
+4ff998c0: 0x48dfa79c 0x00000000 0x00000000 0x00000000 0x4ff27344 0x48c32798 0x48610000 0x00000000
+4ff998e0: 0x38138139 0x4ff26000 0x00ffffff 0x4803b7d8 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5 0x48e3b47c
+4ff99900: 0x00000000 0x48dfa79c 0x00000001 0x4ff23710 0x00000000 0x00000000 0x00000000 0xa5a5a5a5
+4ff99920: 0x4803b546 0x00000000 0x00000000 0x48c32798 0x001c2000 0x50424752 0x00000500 0x000002d0
+4ff99940: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff99960: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff99980: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff999a0: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5
+4ff999c0: 0x30100000 0x00000068 0xa5a5a5a5 0xa5a5a5a5 0x00000001 0x4ff969fc 0x4ff96a80 0x4ff969fc
+4ff999e0: 0x00000000 0x00000000 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5 0x00000160
+4ff99a00: 0x4ff99640 0x0000afde 0x4ff1f958 0x4ff1f958 0x4ff99a00 0x4ff1f950 0x00000015 0x4ff29a34
+4ff99a20: 0x4ff29a34 0x4ff99a00 0x00000000 0x00000004 0x4ff96a80 0x65636166 0x6365725f 0x0000676f
+4ff99a40: 0x00000000 0x00000001 0x4ff999f0 0x00000014 0x00000000 0x00000004 0x00000000 0x00000000
+4ff99a60: 0x00000000 0x0003cc96 0x00000000 0x4ff275ac 0x4ff27614 0x4ff2767c 0x00000000 0x00000000
+4ff99a80: 0x00000001 0x00000000 0x00000000 0x00000000 0x4fc0af14 0x00000000 0x00000000 0x00000000
+4ff99aa0: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff99ac0: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff99ae0: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff99b00: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff99b20: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff99b40: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+
+
+
+ELF file SHA256: cacf747b2
+
+Rebooting...
+ESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0xc (SW_CPU_RESET),boot:0xc (SPI_FAST_FLASH_BOOT)
+Core0 Saved PC:0x4ff04df8
+Core1 Saved PC:0x4ff0bd6a
+SPI mode:DIO, clock div:2
+load:0x4ff33ce0,len:0x5a0
+load:0x4ff29ed0,len:0xd14
+load:0x4ff2cbd0,len:0x32e8
+entry 0x4ff29ed0
+I (46) hex_psram: vendor id    : 0x0d (AP)
+I (47) hex_psram: Latency      : 0x01 (Fixed)
+I (48) hex_psram: DriveStr.    : 0x00 (25 Ohm)
+I (48) hex_psram: dev id       : 0x03 (generation 4)
+I (52) hex_psram: density      : 0x07 (256 Mbit)
+I (56) hex_psram: good-die     : 0x06 (Pass)
+I (60) hex_psram: SRF          : 0x02 (Slow Refresh)
+I (65) hex_psram: BurstType    : 0x00 ( Wrap)
+I (69) hex_psram: BurstLen     : 0x03 (2048 Byte)
+I (74) hex_psram: BitMode      : 0x01 (X16 Mode)
+I (78) hex_psram: Readlatency  : 0x04 (14 cycles@Fixed)
+I (83) hex_psram: DriveStrength: 0x00 (1/1)
+I (87) MSPI Timing: Enter psram timing tuning
+I esp_psram: Found 32MB PSRAM device
+I esp_psram: Speed: 200MHz
+I (517) mmu_psram: .rodata xip on psram
+I (801) mmu_psram: .text xip on psram
+I (802) hex_psram: psram CS IO is dedicated
+I (802) cpu_start: Multicore app
+I (812) cpu_start: GPIO 38 and 37 are used as console UART I/O pins
+I (812) cpu_start: Pro cpu start user code
+I (812) cpu_start: cpu freq: 360000000 Hz
+I (814) app_init: Application information:
+I (818) app_init: Project name:     xiaozhi
+I (822) app_init: App version:      2.2.4
+I (826) app_init: Compile time:     Jun 23 2026 12:30:42
+I (831) app_init: ELF file SHA256:  cacf747b2...
+I (835) app_init: ESP-IDF:          v5.5.3-dirty
+I (839) efuse_init: Min chip rev:     v0.0
+I (843) efuse_init: Max chip rev:     v1.99 
+I (847) efuse_init: Chip rev:         v1.3
+I (851) heap_init: Initializing. RAM available for dynamic allocation:
+I (857) heap_init: At 4FF26F20 len 000140A0 (80 KiB): RETENT_RAM
+I (863) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM
+I (868) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM
+I (873) heap_init: At 30100068 len 00001F98 (7 KiB): TCM
+I (878) esp_psram: Adding pool of 26560K of PSRAM memory to heap allocator
+I (885) esp_psram: Adding pool of 15K of PSRAM memory gap generated due to end address alignment of irom to the heap allocator
+I (896) esp_psram: Adding pool of 60K of PSRAM memory gap generated due to end address alignment of drom to the heap allocator
+I (907) spi_flash: detected chip: gd
+I (910) spi_flash: flash io: qio
+I (953) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (959) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (966) main_task: Started on CPU0
+I (969) esp_psram: Reserving pool of 64K of internal memory for DMA/internal allocations
+I (977) main_task: Calling app_main()
+I (988) Board: UUID=bfba9048-2a61-4c2a-a7b0-1de80e6c0f4d SKU=esp-p4-function-ev-board
+I (988) button: IoT Button Version: 4.1.6
+W (991) i2c.master: Please check pull-up resistances whether be connected properly. Otherwise unexpected behavior would happen. For more detailed information, please read docs
+I (1007) ESP32_P4_EV: MIPI DSI PHY Powered on
+I (1012) ESP32_P4_EV: Install MIPI DSI LCD control panel
+I (1016) ESP32_P4_EV: Install EK79007 LCD control panel
+I (1021) ek79007: version: 1.0.4
+I (1188) ESP32_P4_EV: Display initialized
+I (1188) Display: Power management not supported
+I (1188) LcdDisplay: Initialize LVGL library
+I (1189) LcdDisplay: Initialize LVGL port
+I (1192) LVGL: Starting LVGL task
+I (1195) LcdDisplay: Adding LCD display
+I (1206) GT911: I2C address initialization procedure skipped - using default GT9xx setup
+I (1207) GT911: TouchPad_ID:0x39,0x31,0x31
+I (1211) GT911: TouchPad_Config_Version:89
+I (1214) ESP32P4FuncEV: Touch controller registered with LVGL
+I (1220) ESP32P4_TF: Initializing TF card
+I (1274) ESP32P4_TF: SD card power enabled: GPIO45(SD_PWRn)=0, LDO_VO4=3300mV
+I (1274) ESP32P4_TF: Mounting TF card via SDMMC slot 0, 1-bit, 20000kHz: CLK=43 CMD=44 D0=39
+I (1278) sdmmc_periph: sdmmc_host_init: SDMMC host already initialized, skipping init flow
+I (1371) ESP32P4_TF: TF card mounted successfully at /sdcard (SDMMC slot0, 1-bit)
+Name: SD
+Type: SDHC
+Speed: 20.00 MHz (limit: 20.00 MHz)
+Size: luMB
+CSD: ver=2, sector_size=512, capacity=15613952 read_bl_len=9
+SSR: bus_width=1
+I (1411) ESP32P4_TF: UI asset folder found: /sdcard/xiaozhi_ui
+I (1411) UI_ASSET: Preloading TF UI assets from /sdcard/xiaozhi_ui before Wi-Fi SDIO runtime traffic
+E (2368) sdmmc_cmd: sdmmc_read_sectors_dma: sdmmc_send_cmd returned 0x107, status 0xb00
+E (2368) diskio_sdmmc: sdmmc_read_blocks failed (0x107)
+W (2369) UI_ASSET: asset read FAIL: /sdcard/xiaozhi_ui/overview_home.png (512/1838 errno=5)
+W (2377) UI_ASSET: preload missing/read fail: overview_home.png
+E (2383) sdmmc_cmd: sdmmc_read_sectors_dma: sdmmc_send_cmd returned 0x107, status 0x400b00
+E (2391) diskio_sdmmc: sdmmc_read_blocks failed (0x107)
+W (2396) UI_ASSET: asset fopen FAIL: /sdcard/xiaozhi_ui/weather_guangzhou.png (errno=5)
+W (2404) UI_ASSET: preload missing/read fail: weather_guangzhou.png
+E (2410) sdmmc_cmd: sdmmc_read_sectors_dma: sdmmc_send_cmd returned 0x107, status 0x400900
+E (2418) diskio_sdmmc: sdmmc_read_blocks failed (0x107)
+W (2422) UI_ASSET: asset fopen FAIL: /sdcard/xiaozhi_ui/weather_cloud.png (errno=5)
+W (2430) UI_ASSET: preload missing/read fail: weather_cloud.png
+W (2439) UI_ASSET: asset fopen FAIL: /sdcard/xiaozhi_ui/floor_1.png (errno=2)
+W (2442) UI_ASSET: preload missing/read fail: floor_1.png
+W (2451) UI_ASSET: asset fopen FAIL: /sdcard/xiaozhi_ui/floor_2.png (errno=2)
+W (2454) UI_ASSET: preload missing/read fail: floor_2.png
+W (2463) UI_ASSET: asset fopen FAIL: /sdcard/xiaozhi_ui/floor_3.png (errno=2)
+W (2466) UI_ASSET: preload missing/read fail: floor_3.png
+W (2475) UI_ASSET: asset fopen FAIL: /sdcard/xiaozhi_ui/alarm_siren.png (errno=2)
+W (2479) UI_ASSET: preload missing/read fail: alarm_siren.png
+W (2487) UI_ASSET: asset fopen FAIL: /sdcard/xiaozhi_ui/logo_robot.png (errno=2)
+W (2491) UI_ASSET: preload missing/read fail: logo_robot.png
+I (2635) UI_ASSET: TF asset preload complete: 10/18 files, 38713 bytes
+I (2636) ESP32P4FuncEV: Initializing camera (MIPI-CSI)
+I (2636) sc2336: Detected Camera sensor PID=0xcb3a
+W (2667) ISP_AWB: Subwindow feature is not supported on REV < 3.0, subwindow will not be configured
+I (2668) ESP32P4FuncEV: MIPI-CSI camera initialized successfully
+I (2670) ESP32P4FuncEV: Initializing font support
+I (2675) ESP32P4FuncEV: Custom font loaded successfully: line_height=25
+W (2681) ledc: GPIO 26 is not usable, maybe conflict with others
+I (2687) Backlight: Set brightness to 75
+I (2690) StateMachine: State: unknown -> starting
+I (2742) Es8311AudioCodec: Duplex channels created
+I (2747) ES8311: Work in Slave mode
+I (2750) Es8311AudioCodec: Es8311AudioCodec initialized
+I (2750) AudioCodec: Audio codec started
+I (2752) MCP: Add tool: self.get_device_status
+I (2753) MCP: Add tool: self.audio_speaker.set_volume
+I (2757) MCP: Add tool: self.screen.set_brightness
+I (2762) MCP: Add tool: self.screen.set_theme
+I (2766) MCP: Add tool: self.camera.take_photo
+I (2770) MCP: Add tool: self.get_system_info [user]
+I (2775) MCP: Add tool: self.reboot [user]
+I (2778) MCP: Add tool: self.upgrade_firmware [user]
+I (2783) MCP: Add tool: self.screen.get_info [user]
+I (2788) MCP: Add tool: self.screen.snapshot [user]
+I (2792) MCP: Add tool: self.screen.preview_image [user]
+I (2797) Assets: The storage free size is 65536 KB
+I (2802) Assets: The partition size is 3072 KB
+I (2921) Assets: The checksum calculation time is 115 ms
+I (2922) MCP: Add tool: self.assets.set_download_url [user]
+I (2922) MCP: Add tool: self.iot.get_status
+I (2924) MCP: Add tool: self.iot.get_sensors
+I (2928) MCP: Add tool: self.iot.discover
+I (2932) MCP: Add tool: self.iot.set_gpio
+I (2936) MCP: Add tool: self.iot.set_light
+I (2940) MCP: Add tool: self.iot.set_rgb_light
+I (2944) MCP: Add tool: self.iot.set_scene
+I (2948) MCP: Add tool: self.iot.set_relay
+I (2951) MCP: Add tool: self.iot.set_servo_by_index
+I (2956) MCP: Add tool: self.iot.all_off
+I (2960) MCP: Add tool: self.iot.all_on
+I (2963) MCP: Add tool: self.iot.all_lights_off
+I (2967) MCP: Add tool: self.iot.all_lights_on
+I (2972) MCP: Add tool: self.face.list
+I (2975) MCP: Add tool: self.face.delete
+I (2979) MCP: Add tool: self.face.clear_all
+I (2983) MCP: Add tool: self.face.recognize
+I (2987) MCP: Add tool: self.face.capture
+I (2990) MCP: Add tool: self.face.register
+I (2994) FaceMcp: Face MCP tools registered
+I (2998) LOGIN_UI: Login UI initialized
+I (3002) Application: Face recognition task started
+I (3002) StateMachine: State: starting -> locked
+W (3007) FbsLoader: CONFIG_SPIRAM_RODATA or CONFIG_SPIRAM_XIP_FROM_PSRAM option is on, fbs model is copied to PSRAM.
+I (3019) LOGIN_UI: Login UI shown
+I (3024) Application: Login flow initialized, device locked
+I (3029) DEV_MODEL: Model initialized: 11 devices
+I (3033) EVT_CENTER: Event center initialized
+I (3038) AUTO_MODE: Auto mode initialized, global=1
+I (3042) RULE: Rule engine initialized
+I (3057) SH_MQTT: Smart-home MQTT initialized
+I (3057) SmartHomeTasks: Smart home task layer started
+W (3055) dl::Model: Minimize() will delete variables not used in model inference, which will make it impossible to test or debug the model.
+W (3071) FbsLoader: CONFIG_SPIRAM_RODATA or CONFIG_SPIRAM_XIP_FROM_PSRAM option is on, fbs model is copied to PSRAM.
+W (3098) dl::Model: Minimize() will delete variables not used in model inference, which will make it impossible to test or debug the model.
+W (3101) FbsLoader: There is only one model in the flatbuffers, ignore the input model name!
+W (3108) FbsLoader: CONFIG_SPIRAM_RODATA or CONFIG_SPIRAM_XIP_FROM_PSRAM option is on, fbs model is copied to PSRAM.
+I (3103) Application: Device locked, waiting for login
+I (3103) Application: Network start task started
+I (3127) WifiManager: Initializing...
+I (3131) transport: Attempt connection with slave: retry[0]
+I (3136) transport: Reset slave using GPIO[54]
+I (3140) os_wrapper_esp: GPIO [54] configured
+W (3254) dl::Model: Minimize() will delete variables not used in model inference, which will make it impossible to test or debug the model.
+I (3260) FaceRecog: Face recognition initialized (detector + recognizer)
+I (4381) LOGIN_UI: Mode set to 2
+E (4762) EspVideo: CaptureFrame: stream not on or fd invalid
+I (4766) H_SDIO_DRV: Starting SDIO process rx task
+I (4766) sdio_wrapper: SDIO master: Slot 1, Data-Lines: 4-bit Freq(KHz)[40000 KHz]
+I (4768) sdio_wrapper: GPIOs: CLK[18] CMD[19] D0[14] D1[15] D2[16] D3[17] Slave_Reset[54]
+I (4776) sdio_wrapper: Queues: Tx[20] Rx[20] SDIO-Rx-Mode[1]
+Name: 
+Type: SDIO
+Speed: 40.00 MHz (limit: 40.00 MHz)
+Size: luMB
+CSD: ver=1, sector_size=0, capacity=0 read_bl_len=0
+SCR: sd_spec=0, bus_width=0
+TUPLE: DEVICE, size: 3: D9 01 FF 
+TUPLE: MANFID, size: 4
+  MANF: 0092, CARD: 6666
+TUPLE: FUNCID, size: 2: 0C 00 
+TUPLE: FUNCE, size: 4: 00 00 02 32 
+TUPLE: CONFIG, size: 5: 01 01 00 02 07 
+TUPLE: CFTABLE_ENTRY, size: 8
+  INDX: C1, Intface: 1, Default: 1, Conf-Entry-Num: 1
+  IF: 41
+  FS: 30, misc: 0, mem_space: 1, irq: 1, io_space: 0, timing: 0, power: 0
+  IR: 30, mask: 1,   IRQ: FF FF
+  LEN: FFFF
+TUPLE: END
+I (4855) sdio_wrapper: Function 0 Blocksize: 512
+I (4859) sdio_wrapper: Function 1 Blocksize: 512
+I (4863) H_SDIO_DRV: SDIO Host operating in STREAMING MODE
+I (4868) H_SDIO_DRV: generate slave intr
+I (4873) transport: Received INIT event from ESP32 peripheral
+I (4878) transport: EVENT: 12
+I (4880) transport: EVENT: 11
+I (4883) transport: capabilities: 0xd
+I (4886) transport: Features supported are:
+I (4890) transport: 	 * WLAN
+I (4893) transport: 	   - HCI over SDIO
+I (4896) transport: 	   - BLE only
+I (4900) transport: EVENT: 13
+I (4902) transport: ESP board type is : 13 
+
+I (4906) transport: Base transport is set-up
+
+I (4911) transport: Slave chip Id[12]
+I (4914) hci_stub_drv: Host BT Support: Disabled
+I (4918) H_SDIO_DRV: Received INIT event
+I (4954) rpc_wrap: --- ESP Event: Slave ESP Init ---
+E (4962) EspVideo: CaptureFrame: stream not on or fd invalid
+E (5162) EspVideo: CaptureFrame: stream not on or fd invalid
+E (5362) EspVideo: CaptureFrame: stream not on or fd invalid
+E (5562) EspVideo: CaptureFrame: stream not on or fd invalid
+E (5762) EspVideo: CaptureFrame: stream not on or fd invalid
+I (5856) WifiManager: Initialized
+I (5857) WifiBoard: Starting WiFi connection attempt
+I (5857) WifiManager: Starting station
+I (5955) Application: Network start task finished
+E (5962) EspVideo: CaptureFrame: stream not on or fd invalid
+I (5976) rpc_req: Scan start Req
+
+I (5986) WifiBoard: WiFi scanning
+E (6162) EspVideo: CaptureFrame: stream not on or fd invalid
+E (6362) EspVideo: CaptureFrame: stream not on or fd invalid
+E (6562) EspVideo: CaptureFrame: stream not on or fd invalid
+E (6762) EspVideo: CaptureFrame: stream not on or fd invalid
+E (6962) EspVideo: CaptureFrame: stream not on or fd invalid
+E (7162) EspVideo: CaptureFrame: stream not on or fd invalid
+E (7362) EspVideo: CaptureFrame: stream not on or fd invalid
+E (7562) EspVideo: CaptureFrame: stream not on or fd invalid
+I (7674) EspVideo: Camera init success, captured 150 frames in 5006ms
+E (7851) pix_cvt_dispatch: Invalid pix cvt from DL_IMAGE_PIX_TYPE_RGB888 to DL_IMAGE_PIX_TYPE_BGR888_QINT8.
+ESP_ERROR_CHECK failed: esp_err_t 0xffffffff (ESP_FAIL) at 0x48189ade
+file: "./managed_components/espressif__esp-dl/vision/image/dl_image_preprocessor.cpp" line 130
+func: void dl::image::ImagePreprocessor::preprocess(const dl::image::img_t&, const std::vector<int>&)
+expression: m_image_transformer.set_src_img(img).set_src_img_crop_area(crop_area).transform()
+
+abort() was called at PC 0x4ff0b807 on core 1
+Core  1 register dump:
+MEPC    : 0x4ff0bc70  RA      : 0x4ff0b810  SP      : 0x4ff99730  GP      : 0x4ff18780  
+TP      : 0x4ff99990  T0      : 0x37363534  T1      : 0x7271706f  T2      : 0x33323130  
+S0/FP   : 0x4ff9976c  S1      : 0x4ff9976c  A0      : 0x4ff9976c  A1      : 0x4ff9974e  
+A2      : 0x00000000  A3      : 0x4ff26000  A4      : 0x00000001  A5      : 0x4ff26000  
+A6      : 0x00000000  A7      : 0x76757473  S2      : 0x4ff99750  S3      : 0x4ff96628  
+S4      : 0x00000000  S5      : 0x4ff99864  S6      : 0xa01a01a1  S7      : 0x000002d0  
+S8      : 0x00000000  S9      : 0x4ff998e0  S10     : 0x48dfcf8c  S11     : 0x4ff26000  
+T3      : 0x6e6d6c6b  T4      : 0x6a696867  T5      : 0x66656463  T6      : 0x62613938  
+MSTATUS : 0x00011880  MTVEC   : 0x4ff00003  MCAUSE  : 0x00000002  MTVAL   : 0x00000000  
+MHARTID : 0x00000001  
+
+Stack memory:
+4ff99730: 0x48dfcf8c 0x4ff998e0 0x4ff9976c 0x4ff15566 0xa01a01a1 0x4ff99864 0x00000000 0x4ff90031
+4ff99750: 0x30666634 0x37303862 0x4ff9f400 0x4ff1e26c 0x4ff99750 0x4ff1e288 0x4ff9974c 0x726f6261
+4ff99770: 0x20292874 0x20736177 0x6c6c6163 0x61206465 0x43502074 0x34783020 0x62306666 0x20373038
+4ff99790: 0x63206e6f 0x2065726f 0x00000031 0x48350000 0x4ff99864 0x4ff99804 0x4ff9f428 0x4ff0b80a
+4ff997b0: 0x4ff99864 0x4ff99804 0x4ff9f428 0x48189ae2 0x4ff99990 0x00000500 0xd8fd8fd9 0x8fd8fd8f
+4ff997d0: 0x48dfcf8c 0x00040998 0x48c34fa0 0x48e3d924 0x48c92d05 0x48e3b87c 0x000051c9 0x4ff96628
+4ff997f0: 0x000001a4 0x4ff99864 0x4ff96624 0x48186ed2 0x00000000 0x00000000 0x00000000 0x00000000
+4ff99810: 0x00000000 0xf2ff2ff3 0x48dfcf8c 0x48c34fa0 0xfff91085 0x000375f0 0x00000000 0x48146ece
+4ff99830: 0x000001a4 0x0000013b 0x4ff23710 0x48056820 0x4803b6f0 0x4803b636 0x4ff998c0 0x4ff18780
+4ff99850: 0x4ff99990 0x00000500 0xd8fd8fd9 0x8fd8fd8f 0x00ffffff 0x48c34fa0 0x013b01a4 0x00000000
+4ff99870: 0x0005f500 0x00000000 0x00000000 0x00000000 0x48e3bdfe 0x000da700 0x38138139 0x00000000
+4ff99890: 0x48dfcf8c 0x00000000 0x00000000 0x00000000 0x4ff27344 0x48c34f88 0x48610000 0x00000000
+4ff998b0: 0x38138139 0x4ff26000 0x00ffffff 0x4803b7d8 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5 0x48e3dc6c
+4ff998d0: 0x00000000 0x48dfcf8c 0x00000001 0x4ff23710 0x00000000 0x00000000 0x00000000 0xa5a5a5a5
+4ff998f0: 0x4803b546 0x00000000 0x00000000 0x48c34f88 0x001c2000 0x50424752 0x00000500 0x000002d0
+4ff99910: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff99930: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff99950: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff99970: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5
+4ff99990: 0x30100000 0x00000068 0xa5a5a5a5 0xa5a5a5a5 0x00000001 0x4ff969c4 0x4ff969c4 0x00000000
+4ff999b0: 0x00000000 0x00000000 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5 0x00000160 0x4ff99610 0x00001a8c
+4ff999d0: 0x4ff1f958 0x4ff1f958 0x4ff999c8 0x4ff1f950 0x00000015 0x4ff29a34 0x4ff29a34 0x4ff999c8
+4ff999f0: 0x00000000 0x00000004 0x4ff969c4 0x65636166 0x6365725f 0x0000676f 0x00000000 0x00000001
+4ff99a10: 0x4ff999c0 0x00000014 0x00000000 0x00000004 0x00000000 0x00000000 0x00000000 0x00047c89
+4ff99a30: 0x00000000 0x4ff275ac 0x4ff27614 0x4ff2767c 0x00000000 0x00000000 0x00000001 0x00000000
+4ff99a50: 0x00000000 0x00000000 0x4fc0af14 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff99a70: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff99a90: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff99ab0: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff99ad0: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff99af0: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff99b10: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000010 0x4ff9eb94
+
+
+
+ELF file SHA256: cacf747b2
+
+Rebooting...
+ESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0xc (SW_CPU_RESET),boot:0xc (SPI_FAST_FLASH_BOOT)
+Core0 Saved PC:0x4ff04df8
+Core1 Saved PC:0x4ff0bd6a
+SPI mode:DIO, clock div:2
+load:0x4ff33ce0,len:0x5a0
+load:0x4ff29ed0,len:0xd14
+load:0x4ff2cbd0,len:0x32e8
+entry 0x4ff29ed0
+I (46) hex_psram: vendor id    : 0x0d (AP)
+I (47) hex_psram: Latency      : 0x01 (Fixed)
+I (47) hex_psram: DriveStr.    : 0x00 (25 Ohm)
+I (48) hex_psram: dev id       : 0x03 (generation 4)
+I (52) hex_psram: density      : 0x07 (256 Mbit)
+I (56) hex_psram: good-die     : 0x06 (Pass)
+I (60) hex_psram: SRF          : 0x02 (Slow Refresh)
+I (65) hex_psram: BurstType    : 0x00 ( Wrap)
+I (69) hex_psram: BurstLen     : 0x03 (2048 Byte)
+I (74) hex_psram: BitMode      : 0x01 (X16 Mode)
+I (78) hex_psram: Readlatency  : 0x04 (14 cycles@Fixed)
+I (83) hex_psram: DriveStrength: 0x00 (1/1)
+I (87) MSPI Timing: Enter psram timing tuning
+I esp_psram: Found 32MB PSRAM device
+I esp_psram: Speed: 200MHz
+I (517) mmu_psram: .rodata xip on psram
+I (801) mmu_psram: .text xip on psram
+I (802) hex_psram: psram CS IO is dedicated
+I (802) cpu_start: Multicore app
+I (812) cpu_start: GPIO 38 and 37 are used as console UART I/O pins
+I (813) cpu_start: Pro cpu start user code
+I (813) cpu_start: cpu freq: 360000000 Hz
+I (814) app_init: Application information:
+I (818) app_init: Project name:     xiaozhi
+I (822) app_init: App version:      2.2.4
+I (826) app_init: Compile time:     Jun 23 2026 12:30:42
+I (831) app_init: ELF file SHA256:  cacf747b2...
+I (835) app_init: ESP-IDF:          v5.5.3-dirty
+I (840) efuse_init: Min chip rev:     v0.0
+I (843) efuse_init: Max chip rev:     v1.99 
+I (847) efuse_init: Chip rev:         v1.3
+I (851) heap_init: Initializing. RAM available for dynamic allocation:
+I (858) heap_init: At 4FF26F20 len 000140A0 (80 KiB): RETENT_RAM
+I (863) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM
+I (868) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM
+I (874) heap_init: At 30100068 len 00001F98 (7 KiB): TCM
+I (879) esp_psram: Adding pool of 26560K of PSRAM memory to heap allocator
+I (885) esp_psram: Adding pool of 15K of PSRAM memory gap generated due to end address alignment of irom to the heap allocator
+I (896) esp_psram: Adding pool of 60K of PSRAM memory gap generated due to end address alignment of drom to the heap allocator
+I (908) spi_flash: detected chip: gd
+I (911) spi_flash: flash io: qio
+I (953) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (959) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (966) main_task: Started on CPU0
+I (969) esp_psram: Reserving pool of 64K of internal memory for DMA/internal allocations
+I (977) main_task: Calling app_main()
+I (988) Board: UUID=bfba9048-2a61-4c2a-a7b0-1de80e6c0f4d SKU=esp-p4-function-ev-board
+I (988) button: IoT Button Version: 4.1.6
+W (991) i2c.master: Please check pull-up resistances whether be connected properly. Otherwise unexpected behavior would happen. For more detailed information, please read docs
+I (1007) ESP32_P4_EV: MIPI DSI PHY Powered on
+I (1012) ESP32_P4_EV: Install MIPI DSI LCD control panel
+I (1016) ESP32_P4_EV: Install EK79007 LCD control panel
+I (1021) ek79007: version: 1.0.4
+I (1188) ESP32_P4_EV: Display initialized
+I (1188) Display: Power management not supported
+I (1188) LcdDisplay: Initialize LVGL library
+I (1189) LcdDisplay: Initialize LVGL port
+I (1192) LVGL: Starting LVGL task
+I (1195) LcdDisplay: Adding LCD display
+I (1206) GT911: I2C address initialization procedure skipped - using default GT9xx setup
+I (1207) GT911: TouchPad_ID:0x39,0x31,0x31
+I (1211) GT911: TouchPad_Config_Version:89
+I (1214) ESP32P4FuncEV: Touch controller registered with LVGL
+I (1220) ESP32P4_TF: Initializing TF card
+I (1274) ESP32P4_TF: SD card power enabled: GPIO45(SD_PWRn)=0, LDO_VO4=3300mV
+I (1274) ESP32P4_TF: Mounting TF card via SDMMC slot 0, 1-bit, 20000kHz: CLK=43 CMD=44 D0=39
+I (1278) sdmmc_periph: sdmmc_host_init: SDMMC host already initialized, skipping init flow
+I (1363) ESP32P4_TF: TF card mounted successfully at /sdcard (SDMMC slot0, 1-bit)
+Name: SD
+Type: SDHC
+Speed: 20.00 MHz (limit: 20.00 MHz)
+Size: luMB
+CSD: ver=2, sector_size=512, capacity=15613952 read_bl_len=9
+SSR: bus_width=1
+I (1406) ESP32P4_TF: UI asset folder found: /sdcard/xiaozhi_ui
+I (1406) UI_ASSET: Preloading TF UI assets from /sdcard/xiaozhi_ui before Wi-Fi SDIO runtime traffic
+E (2372) sdmmc_cmd: sdmmc_read_sectors_dma: sdmmc_send_cmd returned 0x107, status 0xb00
+E (2372) diskio_sdmmc: sdmmc_read_blocks failed (0x107)
+W (2373) UI_ASSET: asset read FAIL: /sdcard/xiaozhi_ui/overview_home.png (512/1838 errno=5)
+W (2381) UI_ASSET: preload missing/read fail: overview_home.png
+E (2387) sdmmc_cmd: sdmmc_read_sectors_dma: sdmmc_send_cmd returned 0x107, status 0x400b00
+E (2395) diskio_sdmmc: sdmmc_read_blocks failed (0x107)
+W (2400) UI_ASSET: asset fopen FAIL: /sdcard/xiaozhi_ui/weather_guangzhou.png (errno=5)
+W (2408) UI_ASSET: preload missing/read fail: weather_guangzhou.png
+E (2414) sdmmc_cmd: sdmmc_read_sectors_dma: sdmmc_send_cmd returned 0x107, status 0x400900
+E (2422) diskio_sdmmc: sdmmc_read_blocks failed (0x107)
+W (2427) UI_ASSET: asset fopen FAIL: /sdcard/xiaozhi_ui/weather_cloud.png (errno=5)
+W (2434) UI_ASSET: preload missing/read fail: weather_cloud.png
+W (2444) UI_ASSET: asset fopen FAIL: /sdcard/xiaozhi_ui/floor_1.png (errno=2)
+W (2447) UI_ASSET: preload missing/read fail: floor_1.png
+I (2625) UI_ASSET: TF asset preload complete: 14/18 files, 44416 bytes
+I (2625) ESP32P4FuncEV: Initializing camera (MIPI-CSI)
+I (2626) sc2336: Detected Camera sensor PID=0xcb3a
+W (2656) ISP_AWB: Subwindow feature is not supported on REV < 3.0, subwindow will not be configured
+I (2657) ESP32P4FuncEV: MIPI-CSI camera initialized successfully
+I (2660) ESP32P4FuncEV: Initializing font support
+I (2664) ESP32P4FuncEV: Custom font loaded successfully: line_height=25
+W (2671) ledc: GPIO 26 is not usable, maybe conflict with others
+I (2676) Backlight: Set brightness to 75
+I (2680) StateMachine: State: unknown -> starting
+I (2731) Es8311AudioCodec: Duplex channels created
+I (2736) ES8311: Work in Slave mode
+I (2739) Es8311AudioCodec: Es8311AudioCodec initialized
+I (2739) AudioCodec: Audio codec started
+I (2741) MCP: Add tool: self.get_device_status
+I (2741) MCP: Add tool: self.audio_speaker.set_volume
+I (2746) MCP: Add tool: self.screen.set_brightness
+I (2750) MCP: Add tool: self.screen.set_theme
+I (2754) MCP: Add tool: self.camera.take_photo
+I (2758) MCP: Add tool: self.get_system_info [user]
+I (2763) MCP: Add tool: self.reboot [user]
+I (2767) MCP: Add tool: self.upgrade_firmware [user]
+I (2772) MCP: Add tool: self.screen.get_info [user]
+I (2776) MCP: Add tool: self.screen.snapshot [user]
+I (2781) MCP: Add tool: self.screen.preview_image [user]
+I (2786) Assets: The storage free size is 65536 KB
+I (2790) Assets: The partition size is 3072 KB
+I (2910) Assets: The checksum calculation time is 114 ms
+I (2910) MCP: Add tool: self.assets.set_download_url [user]
+I (2910) MCP: Add tool: self.iot.get_status
+I (2913) MCP: Add tool: self.iot.get_sensors
+I (2917) MCP: Add tool: self.iot.discover
+I (2921) MCP: Add tool: self.iot.set_gpio
+I (2924) MCP: Add tool: self.iot.set_light
+I (2928) MCP: Add tool: self.iot.set_rgb_light
+I (2932) MCP: Add tool: self.iot.set_scene
+I (2936) MCP: Add tool: self.iot.set_relay
+I (2940) MCP: Add tool: self.iot.set_servo_by_index
+I (2945) MCP: Add tool: self.iot.all_off
+I (2948) MCP: Add tool: self.iot.all_on
+I (2952) MCP: Add tool: self.iot.all_lights_off
+I (2956) MCP: Add tool: self.iot.all_lights_on
+I (2960) MCP: Add tool: self.face.list
+I (2964) MCP: Add tool: self.face.delete
+I (2967) MCP: Add tool: self.face.clear_all
+I (2971) MCP: Add tool: self.face.recognize
+I (2975) MCP: Add tool: self.face.capture
+I (2979) MCP: Add tool: self.face.register
+I (2983) FaceMcp: Face MCP tools registered
+I (2986) LOGIN_UI: Login UI initialized
+I (2990) StateMachine: State: starting -> locked
+I (2990) Application: Face recognition task started
+W (3000) FbsLoader: CONFIG_SPIRAM_RODATA or CONFIG_SPIRAM_XIP_FROM_PSRAM option is on, fbs model is copied to PSRAM.
+I (3003) LOGIN_UI: Login UI shown
+I (3012) Application: Login flow initialized, device locked
+I (3018) DEV_MODEL: Model initialized: 11 devices
+I (3022) EVT_CENTER: Event center initialized
+I (3027) AUTO_MODE: Auto mode initialized, global=1
+I (3046) RULE: Rule engine initialized
+I (3046) SH_MQTT: Smart-home MQTT initialized
+I (3046) SmartHomeTasks: Smart home task layer started
+W (3044) dl::Model: Minimize() will delete variables not used in model inference, which will make it impossible to test or debug the model.
+W (3061) FbsLoader: CONFIG_SPIRAM_RODATA or CONFIG_SPIRAM_XIP_FROM_PSRAM option is on, fbs model is copied to PSRAM.
+W (3084) dl::Model: Minimize() will delete variables not used in model inference, which will make it impossible to test or debug the model.
+W (3086) FbsLoader: There is only one model in the flatbuffers, ignore the input model name!
+I (3090) Application: Device locked, waiting for login
+I (3090) Application: Network start task started
+I (3103) WifiManager: Initializing...
+I (3107) transport: Attempt connection with slave: retry[0]
+I (3111) transport: Reset slave using GPIO[54]
+I (3115) os_wrapper_esp: GPIO [54] configured
+W (3094) FbsLoader: CONFIG_SPIRAM_RODATA or CONFIG_SPIRAM_XIP_FROM_PSRAM option is on, fbs model is copied to PSRAM.
+W (3244) dl::Model: Minimize() will delete variables not used in model inference, which will make it impossible to test or debug the model.
+I (3250) FaceRecog: Face recognition initialized (detector + recognizer)
+I (4015) LOGIN_UI: Mode set to 1
+I (4766) sdio_wrapper: SDIO master: Slot 1, Data-Lines: 4-bit Freq(KHz)[40000 KHz]
+I (4766) sdio_wrapper: GPIOs: CLK[18] CMD[19] D0[14] D1[15] D2[16] D3[17] Slave_Reset[54]
+I (4766) H_SDIO_DRV: Starting SDIO process rx task
+I (4770) sdio_wrapper: Queues: Tx[20] Rx[20] SDIO-Rx-Mode[1]
+Name: 
+Type: SDIO
+Speed: 40.00 MHz (limit: 40.00 MHz)
+Size: luMB
+CSD: ver=1, sector_size=0, capacity=0 read_bl_len=0
+SCR: sd_spec=0, bus_width=0
+TUPLE: DEVICE, size: 3: D9 01 FF 
+TUPLE: MANFID, size: 4
+  MANF: 0092, CARD: 6666
+TUPLE: FUNCID, size: 2: 0C 00 
+TUPLE: FUNCE, size: 4: 00 00 02 32 
+TUPLE: CONFIG, size: 5: 01 01 00 02 07 
+TUPLE: CFTABLE_ENTRY, size: 8
+  INDX: C1, Intface: 1, Default: 1, Conf-Entry-Num: 1
+  IF: 41
+  FS: 30, misc: 0, mem_space: 1, irq: 1, io_space: 0, timing: 0, power: 0
+  IR: 30, mask: 1,   IRQ: FF FF
+  LEN: FFFF
+TUPLE: END
+I (4853) sdio_wrapper: Function 0 Blocksize: 512
+I (4857) sdio_wrapper: Function 1 Blocksize: 512
+I (4861) H_SDIO_DRV: SDIO Host operating in STREAMING MODE
+I (4866) H_SDIO_DRV: generate slave intr
+I (4872) transport: Received INIT event from ESP32 peripheral
+I (4876) transport: EVENT: 12
+I (4878) transport: EVENT: 11
+I (4881) transport: capabilities: 0xd
+I (4884) transport: Features supported are:
+I (4888) transport: 	 * WLAN
+I (4891) transport: 	   - HCI over SDIO
+I (4894) transport: 	   - BLE only
+I (4898) transport: EVENT: 13
+I (4900) transport: ESP board type is : 13 
+
+I (4904) transport: Base transport is set-up
+
+I (4909) transport: Slave chip Id[12]
+I (4912) hci_stub_drv: Host BT Support: Disabled
+I (4916) H_SDIO_DRV: Received INIT event
+I (4963) rpc_wrap: --- ESP Event: Slave ESP Init ---
+I (5832) WifiManager: Initialized
+I (5833) WifiBoard: Starting WiFi connection attempt
+I (5833) WifiManager: Starting station
+I (5865) LOGIN_UI: Login success
+I (5931) Application: Network start task finished
+I (5952) rpc_req: Scan start Req
+
+I (5962) WifiBoard: WiFi scanning
+I (6367) LOGIN_UI: Login UI hidden
+I (7663) EspVideo: Camera init success, captured 150 frames in 5006ms
+I (8381) WifiStation: Found AP: Ll, BSSID: 9a:5f:41:ea:cc:75, RSSI: -25, Channel: 11, Authmode: 3
+I (8381) WifiBoard: WiFi connecting to Ll
+I (8400) H_API: esp_wifi_remote_connect
+I (11412) esp_wifi_remote: esp_wifi_internal_reg_rxcb: sta: 0x482bf3b8
+I (12741) SystemInfo: free sram: 60307 minimal sram: 40691
+I (13650) esp_netif_handlers: sta ip: 192.168.137.203, mask: 255.255.255.0, gw: 192.168.137.1
+I (13650) WifiStation: Got IP: 192.168.137.203
+I (13651) WifiBoard: Connected to WiFi: Ll
+I (13655) SmartHomeTasks: Initializing SNTP
+I (13659) SmartHomeTasks: SNTP started, waiting for time sync...
+I (13665) Application: Network connected
+create static modelsI (13669) MODEL_LOADER: Successfully load srmodels
+I (13675) Assets: Refreshing display theme...
+I (13682) Ota: Current version: 2.2.4
+I (14046) SH_MQTT: Connecting to mqtt://8.134.167.240:1883
+I (17792) SH_MQTT: Connected and subscribed to smart-home topics
+I (20097) esp-x509-crt-bundle: Certificate validated
+I (21631) HttpClient: Established new connection to api.tenclass.net:443
+I (21873) HttpClient: HTTP connection closed
+I (21875) Ota: Current is the latest version
+I (21875) Ota: Running partition: app
+E (21875) Ota: Failed to get state of partition
+I (21879) MQTT: Connecting to endpoint mqtt.xiaozhi.me
+I (21953) esp-x509-crt-bundle: Certificate validated
+I (22195) esp-x509-crt-bundle: Certificate validated
+I (22741) SystemInfo: free sram: 30091 minimal sram: 27963
+I (22791) HttpClient: Established new connection to api.open-meteo.com:443
+E (23104) esp-tls-mbedtls: read error :-0x004C
+E (23105) EspSsl: SSL receive failed: -76
+I (23105) HttpClient: HTTP connection closed
+I (23403) MQTT: Connected to endpoint
+I (23407) Application: Activation done
+I (23407) SystemInfo: free sram: 38739 minimal sram: 23411
+I (23407) WifiStation: Setting WiFi power save level: LOW_POWER (MAX_MODEM)
+I (26609) esp-x509-crt-bundle: Certificate validated
+I (28319) HttpClient: Established new connection to air-quality-api.open-meteo.com:443
+I (29248) HttpClient: HTTP connection closed
+I (29249) WEATHER: Weather updated for 广州
+W (31136) Application: Device is locked, ignoring toggle chat
+I (32741) SystemInfo: free sram: 40303 minimal sram: 23411
+W (34531) Application: Device is locked, ignoring toggle chat
+I (35109) LcdDisplay: Shell page switch: overview
+I (35109) UI_ASSET: LVGL asset drive S: mapped to /sdcard/xiaozhi_ui
+I (35110) UI_ASSET: Asset service: preload=14 files, 44416 bytes, unavailable=0
+I (35116) UI_ASSET: All 14 TF assets preloaded OK
+I (35120) ALARM_UI: Fire alarm UI initialized with 500ms polling
+I (35126) UI_MGR: UI initialized in embedded content mode, 7 pages
+I (35132) Application: Login success event received
+I (35136) StateMachine: State: locked -> idle
+I (35226) PAGE_DATA: Data overview page created
+I (35308) AfeWakeWord: Model 0: wn9_nihaoxiaozhi_tts
+I (35309) AFE_CONFIG: Set WakeNet Model: wn9_nihaoxiaozhi_tts
+MC Quantized wakenet9: wakenet9l_tts1h8_你好小智_3_0.631_0.635, tigger:v4, mode:0, p:0, (Dec 16 2025 14:46:33)
+I (35348) AFE: AFE Version: (1MIC_V251128)
+I (35351) AFE: Input PCM Config: total 1 channels(1 microphone, 0 playback), sample rate:16000
+I (35359) AFE: AFE Pipeline: [input] ->  -> |VAD(WebRTC)| -> |WakeNet(wn9_nihaoxiaozhi_tts,)| -> [output]
+I (35368) AfeWakeWord: Audio detection task started, feed size: 512 fetch size: 512
+I (35368) AudioCodec: Set input enable to true
+I (35380) I2S_IF: channel mode 0 bits:16/16 channel:2 mask:1
+W (35385) i2s_common: dma frame num is adjusted to 256 to align the dma buffer with 64, bufsize = 512
+I (35394) I2S_IF: STD Mode 1 bits:16/16 channel:2 sample_rate:24000 mask:1
+I (35401) I2S_IF: channel mode 0 bits:16/16 channel:2 mask:1
+W (35406) i2s_common: dma frame num is adjusted to 256 to align the dma buffer with 64, bufsize = 512
+I (35415) I2S_IF: STD Mode 0 bits:16/16 channel:2 sample_rate:24000 mask:1
+I (35437) Adev_Codec: Open codec device OK
+I (36331) LcdDisplay: Shell page switch: overview
+I (36426) PAGE_DATA: Data overview page created
+I (44741) SystemInfo: free sram: 24287 minimal sram: 23411
+I (46270) LcdDisplay: Shell page switch: lighting
+I (46333) PAGE_LIGHT: Light page created
+I (47143) LcdDisplay: Shell page switch: control
+I (47188) PAGE_CTRL: Device control page created (floor=0)
+I (48348) LcdDisplay: Shell page switch: overview
+I (48444) PAGE_DATA: Data overview page created
+I (48800) LcdDisplay: Shell page switch: overview
+I (48895) PAGE_DATA: Data overview page created
+I (49180) LcdDisplay: Shell page switch: chat
+I (51174) StateMachine: State: idle -> connecting
+I (51174) LcdDisplay: Shell page switch: chat
+I (52281) MQTT: Session ID: 3340d571
+I (52282) WifiStation: Setting WiFi power save level: PERFORMANCE (NONE)
+I (52287) StateMachine: State: connecting -> listening
+I (52289) AFE: AFE Version: (1MIC_V251128)
+I (52290) AFE: Input PCM Config: total 1 channels(1 microphone, 0 playback), sample rate:16000
+I (52297) AFE: AFE Pipeline: [input] -> |VAD(WebRTC)| -> [output]
+I (52303) AfeAudioProcessor: Audio communication task started, feed size: 512 fetch size: 512
+I (56821) LcdDisplay: Shell page switch: chat
+I (56823) MQTT: Closing audio channel, send_goodbye: 1
+I (56825) WifiStation: Setting WiFi power save level: LOW_POWER (MAX_MODEM)
+I (56835) StateMachine: State: listening -> idle
+I (56962) MQTT: Received goodbye message, session_id: 3340d571
+I (56962) MQTT: Closing audio channel, send_goodbye: 0
+I (56962) WifiStation: Setting WiFi power save level: LOW_POWER (MAX_MODEM)
+I (61040) LcdDisplay: Shell page switch: chat
+I (61879) LcdDisplay: Shell page switch: settings
+I (61910) PAGE_SET: Settings page created
+I (63355) LcdDisplay: Shell page switch: chat

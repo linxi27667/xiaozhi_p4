@@ -56,8 +56,10 @@ list(APPEND SOURCES
     "smart_home/services/smart_home_alarm_bridge.cc"
     "smart_home/services/wifi_manager.cc"
     "smart_home/services/weather_service.cc"
+    "smart_home/services/face_recognition.cc"
     "smart_home/tasks/smart_home_tasks.cc"
     "smart_home/mcp/smart_home_mcp_tool.cc"
+    "smart_home/mcp/face_mcp_tool.cc"
 )
 list(APPEND INCLUDE_DIRS
     "smart_home/ui"

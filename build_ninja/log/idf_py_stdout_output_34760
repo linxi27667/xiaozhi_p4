@@ -1,0 +1,125 @@
+Command: ninja all
+[1/33] Performing build step for 'bootloader'
+[1/1] C:\WINDOWS\system32\cmd.exe /C "cd /D E:\MCU\esp32\p4\xiaozhi-for-p4\build_ninja\bootloader\esp-idf\esptool_py && C:\Users\30817\.espressif\python_env\idf5.5_py3.13_env\Scripts\python.exe E:/MCU/esp32/.espressif/v5.5.3/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x2000 E:/MCU/esp32/p4/xiaozhi-for-p4/build_ninja/bootloader/bootloader.bin"
+Bootloader binary size 0x45f0 bytes. 0x1a10 bytes (27%) free.
+[2/33] No install step for 'bootloader'
+[3/33] Completed 'bootloader'
+[4/33] Building C object esp-idf/main/CMakeFiles/__idf_main.dir/smart_home/ui/services/login_ui.c.obj
+[5/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/device_state_machine.cc.obj
+[6/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/smart_home/services/face_recognition.cc.obj
+[7/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/led/single_led.cc.obj
+[8/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/led/gpio_led.cc.obj
+[9/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/smart_home/services/smart_home_alarm_bridge.cc.obj
+[10/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/main.cc.obj
+[11/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/protocols/websocket_protocol.cc.obj
+[12/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/boards/common/power_save_timer.cc.obj
+[13/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/led/circular_strip.cc.obj
+[14/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/display/display.cc.obj
+[15/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/protocols/mqtt_protocol.cc.obj
+[16/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/display/lvgl_display/lvgl_display.cc.obj
+In file included from E:/MCU/esp32/p4/xiaozhi-for-p4/managed_components/espressif__esp_video/include/linux/videodev2.h:62,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/display/lvgl_display/jpg/image_to_jpeg.h:12,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/display/lvgl_display/lvgl_display.cc:14:
+E:/MCU/esp32/p4/xiaozhi-for-p4/managed_components/espressif__esp_video/include/linux/ioctl.h:54:9: warning: "_IO" redefined
+   54 | #define _IO(type,nr)        _IOC(_IOC_NONE,(type),(nr),0)
+      |         ^~~
+In file included from E:/MCU/esp32/.espressif/v5.5.3/esp-idf/components/lwip/include/lwip/sockets.h:8,
+                 from E:/MCU/esp32/.espressif/v5.5.3/esp-idf/components/lwip/port/esp32xx/include/sys/socket.h:15,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/audio/processors/audio_debugger.h:7,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/audio/audio_service.h:23,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/application.h:16,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/display/lvgl_display/lvgl_display.cc:10:
+E:/MCU/esp32/.espressif/v5.5.3/esp-idf/components/lwip/lwip/src/include/lwip/sockets.h:419:9: note: this is the location of the previous definition
+  419 | #define _IO(x,y)        ((long)(IOC_VOID|((x)<<8)|(y)))
+      |         ^~~
+E:/MCU/esp32/p4/xiaozhi-for-p4/managed_components/espressif__esp_video/include/linux/ioctl.h:55:9: warning: "_IOR" redefined
+   55 | #define _IOR(type,nr,size)  _IOC(_IOC_READ,(type),(nr),(_IOC_TYPECHECK(size)))
+      |         ^~~~
+E:/MCU/esp32/.espressif/v5.5.3/esp-idf/components/lwip/lwip/src/include/lwip/sockets.h:421:9: note: this is the location of the previous definition
+  421 | #define _IOR(x,y,t)     ((long)(IOC_OUT|((sizeof(t)&IOCPARM_MASK)<<16)|((x)<<8)|(y)))
+      |         ^~~~
+E:/MCU/esp32/p4/xiaozhi-for-p4/managed_components/espressif__esp_video/include/linux/ioctl.h:56:9: warning: "_IOW" redefined
+   56 | #define _IOW(type,nr,size)  _IOC(_IOC_WRITE,(type),(nr),(_IOC_TYPECHECK(size)))
+      |         ^~~~
+E:/MCU/esp32/.espressif/v5.5.3/esp-idf/components/lwip/lwip/src/include/lwip/sockets.h:423:9: note: this is the location of the previous definition
+  423 | #define _IOW(x,y,t)     ((long)(IOC_IN|((sizeof(t)&IOCPARM_MASK)<<16)|((x)<<8)|(y)))
+      |         ^~~~
+[17/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/boards/common/sleep_timer.cc.obj
+[18/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/boards/common/dual_network_board.cc.obj
+[19/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/boards/common/rndis_board.cc.obj
+[20/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/boards/common/esp_video.cc.obj
+[21/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/boards/common/nt26_board.cc.obj
+[22/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/display/lcd_display.cc.obj
+[23/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/assets.cc.obj
+[24/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/boards/common/wifi_board.cc.obj
+[25/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/boards/esp-p4-function-ev-board/esp-p4-function-ev-board.cc.obj
+In file included from E:/MCU/esp32/p4/xiaozhi-for-p4/managed_components/espressif__esp_video/include/linux/videodev2.h:62,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/display/lvgl_display/jpg/image_to_jpeg.h:12,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/boards/common/esp_video.h:13,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/boards/esp-p4-function-ev-board/esp-p4-function-ev-board.cc:14:
+E:/MCU/esp32/p4/xiaozhi-for-p4/managed_components/espressif__esp_video/include/linux/ioctl.h:54:9: warning: "_IO" redefined
+   54 | #define _IO(type,nr)        _IOC(_IOC_NONE,(type),(nr),0)
+      |         ^~~
+In file included from E:/MCU/esp32/.espressif/v5.5.3/esp-idf/components/lwip/include/lwip/sockets.h:8,
+                 from E:/MCU/esp32/.espressif/v5.5.3/esp-idf/components/lwip/port/esp32xx/include/sys/socket.h:15,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/audio/processors/audio_debugger.h:7,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/audio/audio_service.h:23,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/application.h:16,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/boards/esp-p4-function-ev-board/esp-p4-function-ev-board.cc:10:
+E:/MCU/esp32/.espressif/v5.5.3/esp-idf/components/lwip/lwip/src/include/lwip/sockets.h:419:9: note: this is the location of the previous definition
+  419 | #define _IO(x,y)        ((long)(IOC_VOID|((x)<<8)|(y)))
+      |         ^~~
+E:/MCU/esp32/p4/xiaozhi-for-p4/managed_components/espressif__esp_video/include/linux/ioctl.h:55:9: warning: "_IOR" redefined
+   55 | #define _IOR(type,nr,size)  _IOC(_IOC_READ,(type),(nr),(_IOC_TYPECHECK(size)))
+      |         ^~~~
+E:/MCU/esp32/.espressif/v5.5.3/esp-idf/components/lwip/lwip/src/include/lwip/sockets.h:421:9: note: this is the location of the previous definition
+  421 | #define _IOR(x,y,t)     ((long)(IOC_OUT|((sizeof(t)&IOCPARM_MASK)<<16)|((x)<<8)|(y)))
+      |         ^~~~
+E:/MCU/esp32/p4/xiaozhi-for-p4/managed_components/espressif__esp_video/include/linux/ioctl.h:56:9: warning: "_IOW" redefined
+   56 | #define _IOW(type,nr,size)  _IOC(_IOC_WRITE,(type),(nr),(_IOC_TYPECHECK(size)))
+      |         ^~~~
+E:/MCU/esp32/.espressif/v5.5.3/esp-idf/components/lwip/lwip/src/include/lwip/sockets.h:423:9: note: this is the location of the previous definition
+  423 | #define _IOW(x,y,t)     ((long)(IOC_IN|((sizeof(t)&IOCPARM_MASK)<<16)|((x)<<8)|(y)))
+      |         ^~~~
+[26/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/boards/common/afsk_demod.cc.obj
+[27/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/application.cc.obj
+In file included from E:/MCU/esp32/p4/xiaozhi-for-p4/managed_components/espressif__esp_video/include/linux/videodev2.h:62,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/display/lvgl_display/jpg/image_to_jpeg.h:12,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/boards/common/esp_video.h:13,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/application.cc:19:
+E:/MCU/esp32/p4/xiaozhi-for-p4/managed_components/espressif__esp_video/include/linux/ioctl.h:54:9: warning: "_IO" redefined
+   54 | #define _IO(type,nr)        _IOC(_IOC_NONE,(type),(nr),0)
+      |         ^~~
+In file included from E:/MCU/esp32/.espressif/v5.5.3/esp-idf/components/lwip/include/lwip/sockets.h:8,
+                 from E:/MCU/esp32/.espressif/v5.5.3/esp-idf/components/lwip/port/esp32xx/include/sys/socket.h:15,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/audio/processors/audio_debugger.h:7,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/audio/audio_service.h:23,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/application.h:16,
+                 from E:/MCU/esp32/p4/xiaozhi-for-p4/main/application.cc:1:
+E:/MCU/esp32/.espressif/v5.5.3/esp-idf/components/lwip/lwip/src/include/lwip/sockets.h:419:9: note: this is the location of the previous definition
+  419 | #define _IO(x,y)        ((long)(IOC_VOID|((x)<<8)|(y)))
+      |         ^~~
+E:/MCU/esp32/p4/xiaozhi-for-p4/managed_components/espressif__esp_video/include/linux/ioctl.h:55:9: warning: "_IOR" redefined
+   55 | #define _IOR(type,nr,size)  _IOC(_IOC_READ,(type),(nr),(_IOC_TYPECHECK(size)))
+      |         ^~~~
+E:/MCU/esp32/.espressif/v5.5.3/esp-idf/components/lwip/lwip/src/include/lwip/sockets.h:421:9: note: this is the location of the previous definition
+  421 | #define _IOR(x,y,t)     ((long)(IOC_OUT|((sizeof(t)&IOCPARM_MASK)<<16)|((x)<<8)|(y)))
+      |         ^~~~
+E:/MCU/esp32/p4/xiaozhi-for-p4/managed_components/espressif__esp_video/include/linux/ioctl.h:56:9: warning: "_IOW" redefined
+   56 | #define _IOW(type,nr,size)  _IOC(_IOC_WRITE,(type),(nr),(_IOC_TYPECHECK(size)))
+      |         ^~~~
+E:/MCU/esp32/.espressif/v5.5.3/esp-idf/components/lwip/lwip/src/include/lwip/sockets.h:423:9: note: this is the location of the previous definition
+  423 | #define _IOW(x,y,t)     ((long)(IOC_IN|((sizeof(t)&IOCPARM_MASK)<<16)|((x)<<8)|(y)))
+      |         ^~~~
+[28/33] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/mcp_server.cc.obj
+[29/33] Linking C static library esp-idf\main\libmain.a
+[30/33] Generating esp-idf/esp_system/ld/sections.ld
+[31/33] Linking CXX executable xiaozhi.elf
+[32/33] Generating binary image from built executable
+esptool.py v4.12.dev2
+Creating esp32p4 image...
+Merged 4 ELF sections
+Successfully created esp32p4 image.
+Generated E:/MCU/esp32/p4/xiaozhi-for-p4/build_ninja/xiaozhi.bin
+[33/33] C:\WINDOWS\system32\cmd.exe /C "cd /D E:\MCU\esp32\p4\xiaozhi-for-p4\build_ninja\esp-idf\esptool_py && C:\Users\30817\.espressif\python_env\idf5.5_py3.13_env\Scripts\python.exe E:/MCU/esp32/.espressif/v5.5.3/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 partition --type app E:/MCU/esp32/p4/xiaozhi-for-p4/build_ninja/partition_table/partition-table.bin E:/MCU/esp32/p4/xiaozhi-for-p4/build_ninja/xiaozhi.bin"
+xiaozhi.bin binary size 0x61c6a0 bytes. Smallest app partition is 0xc80000 bytes. 0x663960 bytes (51%) free.
