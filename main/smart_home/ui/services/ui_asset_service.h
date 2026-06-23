@@ -9,6 +9,7 @@ extern "C" {
 
 #define UI_ASSET_DRIVE_LETTER 'S'
 #define UI_ASSET_ROOT "/sdcard/xiaozhi_ui"
+#define UI_ASSET_OVERRIDE_MARKER "/sdcard/xiaozhi_ui/.use_tf_assets"
 
 void ui_asset_service_init(void);
 int ui_asset_service_preload_required(void);

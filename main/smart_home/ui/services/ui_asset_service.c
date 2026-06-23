@@ -17,42 +17,93 @@ static bool s_inited;
 static bool s_preload_done;
 static bool s_assets_unavailable;
 static bool s_sdcard_missing_logged;
+static bool s_tf_override_enabled;
 static int s_preload_count;
 static uint32_t s_preload_bytes;
 static char s_path_buf[160];
 static char s_src_buf[96];
 
-static const char *s_required_assets[] = {
-    "siyin_logo.png",
-    "overview_home.png",
-    "weather_guangzhou.png",
-    "weather_cloud.png",
-    "floor_1.png",
-    "floor_2.png",
-    "floor_3.png",
-    "alarm_siren.png",
-    "logo_robot.png",
-    "scene_lights.png",
-    "scene_home.png",
-    "scene_away.png",
-    "scene_sleep.png",
-    "scene_movie.png",
-    "scene_night.png",
-    "scene_rain.png",
-    "scene_fire.png",
-    "color_wheel_220.png",
+extern const uint8_t _binary_alarm_siren_png_start[] asm("_binary_alarm_siren_png_start");
+extern const uint8_t _binary_alarm_siren_png_end[] asm("_binary_alarm_siren_png_end");
+extern const uint8_t _binary_color_wheel_220_png_start[] asm("_binary_color_wheel_220_png_start");
+extern const uint8_t _binary_color_wheel_220_png_end[] asm("_binary_color_wheel_220_png_end");
+extern const uint8_t _binary_floor_1_png_start[] asm("_binary_floor_1_png_start");
+extern const uint8_t _binary_floor_1_png_end[] asm("_binary_floor_1_png_end");
+extern const uint8_t _binary_floor_2_png_start[] asm("_binary_floor_2_png_start");
+extern const uint8_t _binary_floor_2_png_end[] asm("_binary_floor_2_png_end");
+extern const uint8_t _binary_floor_3_png_start[] asm("_binary_floor_3_png_start");
+extern const uint8_t _binary_floor_3_png_end[] asm("_binary_floor_3_png_end");
+extern const uint8_t _binary_logo_robot_png_start[] asm("_binary_logo_robot_png_start");
+extern const uint8_t _binary_logo_robot_png_end[] asm("_binary_logo_robot_png_end");
+extern const uint8_t _binary_overview_home_png_start[] asm("_binary_overview_home_png_start");
+extern const uint8_t _binary_overview_home_png_end[] asm("_binary_overview_home_png_end");
+extern const uint8_t _binary_scene_away_png_start[] asm("_binary_scene_away_png_start");
+extern const uint8_t _binary_scene_away_png_end[] asm("_binary_scene_away_png_end");
+extern const uint8_t _binary_scene_fire_png_start[] asm("_binary_scene_fire_png_start");
+extern const uint8_t _binary_scene_fire_png_end[] asm("_binary_scene_fire_png_end");
+extern const uint8_t _binary_scene_home_png_start[] asm("_binary_scene_home_png_start");
+extern const uint8_t _binary_scene_home_png_end[] asm("_binary_scene_home_png_end");
+extern const uint8_t _binary_scene_lights_png_start[] asm("_binary_scene_lights_png_start");
+extern const uint8_t _binary_scene_lights_png_end[] asm("_binary_scene_lights_png_end");
+extern const uint8_t _binary_scene_movie_png_start[] asm("_binary_scene_movie_png_start");
+extern const uint8_t _binary_scene_movie_png_end[] asm("_binary_scene_movie_png_end");
+extern const uint8_t _binary_scene_night_png_start[] asm("_binary_scene_night_png_start");
+extern const uint8_t _binary_scene_night_png_end[] asm("_binary_scene_night_png_end");
+extern const uint8_t _binary_scene_rain_png_start[] asm("_binary_scene_rain_png_start");
+extern const uint8_t _binary_scene_rain_png_end[] asm("_binary_scene_rain_png_end");
+extern const uint8_t _binary_scene_sleep_png_start[] asm("_binary_scene_sleep_png_start");
+extern const uint8_t _binary_scene_sleep_png_end[] asm("_binary_scene_sleep_png_end");
+extern const uint8_t _binary_siyin_logo_png_start[] asm("_binary_siyin_logo_png_start");
+extern const uint8_t _binary_siyin_logo_png_end[] asm("_binary_siyin_logo_png_end");
+extern const uint8_t _binary_weather_cloud_png_start[] asm("_binary_weather_cloud_png_start");
+extern const uint8_t _binary_weather_cloud_png_end[] asm("_binary_weather_cloud_png_end");
+extern const uint8_t _binary_weather_guangzhou_png_start[] asm("_binary_weather_guangzhou_png_start");
+extern const uint8_t _binary_weather_guangzhou_png_end[] asm("_binary_weather_guangzhou_png_end");
+
+typedef struct {
+    const char *name;
+    const uint8_t *embedded_start;
+    const uint8_t *embedded_end;
+    long legacy_size;
+} ui_asset_def_t;
+
+static const ui_asset_def_t s_required_assets[] = {
+    {"siyin_logo.png", _binary_siyin_logo_png_start, _binary_siyin_logo_png_end, 9857},
+    {"overview_home.png", _binary_overview_home_png_start, _binary_overview_home_png_end, 1838},
+    {"weather_guangzhou.png", _binary_weather_guangzhou_png_start, _binary_weather_guangzhou_png_end, 1381},
+    {"weather_cloud.png", _binary_weather_cloud_png_start, _binary_weather_cloud_png_end, 1511},
+    {"floor_1.png", _binary_floor_1_png_start, _binary_floor_1_png_end, 981},
+    {"floor_2.png", _binary_floor_2_png_start, _binary_floor_2_png_end, 999},
+    {"floor_3.png", _binary_floor_3_png_start, _binary_floor_3_png_end, 1005},
+    {"alarm_siren.png", _binary_alarm_siren_png_start, _binary_alarm_siren_png_end, 1428},
+    {"logo_robot.png", _binary_logo_robot_png_start, _binary_logo_robot_png_end, 2271},
+    {"scene_lights.png", _binary_scene_lights_png_start, _binary_scene_lights_png_end, 786},
+    {"scene_home.png", _binary_scene_home_png_start, _binary_scene_home_png_end, 724},
+    {"scene_away.png", _binary_scene_away_png_start, _binary_scene_away_png_end, 671},
+    {"scene_sleep.png", _binary_scene_sleep_png_start, _binary_scene_sleep_png_end, 772},
+    {"scene_movie.png", _binary_scene_movie_png_start, _binary_scene_movie_png_end, 652},
+    {"scene_night.png", _binary_scene_night_png_start, _binary_scene_night_png_end, 831},
+    {"scene_rain.png", _binary_scene_rain_png_start, _binary_scene_rain_png_end, 1485},
+    {"scene_fire.png", _binary_scene_fire_png_start, _binary_scene_fire_png_end, 2523},
+    {"color_wheel_220.png", _binary_color_wheel_220_png_start, _binary_color_wheel_220_png_end, 20412},
 };
+
+#define UI_ASSET_COUNT (sizeof(s_required_assets) / sizeof(s_required_assets[0]))
 
 typedef struct {
     const char *name;
     uint8_t *data;
     uint32_t data_size;
+    uint8_t *decoded_data;
+    uint32_t decoded_size;
+    lv_image_dsc_t decoded_dsc;
     long file_size;
     time_t file_mtime;
     bool valid;
+    bool decoded_valid;
 } ui_asset_cache_entry_t;
 
-static ui_asset_cache_entry_t s_asset_cache[sizeof(s_required_assets) / sizeof(s_required_assets[0])];
+static ui_asset_cache_entry_t s_asset_cache[UI_ASSET_COUNT];
 
 typedef struct {
     lv_image_dsc_t dsc;
@@ -60,6 +111,7 @@ typedef struct {
     uint32_t data_size;
     char name[64];
     char src[96];
+    bool owns_data;
 } ui_asset_image_payload_t;
 
 static void build_host_path(const char *path, char *out, size_t out_size)
@@ -146,12 +198,29 @@ static bool stat_asset_file(const char *name, struct stat *st)
     return stat(host_path, st) == 0 && S_ISREG(st->st_mode);
 }
 
+static bool tf_override_marker_exists(void)
+{
+    struct stat st;
+    return stat(UI_ASSET_OVERRIDE_MARKER, &st) == 0 && S_ISREG(st.st_mode);
+}
+
 static ui_asset_cache_entry_t *find_cache_entry(const char *name)
 {
     if (!name || !name[0]) return NULL;
-    for (size_t i = 0; i < sizeof(s_asset_cache) / sizeof(s_asset_cache[0]); i++) {
+    for (size_t i = 0; i < UI_ASSET_COUNT; i++) {
         if (s_asset_cache[i].name && strcmp(s_asset_cache[i].name, name) == 0) {
             return &s_asset_cache[i];
+        }
+    }
+    return NULL;
+}
+
+static const ui_asset_def_t *find_asset_def(const char *name)
+{
+    if (!name || !name[0]) return NULL;
+    for (size_t i = 0; i < UI_ASSET_COUNT; i++) {
+        if (strcmp(s_required_assets[i].name, name) == 0) {
+            return &s_required_assets[i];
         }
     }
     return NULL;
@@ -168,17 +237,26 @@ static void invalidate_cache_entry(ui_asset_cache_entry_t *entry, const char *re
         snprintf(src, sizeof(src), "%c:%s", UI_ASSET_DRIVE_LETTER, entry->name);
         lv_image_cache_drop(src);
     }
+    if (entry->decoded_valid && entry->decoded_dsc.data) {
+        lv_image_cache_drop(&entry->decoded_dsc);
+    }
     heap_caps_free(entry->data);
+    heap_caps_free(entry->decoded_data);
     entry->data = NULL;
     entry->data_size = 0;
+    entry->decoded_data = NULL;
+    entry->decoded_size = 0;
+    memset(&entry->decoded_dsc, 0, sizeof(entry->decoded_dsc));
     entry->file_size = 0;
     entry->file_mtime = 0;
     entry->valid = false;
+    entry->decoded_valid = false;
 }
 
 static bool cache_entry_matches_file(ui_asset_cache_entry_t *entry)
 {
     if (!entry || !entry->valid || !entry->name) return false;
+    if (entry->file_size < 0) return true;
 
     struct stat st;
     if (!stat_asset_file(entry->name, &st)) {
@@ -204,11 +282,114 @@ static void update_cache_metadata(ui_asset_cache_entry_t *entry)
     }
 }
 
+static bool decode_asset_to_cache(ui_asset_cache_entry_t *entry,
+                                  const uint8_t *data,
+                                  uint32_t data_size)
+{
+    if (!entry || !data || data_size == 0 || !asset_is_png(data, data_size)) {
+        return false;
+    }
+
+    lv_image_dsc_t tmp_dsc;
+    memset(&tmp_dsc, 0, sizeof(tmp_dsc));
+    tmp_dsc.data = data;
+    tmp_dsc.data_size = data_size;
+    tmp_dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
+    tmp_dsc.header.cf = LV_COLOR_FORMAT_UNKNOWN;
+
+    lv_image_decoder_dsc_t decoder_dsc;
+    memset(&decoder_dsc, 0, sizeof(decoder_dsc));
+    lv_image_decoder_args_t decoder_args = {
+        .no_cache = true,
+    };
+
+    lv_result_t open_res = lv_image_decoder_open(&decoder_dsc, &tmp_dsc, &decoder_args);
+    if (open_res != LV_RESULT_OK || decoder_dsc.decoded == NULL) {
+        if (open_res == LV_RESULT_OK) {
+            lv_image_decoder_close(&decoder_dsc);
+        }
+        return false;
+    }
+
+    const lv_draw_buf_t *decoded_buf = decoder_dsc.decoded;
+    const uint32_t decoded_size = decoded_buf->data_size;
+    const uint8_t *decoded_data = decoded_buf->data;
+    if (decoded_size == 0 || decoded_data == NULL) {
+        lv_image_decoder_close(&decoder_dsc);
+        return false;
+    }
+
+    uint8_t *cached = (uint8_t *)asset_malloc(decoded_size);
+    if (!cached) {
+        ESP_LOGW(TAG, "decode cache malloc FAIL: %s (%lu bytes)",
+                 entry->name ? entry->name : "(null)", (unsigned long)decoded_size);
+        lv_image_decoder_close(&decoder_dsc);
+        return false;
+    }
+
+    memcpy(cached, decoded_data, decoded_size);
+    if (entry->decoded_valid && entry->decoded_dsc.data) {
+        lv_image_cache_drop(&entry->decoded_dsc);
+    }
+    heap_caps_free(entry->decoded_data);
+
+    entry->decoded_data = cached;
+    entry->decoded_size = decoded_size;
+    memset(&entry->decoded_dsc, 0, sizeof(entry->decoded_dsc));
+    entry->decoded_dsc.data = cached;
+    entry->decoded_dsc.data_size = decoded_size;
+    entry->decoded_dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
+    entry->decoded_dsc.header.cf = decoded_buf->header.cf;
+    entry->decoded_dsc.header.w = decoded_buf->header.w;
+    entry->decoded_dsc.header.h = decoded_buf->header.h;
+    entry->decoded_dsc.header.stride = decoded_buf->header.stride;
+    entry->decoded_valid = true;
+
+    lv_image_decoder_close(&decoder_dsc);
+    ESP_LOGD(TAG, "asset decoded cache ready: %s size=%ldx%ld bytes=%lu",
+             entry->name ? entry->name : "(null)",
+             (long)entry->decoded_dsc.header.w,
+             (long)entry->decoded_dsc.header.h,
+             (unsigned long)decoded_size);
+    return true;
+}
+
+static bool decode_embedded_asset_to_cache(ui_asset_cache_entry_t *entry)
+{
+    if (!entry || !entry->name) return false;
+
+    const ui_asset_def_t *def = find_asset_def(entry->name);
+    if (!def || !def->embedded_start || !def->embedded_end ||
+        def->embedded_end <= def->embedded_start) {
+        return false;
+    }
+
+    const uint32_t size = (uint32_t)(def->embedded_end - def->embedded_start);
+    if (!decode_asset_to_cache(entry, def->embedded_start, size)) {
+        ESP_LOGW(TAG, "embedded asset decode FAIL: %s", entry->name);
+        return false;
+    }
+
+    heap_caps_free(entry->data);
+    entry->data = NULL;
+    entry->data_size = 0;
+    entry->file_size = -1;
+    entry->file_mtime = 0;
+    entry->valid = true;
+    return true;
+}
+
+static bool asset_is_legacy_default_size(const char *name, long size)
+{
+    const ui_asset_def_t *def = find_asset_def(name);
+    return def && def->legacy_size > 0 && def->legacy_size == size;
+}
+
 static bool copy_cached_asset(const char *name, uint8_t **data, uint32_t *data_size)
 {
     ui_asset_cache_entry_t *entry = find_cache_entry(name);
     if (!cache_entry_matches_file(entry)) return false;
-    if (!entry || !data || !data_size) return false;
+    if (!entry || !data || !data_size || !entry->data || entry->data_size == 0) return false;
 
     uint8_t *copy = (uint8_t *)asset_malloc(entry->data_size);
     if (!copy) {
@@ -250,15 +431,6 @@ static bool ensure_sdcard_mounted(void)
     return false;
 }
 
-static void diagnose_possible_nested_path(const char *path, const char *hint)
-{
-    struct stat st;
-    if (stat(path, &st) == 0) {
-        ESP_LOGE(TAG, "Found assets at wrong path: %s", path);
-        ESP_LOGE(TAG, "-> %s", hint);
-    }
-}
-
 static void diagnose_sdcard_root(void)
 {
     struct stat st;
@@ -292,12 +464,14 @@ static void asset_image_delete_cb(lv_event_t *e)
         (ui_asset_image_payload_t *)lv_event_get_user_data(e);
     if (!payload) return;
 
-    if (payload->dsc.data) {
+    if (payload->owns_data && payload->dsc.data) {
         lv_image_cache_drop(&payload->dsc);
-    } else if (payload->src[0]) {
+    } else if (payload->owns_data && payload->src[0]) {
         lv_image_cache_drop(payload->src);
     }
-    heap_caps_free(payload->data);
+    if (payload->owns_data) {
+        heap_caps_free(payload->data);
+    }
     heap_caps_free(payload);
 }
 
@@ -435,39 +609,76 @@ int ui_asset_service_preload_required(void)
         return s_preload_count;
     }
 
-    for (size_t i = 0; i < sizeof(s_required_assets) / sizeof(s_required_assets[0]); i++) {
-        s_asset_cache[i].name = s_required_assets[i];
+    for (size_t i = 0; i < UI_ASSET_COUNT; i++) {
+        s_asset_cache[i].name = s_required_assets[i].name;
     }
 
-    if (!ensure_sdcard_mounted()) {
-        ESP_LOGE(TAG, "TF asset preload skipped: /sdcard is not mounted");
-        return 0;
-    }
-
+    bool tf_assets_ready = ensure_sdcard_mounted();
     struct stat st;
-    if (stat(UI_ASSET_ROOT, &st) != 0 || !S_ISDIR(st.st_mode)) {
-        ESP_LOGE(TAG, "TF asset preload skipped: missing %s (errno=%d)", UI_ASSET_ROOT, errno);
-        return 0;
+    if (!tf_assets_ready || stat(UI_ASSET_ROOT, &st) != 0 || !S_ISDIR(st.st_mode)) {
+        ESP_LOGW(TAG, "TF asset folder unavailable; using embedded default UI assets");
+        tf_assets_ready = false;
+    } else if (!tf_override_marker_exists()) {
+        ESP_LOGI(TAG, "TF UI override marker missing; using embedded default UI assets");
+        tf_assets_ready = false;
     }
+    s_tf_override_enabled = tf_assets_ready;
 
-    ESP_LOGI(TAG, "Preloading TF UI assets from %s before Wi-Fi SDIO runtime traffic", UI_ASSET_ROOT);
-    for (size_t i = 0; i < sizeof(s_required_assets) / sizeof(s_required_assets[0]); i++) {
-        const char *name = s_required_assets[i];
+    ESP_LOGI(TAG, "Preloading UI assets (%s preferred, embedded fallback)",
+             tf_assets_ready ? UI_ASSET_ROOT : "embedded");
+    s_preload_count = 0;
+    s_preload_bytes = 0;
+    for (size_t i = 0; i < UI_ASSET_COUNT; i++) {
+        const char *name = s_required_assets[i].name;
         uint8_t *data = NULL;
         uint32_t data_size = 0;
-        if (!read_asset_file(name, &data, &data_size)) {
-            ESP_LOGW(TAG, "preload missing/read fail: %s", name);
+
+        bool use_embedded = true;
+        if (tf_assets_ready && stat_asset_file(name, &st)) {
+            use_embedded = asset_is_legacy_default_size(name, (long)st.st_size);
+            if (use_embedded) {
+                ESP_LOGI(TAG, "preload uses embedded upgrade for legacy asset: %s", name);
+            } else if (read_asset_file(name, &data, &data_size)) {
+                use_embedded = false;
+            } else {
+                ESP_LOGW(TAG, "preload TF read fail, fallback embedded: %s", name);
+                use_embedded = true;
+            }
+        }
+
+        if (use_embedded) {
+            if (!decode_embedded_asset_to_cache(&s_asset_cache[i])) {
+                continue;
+            }
+            const uint32_t embedded_size =
+                (uint32_t)(s_required_assets[i].embedded_end - s_required_assets[i].embedded_start);
+            s_preload_count++;
+            s_preload_bytes += embedded_size;
             continue;
         }
 
         if (!asset_is_png(data, data_size)) {
             ESP_LOGW(TAG, "preload skip non-png: %s", name);
             heap_caps_free(data);
+            if (decode_embedded_asset_to_cache(&s_asset_cache[i])) {
+                const uint32_t embedded_size =
+                    (uint32_t)(s_required_assets[i].embedded_end - s_required_assets[i].embedded_start);
+                s_preload_count++;
+                s_preload_bytes += embedded_size;
+            }
             continue;
         }
 
-        s_asset_cache[i].data = data;
-        s_asset_cache[i].data_size = data_size;
+        heap_caps_free(s_asset_cache[i].data);
+        s_asset_cache[i].data = NULL;
+        s_asset_cache[i].data_size = 0;
+        if (decode_asset_to_cache(&s_asset_cache[i], data, data_size)) {
+            heap_caps_free(data);
+        } else {
+            s_asset_cache[i].data = data;
+            s_asset_cache[i].data_size = data_size;
+            ESP_LOGW(TAG, "preload kept raw PNG fallback: %s", name);
+        }
         s_asset_cache[i].valid = true;
         update_cache_metadata(&s_asset_cache[i]);
         s_preload_count++;
@@ -476,10 +687,8 @@ int ui_asset_service_preload_required(void)
     }
 
     s_preload_done = true;
-    ESP_LOGI(TAG, "TF asset preload complete: %d/%u files, %lu bytes",
-             s_preload_count,
-             (unsigned)(sizeof(s_required_assets) / sizeof(s_required_assets[0])),
-             (unsigned long)s_preload_bytes);
+    ESP_LOGI(TAG, "UI asset preload complete: %d/%u files, %lu bytes",
+             s_preload_count, (unsigned)UI_ASSET_COUNT, (unsigned long)s_preload_bytes);
     if (s_preload_count == 0) {
         s_preload_done = false;
         ESP_LOGE(TAG, "TF asset preload produced no usable PNG files; will retry later");
@@ -501,14 +710,26 @@ bool ui_asset_available(const char *name)
         return false;
     }
 
+    if (!s_tf_override_enabled && find_asset_def(name)) {
+        return true;
+    }
+
     ensure_sdcard_mounted();
     build_host_path(name, s_path_buf, sizeof(s_path_buf));
     struct stat st;
     int ret = stat(s_path_buf, &st);
     if (ret != 0) {
+        if (find_asset_def(name)) {
+            ESP_LOGW(TAG, "asset TF missing, embedded fallback available: %s", name);
+            return true;
+        }
         ESP_LOGW(TAG, "asset NOT found: %s (host: %s, stat=%d errno=%d)",
                  name, s_path_buf, ret, errno);
         return false;
+    }
+    if (asset_is_legacy_default_size(name, (long)st.st_size)) {
+        ESP_LOGI(TAG, "asset legacy default on TF, embedded upgrade available: %s", name);
+        return true;
     }
     ESP_LOGI(TAG, "asset OK: %s -> %s (%ld bytes)", name, s_path_buf, (long)st.st_size);
     return true;
@@ -517,6 +738,7 @@ bool ui_asset_available(const char *name)
 const char *ui_asset_src(const char *name)
 {
     if (!name || !name[0] || !ui_asset_available(name)) return NULL;
+    if (!s_tf_override_enabled) return NULL;
     snprintf(s_src_buf, sizeof(s_src_buf), "%c:%s", UI_ASSET_DRIVE_LETTER, name);
     return s_src_buf;
 }
@@ -532,10 +754,29 @@ lv_obj_t *ui_asset_image_create(lv_obj_t *parent, const char *name)
         return NULL;
     }
 
+    ui_asset_cache_entry_t *entry = find_cache_entry(name);
+    if (cache_entry_matches_file(entry) && entry->decoded_valid) {
+        return asset_image_obj_create(parent, payload, &entry->decoded_dsc);
+    }
+
+    if (!s_tf_override_enabled && entry && decode_embedded_asset_to_cache(entry)) {
+        return asset_image_obj_create(parent, payload, &entry->decoded_dsc);
+    }
+
+    struct stat st;
+    if (entry && stat_asset_file(name, &st) &&
+        asset_is_legacy_default_size(name, (long)st.st_size) &&
+        decode_embedded_asset_to_cache(entry)) {
+        return asset_image_obj_create(parent, payload, &entry->decoded_dsc);
+    }
+
     uint8_t *data = NULL;
     uint32_t data_size = 0;
     if (!copy_cached_asset(name, &data, &data_size) &&
         !read_asset_file(name, &data, &data_size)) {
+        if (entry && decode_embedded_asset_to_cache(entry)) {
+            return asset_image_obj_create(parent, payload, &entry->decoded_dsc);
+        }
         return asset_file_image_create(parent, payload, "direct read failed");
     }
 
@@ -544,6 +785,13 @@ lv_obj_t *ui_asset_image_create(lv_obj_t *parent, const char *name)
         heap_caps_free(data);
         heap_caps_free(payload);
         return NULL;
+    }
+
+    if (entry && decode_asset_to_cache(entry, data, data_size)) {
+        entry->valid = true;
+        update_cache_metadata(entry);
+        heap_caps_free(data);
+        return asset_image_obj_create(parent, payload, &entry->decoded_dsc);
     }
 
     /* Set up a temporary dsc with raw PNG data for decoding.
@@ -589,6 +837,7 @@ lv_obj_t *ui_asset_image_create(lv_obj_t *parent, const char *name)
 
                 payload->data = argb_data;
                 payload->data_size = decoded_size;
+                payload->owns_data = true;
                 payload->dsc.data = argb_data;
                 payload->dsc.data_size = decoded_size;
                 payload->dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
@@ -617,6 +866,7 @@ lv_obj_t *ui_asset_image_create(lv_obj_t *parent, const char *name)
     /* Fallback: keep raw PNG data and let LVGL decode per-frame (original path). */
     payload->data = data;
     payload->data_size = data_size;
+    payload->owns_data = true;
     payload->dsc.data = payload->data;
     payload->dsc.data_size = payload->data_size;
     payload->dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
@@ -650,5 +900,5 @@ void ui_asset_service_diagnose(void)
     }
 
     /* Normal case: just log a summary, skip per-file listing */
-    ESP_LOGI(TAG, "All %d TF assets preloaded OK", s_preload_count);
+    ESP_LOGI(TAG, "All %d UI assets preloaded OK", s_preload_count);
 }

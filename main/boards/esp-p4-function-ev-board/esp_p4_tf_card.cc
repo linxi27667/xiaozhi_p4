@@ -21,6 +21,8 @@
 namespace {
 constexpr char kSdMountPoint[] = "/sdcard";
 constexpr char kUiAssetRoot[] = "/sdcard/xiaozhi_ui";
+constexpr char kUiAssetVersionPath[] = "/sdcard/xiaozhi_ui/.xiaozhi_assets_version";
+constexpr char kUiAssetVersion[] = "premium-2026-06-v2\n";
 constexpr gpio_num_t kSdPowerEnableGpio = GPIO_NUM_45;  // SD_PWRn (active low)
 constexpr int kSdLdoChannel = 4;                         // LDO_VO4
 constexpr int kSdVoltageMv = 3300;
@@ -71,6 +73,12 @@ struct EmbeddedAsset {
     const uint8_t *end;
 };
 
+struct LegacyAssetFingerprint {
+    const char *name;
+    size_t size;
+    uint32_t crc32;
+};
+
 constexpr EmbeddedAsset kDefaultUiAssets[] = {
     {"alarm_siren.png", _binary_alarm_siren_png_start, _binary_alarm_siren_png_end},
     {"color_wheel_220.png", _binary_color_wheel_220_png_start, _binary_color_wheel_220_png_end},
@@ -92,6 +100,27 @@ constexpr EmbeddedAsset kDefaultUiAssets[] = {
     {"weather_guangzhou.png", _binary_weather_guangzhou_png_start, _binary_weather_guangzhou_png_end},
 };
 
+constexpr LegacyAssetFingerprint kLegacyDefaultAssets[] = {
+    {"alarm_siren.png", 1428, 0xf960d25d},
+    {"color_wheel_220.png", 20412, 0xbc165748},
+    {"floor_1.png", 981, 0x78525619},
+    {"floor_2.png", 999, 0xbd955424},
+    {"floor_3.png", 1005, 0x5e49d0b8},
+    {"logo_robot.png", 2271, 0x837be4cc},
+    {"overview_home.png", 1838, 0xb83c74b6},
+    {"scene_away.png", 671, 0x53a9beb0},
+    {"scene_fire.png", 2523, 0xebadac3d},
+    {"scene_home.png", 724, 0x10f4a231},
+    {"scene_lights.png", 786, 0x9d3c00d9},
+    {"scene_movie.png", 652, 0x9ab003ca},
+    {"scene_night.png", 831, 0x28d5a025},
+    {"scene_rain.png", 1485, 0x836c3bc8},
+    {"scene_sleep.png", 772, 0xa52d7812},
+    {"siyin_logo.png", 9857, 0xe6aeff9a},
+    {"weather_cloud.png", 1511, 0x6472981f},
+    {"weather_guangzhou.png", 1381, 0x205aa4b5},
+};
+
 esp_vfs_fat_sdmmc_mount_config_t MakeMountConfig()
 {
     return {
@@ -107,6 +136,133 @@ bool IsPngHeader(const uint8_t *data, size_t size)
 {
     static constexpr uint8_t kPngMagic[] = {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
     return data && size >= sizeof(kPngMagic) && memcmp(data, kPngMagic, sizeof(kPngMagic)) == 0;
+}
+
+uint32_t Crc32Update(uint32_t crc, const uint8_t *data, size_t size)
+{
+    while (size--) {
+        crc ^= *data++;
+        for (int bit = 0; bit < 8; bit++) {
+            crc = (crc >> 1) ^ (0xEDB88320U & (0U - (crc & 1U)));
+        }
+    }
+    return ~crc;
+}
+
+const LegacyAssetFingerprint *FindLegacyAsset(const char *name)
+{
+    for (const auto &asset : kLegacyDefaultAssets) {
+        if (strcmp(asset.name, name) == 0) {
+            return &asset;
+        }
+    }
+    return nullptr;
+}
+
+bool FileCrc32(const char *path, uint32_t *out_crc)
+{
+    if (out_crc == nullptr) {
+        return false;
+    }
+
+    FILE *f = fopen(path, "rb");
+    if (!f) {
+        return false;
+    }
+
+    uint8_t buf[512];
+    uint32_t crc = 0xFFFFFFFFU;
+    size_t n = 0;
+    while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
+        crc = Crc32Update(crc, buf, n);
+    }
+    const bool ok = ferror(f) == 0;
+    fclose(f);
+    if (!ok) {
+        return false;
+    }
+
+    *out_crc = ~crc;
+    return true;
+}
+
+bool IsLegacyDefaultAssetFile(const char *path, const char *name, size_t size)
+{
+    const auto *legacy = FindLegacyAsset(name);
+    if (legacy == nullptr || legacy->size != size) {
+        return false;
+    }
+
+    uint32_t crc = 0;
+    return FileCrc32(path, &crc) && crc == legacy->crc32;
+}
+
+bool UiAssetVersionCurrent()
+{
+    FILE *f = fopen(kUiAssetVersionPath, "rb");
+    if (!f) {
+        return false;
+    }
+
+    char buf[64] = {};
+    const size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+    fclose(f);
+    return n == strlen(kUiAssetVersion) && strcmp(buf, kUiAssetVersion) == 0;
+}
+
+void WriteUiAssetVersion()
+{
+    FILE *f = fopen(kUiAssetVersionPath, "wb");
+    if (!f) {
+        ESP_LOGW(TAG, "Failed to write UI asset version marker (errno=%d)", errno);
+        return;
+    }
+
+    const size_t size = strlen(kUiAssetVersion);
+    const size_t n = fwrite(kUiAssetVersion, 1, size, f);
+    const int close_ret = fclose(f);
+    if (n != size || close_ret != 0) {
+        ESP_LOGW(TAG, "Failed to persist UI asset version marker (%u/%u close=%d errno=%d)",
+                 (unsigned)n, (unsigned)size, close_ret, errno);
+    }
+}
+
+bool WriteEmbeddedAssetFile(const char *path, const EmbeddedAsset &asset)
+{
+    const size_t size = (size_t)(asset.end - asset.start);
+    char tmp_path[192];
+    snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", path);
+
+    for (int attempt = 1; attempt <= 3; attempt++) {
+        FILE *f = fopen(tmp_path, "wb");
+        if (!f) {
+            ESP_LOGW(TAG, "Failed to open temp UI asset %s (attempt=%d errno=%d)",
+                     tmp_path, attempt, errno);
+            vTaskDelay(pdMS_TO_TICKS(150));
+            continue;
+        }
+
+        const size_t n = fwrite(asset.start, 1, size, f);
+        const int flush_ret = fflush(f);
+        const int close_ret = fclose(f);
+        if (n == size && flush_ret == 0 && close_ret == 0) {
+            remove(path);
+            if (rename(tmp_path, path) == 0) {
+                vTaskDelay(pdMS_TO_TICKS(80));
+                return true;
+            }
+            ESP_LOGW(TAG, "Failed to replace UI asset %s (attempt=%d errno=%d)",
+                     path, attempt, errno);
+        } else {
+            ESP_LOGW(TAG, "Failed to write temp UI asset %s (%u/%u flush=%d close=%d attempt=%d errno=%d)",
+                     tmp_path, (unsigned)n, (unsigned)size, flush_ret, close_ret, attempt, errno);
+        }
+
+        remove(tmp_path);
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
+
+    return false;
 }
 }
 
@@ -167,7 +323,6 @@ esp_err_t EspP4TfCard::Mount()
     mounted_ = true;
     ESP_LOGI(TAG, "TF card mounted successfully at %s (SDMMC slot0, 1-bit)", kSdMountPoint);
     LogCardInfo();
-    EnsureUiAssets();
     VerifyAssetFolder();
     return ESP_OK;
 }
@@ -295,17 +450,30 @@ bool EspP4TfCard::EnsureUiAssets() const
         return false;
     }
 
+    const bool assets_current = UiAssetVersionCurrent();
     int written = 0;
+    int upgraded = 0;
     int preserved = 0;
+    int custom_preserved = 0;
+    bool all_writes_ok = true;
     for (const auto &asset : kDefaultUiAssets) {
         const size_t size = (size_t)(asset.end - asset.start);
         char path[160];
         snprintf(path, sizeof(path), "%s/%s", kUiAssetRoot, asset.name);
 
         bool should_write = true;
+        bool is_upgrade = false;
         if (stat(path, &st) == 0 && S_ISREG(st.st_mode) && st.st_size > 0) {
-            should_write = false;
-            preserved++;
+            if (!assets_current && IsLegacyDefaultAssetFile(path, asset.name, (size_t)st.st_size)) {
+                should_write = true;
+                is_upgrade = true;
+            } else {
+                should_write = false;
+                preserved++;
+                if (!assets_current) {
+                    custom_preserved++;
+                }
+            }
         }
         if (!should_write) {
             continue;
@@ -316,23 +484,26 @@ bool EspP4TfCard::EnsureUiAssets() const
             continue;
         }
 
-        FILE *f = fopen(path, "wb");
-        if (!f) {
-            ESP_LOGW(TAG, "Failed to create default UI asset %s (errno=%d)", path, errno);
+        if (!WriteEmbeddedAssetFile(path, asset)) {
+            ESP_LOGW(TAG, "Failed to persist default UI asset %s", asset.name);
+            all_writes_ok = false;
             continue;
         }
-        const size_t n = fwrite(asset.start, 1, size, f);
-        const int close_ret = fclose(f);
-        if (n != size || close_ret != 0) {
-            ESP_LOGW(TAG, "Failed to write complete UI asset %s (%u/%u, close=%d errno=%d)",
-                     asset.name, (unsigned)n, (unsigned)size, close_ret, errno);
-            continue;
+        if (is_upgrade) {
+            upgraded++;
+        } else {
+            written++;
         }
-        written++;
     }
 
-    ESP_LOGI(TAG, "UI asset bootstrap complete: written=%d preserved=%d total=%u",
-             written, preserved, (unsigned)(sizeof(kDefaultUiAssets) / sizeof(kDefaultUiAssets[0])));
+    if (all_writes_ok) {
+        WriteUiAssetVersion();
+    } else {
+        ESP_LOGW(TAG, "UI asset version marker not updated because one or more writes failed");
+    }
+    ESP_LOGI(TAG, "UI asset bootstrap complete: written=%d upgraded=%d preserved=%d custom=%d total=%u",
+             written, upgraded, preserved, custom_preserved,
+             (unsigned)(sizeof(kDefaultUiAssets) / sizeof(kDefaultUiAssets[0])));
     return true;
 }
 

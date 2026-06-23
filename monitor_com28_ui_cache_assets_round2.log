@@ -1,0 +1,594 @@
+ESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0x17 (CHIP_USB_UART_RESET),boot:0xc (SPI_FAST_FLASH_BOOT)
+Core0 Saved PC:0x4ff04de8
+Core1 Saved PC:0x4ff04de8
+SPI mode:DIO, clock div:2
+load:0x4ff33ce0,len:0x5a0
+load:0x4ff29ed0,len:0xd14
+load:0x4ff2cbd0,len:0x32e8
+entry 0x4ff29ed0
+I (46) hex_psram: vendor id    : 0x0d (AP)
+I (46) hex_psram: Latency      : 0x01 (Fixed)
+I (47) hex_psram: DriveStr.    : 0x00 (25 Ohm)
+I (47) hex_psram: dev id       : 0x03 (generation 4)
+I (51) hex_psram: density      : 0x07 (256 Mbit)
+I (56) hex_psram: good-die     : 0x06 (Pass)
+I (60) hex_psram: SRF          : 0x02 (Slow Refresh)
+I (64) hex_psram: BurstType    : 0x00 ( Wrap)
+I (68) hex_psram: BurstLen     : 0x03 (2048 Byte)
+I (73) hex_psram: BitMode      : 0x01 (X16 Mode)
+I (77) hex_psram: Readlatency  : 0x04 (14 cycles@Fixed)
+I (82) hex_psram: DriveStrength: 0x00 (1/1)
+I (86) MSPI Timing: Enter psram timing tuning
+I esp_psram: Found 32MB PSRAM device
+I esp_psram: Speed: 200MHz
+I (527) mmu_psram: .rodata xip on psram
+I (817) mmu_psram: .text xip on psram
+I (818) hex_psram: psram CS IO is dedicated
+I (818) cpu_start: Multicore app
+I (828) cpu_start: GPIO 38 and 37 are used as console UART I/O pins
+I (829) cpu_start: Pro cpu start user code
+I (829) cpu_start: cpu freq: 360000000 Hz
+I (830) app_init: Application information:
+I (834) app_init: Project name:     xiaozhi
+I (838) app_init: App version:      2.2.4
+I (842) app_init: Compile time:     Jun 23 2026 18:51:50
+I (847) app_init: ELF file SHA256:  88d8bcd1c...
+I (851) app_init: ESP-IDF:          v5.5.3-dirty
+I (855) efuse_init: Min chip rev:     v0.0
+I (859) efuse_init: Max chip rev:     v1.99 
+I (863) efuse_init: Chip rev:         v1.3
+I (867) heap_init: Initializing. RAM available for dynamic allocation:
+I (873) heap_init: At 4FF27370 len 00013C50 (79 KiB): RETENT_RAM
+I (879) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM
+I (884) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM
+I (889) heap_init: At 30100068 len 00001F98 (7 KiB): TCM
+I (894) esp_psram: Adding pool of 26368K of PSRAM memory to heap allocator
+I (901) esp_psram: Adding pool of 21K of PSRAM memory gap generated due to end address alignment of irom to the heap allocator
+I (912) esp_psram: Adding pool of 37K of PSRAM memory gap generated due to end address alignment of drom to the heap allocator
+I (923) spi_flash: detected chip: gd
+I (926) spi_flash: flash io: qio
+I (969) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (975) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (982) main_task: Started on CPU0
+I (985) esp_psram: Reserving pool of 64K of internal memory for DMA/internal allocations
+I (993) main_task: Calling app_main()
+I (1004) Board: UUID=bfba9048-2a61-4c2a-a7b0-1de80e6c0f4d SKU=esp-p4-function-ev-board
+I (1004) button: IoT Button Version: 4.1.6
+W (1008) i2c.master: Please check pull-up resistances whether be connected properly. Otherwise unexpected behavior would happen. For more detailed information, please read docs
+I (1023) ESP32_P4_EV: MIPI DSI PHY Powered on
+I (1028) ESP32_P4_EV: Install MIPI DSI LCD control panel
+I (1032) ESP32_P4_EV: Install EK79007 LCD control panel
+I (1037) ek79007: version: 1.0.4
+I (1205) ESP32_P4_EV: Display initialized
+I (1205) Display: Power management not supported
+I (1205) LcdDisplay: Initialize LVGL library
+I (1206) LcdDisplay: Initialize LVGL port
+I (1209) LVGL: Starting LVGL task
+I (1212) LcdDisplay: Adding LCD display
+I (1223) GT911: I2C address initialization procedure skipped - using default GT9xx setup
+I (1224) GT911: TouchPad_ID:0x39,0x31,0x31
+I (1228) GT911: TouchPad_Config_Version:89
+I (1231) ESP32P4FuncEV: Touch controller registered with LVGL
+I (1237) ESP32P4_TF: Initializing TF card
+I (1741) ESP32P4_TF: SD card power enabled: GPIO45(SD_PWRn)=0, LDO_VO4=3300mV
+I (1741) ESP32P4_TF: Mounting TF card via SDMMC slot 0, 1-bit, 400kHz: CLK=43 CMD=44 D0=39
+I (1744) sdmmc_periph: sdmmc_host_init: SDMMC host already initialized, skipping init flow
+I (1875) ESP32P4_TF: TF card mounted successfully at /sdcard (SDMMC slot0, 1-bit)
+I (1875) ESP32P4_TF: TF card: name=SD speed=0.40MHz size=7624MiB sector=512 capacity=15613952 bus_width=1
+W (2587) ESP32P4_TF: Failed to replace UI asset /sdcard/xiaozhi_ui/floor_1.png (attempt=1 errno=2)
+W (3232) ESP32P4_TF: Failed to replace UI asset /sdcard/xiaozhi_ui/floor_1.png (attempt=2 errno=2)
+W (3885) ESP32P4_TF: Failed to replace UI asset /sdcard/xiaozhi_ui/floor_1.png (attempt=3 errno=2)
+W (4109) ESP32P4_TF: Failed to persist default UI asset floor_1.png
+W (4763) ESP32P4_TF: Failed to replace UI asset /sdcard/xiaozhi_ui/scene_away.png (attempt=1 errno=2)
+W (5357) ESP32P4_TF: Failed to replace UI asset /sdcard/xiaozhi_ui/scene_away.png (attempt=2 errno=2)
+W (5918) ESP32P4_TF: Failed to replace UI asset /sdcard/xiaozhi_ui/scene_away.png (attempt=3 errno=2)
+W (6145) ESP32P4_TF: Failed to persist default UI asset scene_away.png
+W (6695) ESP32P4_TF: Failed to replace UI asset /sdcard/xiaozhi_ui/scene_fire.png (attempt=1 errno=2)
+W (7405) ESP32P4_TF: Failed to replace UI asset /sdcard/xiaozhi_ui/scene_fire.png (attempt=2 errno=2)
+W (8099) ESP32P4_TF: Failed to replace UI asset /sdcard/xiaozhi_ui/scene_fire.png (attempt=3 errno=2)
+W (8323) ESP32P4_TF: Failed to persist default UI asset scene_fire.png
+W (8655) ESP32P4_TF: Failed to replace UI asset /sdcard/xiaozhi_ui/scene_home.png (attempt=1 errno=2)
+W (9200) ESP32P4_TF: Failed to replace UI asset /sdcard/xiaozhi_ui/scene_home.png (attempt=2 errno=2)
+W (9782) ESP32P4_TF: Failed to replace UI asset /sdcard/xiaozhi_ui/scene_home.png (attempt=3 errno=2)
+W (10027) ESP32P4_TF: Failed to persist default UI asset scene_home.png
+W (10512) ESP32P4_TF: Failed to replace UI asset /sdcard/xiaozhi_ui/scene_lights.png (attempt=1 errno=2)
+E (10632) sdmmc_cmd: sdmmc_read_sectors_dma: sdmmc_send_cmd returned 0x107, status 0xb00
+E (10632) diskio_sdmmc: sdmmc_read_blocks failed (0x107)
+E (10844) sdmmc_cmd: sdmmc_read_sectors_dma: sdmmc_send_cmd returned 0x107, status 0x400900
+E (10845) diskio_sdmmc: sdmmc_read_blocks failed (0x107)
+W (10846) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_lights.png.tmp (attempt=2 errno=5)
+W (11017) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_lights.png.tmp (attempt=3 errno=2)
+W (11168) ESP32P4_TF: Failed to persist default UI asset scene_lights.png
+W (11168) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_movie.png.tmp (attempt=1 errno=2)
+W (11323) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_movie.png.tmp (attempt=2 errno=2)
+W (11473) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_movie.png.tmp (attempt=3 errno=2)
+W (11623) ESP32P4_TF: Failed to persist default UI asset scene_movie.png
+W (11623) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_night.png.tmp (attempt=1 errno=2)
+W (11778) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_night.png.tmp (attempt=2 errno=2)
+W (11928) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_night.png.tmp (attempt=3 errno=2)
+W (12078) ESP32P4_TF: Failed to persist default UI asset scene_night.png
+W (12078) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_rain.png.tmp (attempt=1 errno=2)
+W (12233) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_rain.png.tmp (attempt=2 errno=2)
+W (12383) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_rain.png.tmp (attempt=3 errno=2)
+W (12533) ESP32P4_TF: Failed to persist default UI asset scene_rain.png
+W (12533) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_sleep.png.tmp (attempt=1 errno=2)
+W (12688) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_sleep.png.tmp (attempt=2 errno=2)
+W (12838) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_sleep.png.tmp (attempt=3 errno=2)
+W (12988) ESP32P4_TF: Failed to persist default UI asset scene_sleep.png
+W (12988) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/siyin_logo.png.tmp (attempt=1 errno=2)
+W (13143) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/siyin_logo.png.tmp (attempt=2 errno=2)
+W (13293) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/siyin_logo.png.tmp (attempt=3 errno=2)
+W (13443) ESP32P4_TF: Failed to persist default UI asset siyin_logo.png
+W (13443) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/weather_cloud.png.tmp (attempt=1 errno=2)
+W (13598) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/weather_cloud.png.tmp (attempt=2 errno=2)
+W (13748) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/weather_cloud.png.tmp (attempt=3 errno=2)
+W (13898) ESP32P4_TF: Failed to persist default UI asset weather_cloud.png
+W (13898) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/weather_guangzhou.png.tmp (attempt=1 errno=2)
+W (14053) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/weather_guangzhou.png.tmp (attempt=2 errno=2)
+W (14203) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/weather_guangzhou.png.tmp (attempt=3 errno=2)
+W (14353) ESP32P4_TF: Failed to persist default UI asset weather_guangzhou.png
+W (14353) ESP32P4_TF: UI asset version marker not updated because one or more writes failed
+I (14357) ESP32P4_TF: UI asset bootstrap complete: written=0 upgraded=0 preserved=6 custom=6 total=18
+W (14366) ESP32P4_TF: TF card mounted, but UI asset folder is missing: /sdcard/xiaozhi_ui (errno=2)
+W (14374) ESP32P4_TF: Expected TF layout: /sdcard/xiaozhi_ui/*.png
+I (14380) ESP32P4_TF: TF card root listing:
+I (14384) ESP32P4_TF:   /sdcard/N�@
+I (14387) ESP32P4_TF:   /sdcard/�D
+	��
+I (14391) ESP32P4_TF:   /sdcard/�d
+	��
+I (14394) ESP32P4_TF:   /sdcard/��������.��
+I (14398) ESP32P4_TF:   /sdcard/�����.n@
+I (14402) ESP32P4_TF:   /sdcard/O�*	��
+I (14406) ESP32P4_TF:   /sdcard/��
+I (14409) ESP32P4_TF:   /sdcard/�@��.�
+I (14413) ESP32P4_TF:   /sdcard//�*	��
+E (14417) UI_ASSET: TF asset preload skipped: missing /sdcard/xiaozhi_ui (errno=2)
+I (14424) ESP32P4FuncEV: Initializing camera (MIPI-CSI)
+I (14429) sc2336: Detected Camera sensor PID=0xcb3a
+W (14460) ISP_AWB: Subwindow feature is not supported on REV < 3.0, subwindow will not be configured
+I (14461) ESP32P4FuncEV: MIPI-CSI camera initialized successfully
+I (14464) ESP32P4FuncEV: Initializing font support
+I (14468) ESP32P4FuncEV: Custom font loaded successfully: line_height=25
+W (14475) ledc: GPIO 26 is not usable, maybe conflict with others
+I (14480) Backlight: Set brightness to 75
+I (14484) StateMachine: State: unknown -> starting
+I (14535) Es8311AudioCodec: Duplex channels created
+I (14540) ES8311: Work in Slave mode
+I (14543) Es8311AudioCodec: Es8311AudioCodec initialized
+I (14543) AudioCodec: Audio codec started
+I (14545) MCP: Add tool: self.get_device_status
+I (14545) MCP: Add tool: self.audio_speaker.set_volume
+I (14550) MCP: Add tool: self.screen.set_brightness
+I (14554) MCP: Add tool: self.screen.set_theme
+I (14559) MCP: Add tool: self.camera.take_photo
+I (14563) MCP: Add tool: self.get_system_info [user]
+I (14568) MCP: Add tool: self.reboot [user]
+I (14571) MCP: Add tool: self.upgrade_firmware [user]
+I (14576) MCP: Add tool: self.screen.get_info [user]
+I (14581) MCP: Add tool: self.screen.snapshot [user]
+I (14586) MCP: Add tool: self.screen.preview_image [user]
+I (14591) Assets: The storage free size is 65536 KB
+I (14595) Assets: The partition size is 3072 KB
+I (14714) Assets: The checksum calculation time is 114 ms
+I (14715) MCP: Add tool: self.assets.set_download_url [user]
+I (14715) MCP: Add tool: self.iot.get_status
+I (14718) MCP: Add tool: self.iot.get_sensors
+I (14722) MCP: Add tool: self.iot.discover
+I (14726) MCP: Add tool: self.iot.set_gpio
+I (14730) MCP: Add tool: self.iot.set_light
+I (14734) MCP: Add tool: self.iot.set_rgb_light
+I (14738) MCP: Add tool: self.iot.set_scene
+I (14742) MCP: Add tool: self.iot.set_relay
+I (14746) MCP: Add tool: self.iot.set_servo_by_index
+I (14750) MCP: Add tool: self.iot.all_off
+I (14754) MCP: Add tool: self.iot.all_on
+I (14758) MCP: Add tool: self.iot.all_lights_off
+I (14762) MCP: Add tool: self.iot.all_lights_on
+I (14766) MCP: Add tool: self.face.list
+I (14770) MCP: Add tool: self.face.delete
+I (14774) MCP: Add tool: self.face.clear_all
+I (14778) MCP: Add tool: self.face.recognize
+I (14782) MCP: Add tool: self.face.capture
+I (14785) MCP: Add tool: self.face.register
+I (14789) FaceMcp: Face MCP tools registered
+I (14793) LOGIN_UI: Login UI initialized
+I (14797) StateMachine: State: starting -> locked
+I (14797) Application: Face recognition task started
+I (14809) LOGIN_UI: Login UI shown
+I (14810) Application: Login flow initialized, device locked
+I (14815) DEV_MODEL: Model initialized: 11 devices
+I (14819) EVT_CENTER: Event center initialized
+I (14824) AUTO_MODE: Auto mode initialized, global=1
+I (14828) RULE: Rule engine initialized
+I (14831) SH_MQTT: Smart-home MQTT initialized
+I (14836) SmartHomeTasks: Smart home task layer started
+I (14890) Application: Network start task started
+I (14890) WifiManager: Initializing...
+I (14891) transport: Attempt connection with slave: retry[0]
+I (14892) transport: Reset slave using GPIO[54]
+I (14896) os_wrapper_esp: GPIO [54] configured
+I (14901) Application: Device locked, waiting for login
+W (16198) FbsLoader: CONFIG_SPIRAM_RODATA or CONFIG_SPIRAM_XIP_FROM_PSRAM option is on, fbs model is copied to PSRAM.
+W (16246) dl::Model: Minimize() will delete variables not used in model inference, which will make it impossible to test or debug the model.
+W (16250) FbsLoader: CONFIG_SPIRAM_RODATA or CONFIG_SPIRAM_XIP_FROM_PSRAM option is on, fbs model is copied to PSRAM.
+W (16277) dl::Model: Minimize() will delete variables not used in model inference, which will make it impossible to test or debug the model.
+W (16280) FbsLoader: There is only one model in the flatbuffers, ignore the input model name!
+W (16287) FbsLoader: CONFIG_SPIRAM_RODATA or CONFIG_SPIRAM_XIP_FROM_PSRAM option is on, fbs model is copied to PSRAM.
+W (16412) dl::Model: Minimize() will delete variables not used in model inference, which will make it impossible to test or debug the model.
+E (16527) sdmmc_cmd: sdmmc_read_sectors_dma: sdmmc_send_cmd returned 0x107, status 0xb00
+E (16528) diskio_sdmmc: sdmmc_read_blocks failed (0x107)
+E (16530) sdmmc_cmd: sdmmc_read_sectors_dma: sdmmc_send_cmd returned 0x107, status 0x400b00
+E (16537) diskio_sdmmc: sdmmc_read_blocks failed (0x107)
+E (16542) dl::recognition::DataBase: Failed to open db.
+I (16547) FaceRecog: Face recognition initialized (detector + recognizer)
+I (16554) Application: Face DB contains 18454 enrolled face(s)
+I (16582) sdio_wrapper: SDIO master: Slot 1, Data-Lines: 4-bit Freq(KHz)[40000 KHz]
+I (16582) sdio_wrapper: GPIOs: CLK[18] CMD[19] D0[14] D1[15] D2[16] D3[17] Slave_Reset[54]
+I (16582) H_SDIO_DRV: Starting SDIO process rx task
+I (16586) sdio_wrapper: Queues: Tx[20] Rx[20] SDIO-Rx-Mode[1]
+Name: 
+Type: SDIO
+Speed: 40.00 MHz (limit: 40.00 MHz)
+Size: luMB
+CSD: ver=1, sector_size=0, capacity=0 read_bl_len=0
+SCR: sd_spec=0, bus_width=0
+E (16632) sdio_wrapper: failed to get CIS data.
+W (16636) sdio_wrapper: failed to print card info
+I (16641) sdio_wrapper: Function 0 Blocksize: 512
+I (16645) sdio_wrapper: Function 1 Blocksize: 512
+I (16649) H_SDIO_DRV: SDIO Host operating in STREAMING MODE
+I (16655) H_SDIO_DRV: generate slave intr
+E (17668) sdmmc_req: sdmmc_host_wait_for_event returned 0x107
+
+assert failed: sdio_rx_get_buffer sdio_drv.c:676 (*buf)
+Core  0 register dump:
+MEPC    : 0x4ff0bc70  RA      : 0x4ff0b810  SP      : 0x4ff2c990  GP      : 0x4ff18780  
+TP      : 0x4ff2cb50  T0      : 0x37363534  T1      : 0x7271706f  T2      : 0x33323130  
+S0/FP   : 0x00000001  S1      : 0x00000090  A0      : 0x4ff2c9d8  A1      : 0x4ff1d7e9  
+A2      : 0x00000001  A3      : 0x4ff27000  A4      : 0x00000001  A5      : 0x4ff27000  
+A6      : 0x0000000c  A7      : 0x76757473  S2      : 0x4ff2c9d8  S3      : 0x4ff2c9d7  
+S4      : 0x4ff1d7e8  S5      : 0x4ff2c9d8  S6      : 0x48393000  S7      : 0x4ff27000  
+S8      : 0x000fffff  S9      : 0x4ff27000  S10     : 0x00000000  S11     : 0x000cce00  
+T3      : 0x6e6d6c6b  T4      : 0x6a696867  T5      : 0x66656463  T6      : 0x62613938  
+MSTATUS : 0x00011880  MTVEC   : 0x4ff00003  MCAUSE  : 0x00000002  MTVAL   : 0x00000000  
+MHARTID : 0x00000000  
+
+Stack memory:
+4ff2c990: 0x4ff2ca14 0x00000000 0x483932ec 0x4ff15684 0x00363736 0x4ff2cc40 0x00000000 0x00000000
+4ff2c9b0: 0x4f000000 0x4ff1e2ac 0x483932ec 0x4ff1e290 0x4834cf60 0x4ff1e2bc 0x4ff2c9a0 0x4ff1e2c0
+4ff2c9d0: 0x4834d2d0 0x4ff1d7e8 0x65737361 0x66207472 0x656c6961 0x73203a64 0x5f6f6964 0x675f7872
+4ff2c9f0: 0x625f7465 0x65666675 0x64732072 0x645f6f69 0x632e7672 0x3637363a 0x622a2820 0x00296675
+4ff2ca10: 0x00000000 0x00000035 0x9401a804 0x00001000 0x00000000 0x00000000 0x00000000 0x4ff27000
+4ff2ca30: 0x48393000 0x00000002 0x00000008 0x4ff3b2b8 0x000cce00 0x00000040 0x4ff40700 0x4ff1395a
+4ff2ca50: 0x84000000 0x00000001 0x4ff2a0a0 0x00000000 0x000000d4 0x4ff27000 0x4ff208f0 0x00000004
+4ff2ca70: 0x00000003 0x4ff27000 0x4ff3b2a4 0x4ff00ca2 0x48393000 0x0000080c 0x000cce00 0x00000040
+4ff2ca90: 0x00000004 0x4ff27000 0x4ff208f0 0x4ff27000 0x48393000 0x4ff27000 0x4ff208f0 0x4ff27000
+4ff2cab0: 0x4ff27000 0x000ccccc 0x00000000 0x480186fa 0x4ff2cb50 0x00000000 0x00000000 0x00000000
+4ff2cad0: 0x00000000 0x00000000 0x01000000 0x00000000 0x00000000 0x00000000 0x00000000 0xcccccccc
+4ff2caf0: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff2cb10: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff2cb30: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5
+4ff2cb50: 0x30100000 0x00000068 0x50115737 0x15c72683 0x01000637 0x501117b7 0x2e238ed1 0x43b814d7
+4ff2cb70: 0x100006b7 0xc3b88f55 0x05378082 0x05133010 0x80820305 0x00000000 0x30100064 0x30100038
+4ff2cb90: 0x000401c2 0x009a0000 0x010100fa 0x00020002 0x009601c2 0x0104007c 0x001a0002 0xa5a5a5a5
+4ff2cbb0: 0x00000001 0x4ff2b7d4 0x4ff2b858 0x4ff2b7d4 0x00000000 0x00000000 0xa5a5a5a5 0xa5a5a5a5
+4ff2cbd0: 0xa5a5a5a5 0x00000160 0x4ff2c780 0x0000412e 0x4ff1fad4 0x4ff1fad4 0x4ff2cbd8 0x4ff1facc
+4ff2cbf0: 0x00000002 0x4ff29e84 0x4ff29e84 0x4ff2cbd8 0x00000000 0x00000017 0x4ff2b858 0x6f696473
+4ff2cc10: 0x6165725f 0x00000064 0x00000000 0x00000000 0x4ff2cbd0 0x00000004 0x00000000 0x00000017
+4ff2cc30: 0x00000001 0x00000000 0x00000000 0x00009d21 0x00000000 0x4ff279fc 0x4ff27a64 0x4ff27acc
+4ff2cc50: 0x00000000 0x00000000 0x00000001 0x00000000 0x00000000 0x4ff9ff8c 0x48006b0a 0x00000000
+4ff2cc70: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff2cc90: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff2ccb0: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff2ccd0: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff2ccf0: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff2cd10: 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000 0x00000000
+4ff2cd30: 0x00000000 0x00000000 0x0000000c 0x4ff2e150 0x4ff27384 0x4ff2cd34 0x00001400 0xa5a5a5a5
+4ff2cd50: 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5
+4ff2cd70: 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5 0xa5a5a5a5
+
+
+
+ELF file SHA256: 88d8bcd1c
+
+Rebooting...
+ESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0xc (SW_CPU_RESET),boot:0xc (SPI_FAST_FLASH_BOOT)
+Core0 Saved PC:0x4ff0bd6a
+Core1 Saved PC:0x4ff04de8
+SPI mode:DIO, clock div:2
+load:0x4ff33ce0,len:0x5a0
+load:0x4ff29ed0,len:0xd14
+load:0x4ff2cbd0,len:0x32e8
+entry 0x4ff29ed0
+I (46) hex_psram: vendor id    : 0x0d (AP)
+I (46) hex_psram: Latency      : 0x01 (Fixed)
+I (47) hex_psram: DriveStr.    : 0x00 (25 Ohm)
+I (47) hex_psram: dev id       : 0x03 (generation 4)
+I (52) hex_psram: density      : 0x07 (256 Mbit)
+I (56) hex_psram: good-die     : 0x06 (Pass)
+I (60) hex_psram: SRF          : 0x02 (Slow Refresh)
+I (65) hex_psram: BurstType    : 0x00 ( Wrap)
+I (69) hex_psram: BurstLen     : 0x03 (2048 Byte)
+I (73) hex_psram: BitMode      : 0x01 (X16 Mode)
+I (77) hex_psram: Readlatency  : 0x04 (14 cycles@Fixed)
+I (82) hex_psram: DriveStrength: 0x00 (1/1)
+I (86) MSPI Timing: Enter psram timing tuning
+I esp_psram: Found 32MB PSRAM device
+I esp_psram: Speed: 200MHz
+I (527) mmu_psram: .rodata xip on psram
+I (817) mmu_psram: .text xip on psram
+I (818) hex_psram: psram CS IO is dedicated
+I (818) cpu_start: Multicore app
+I (828) cpu_start: GPIO 38 and 37 are used as console UART I/O pins
+I (828) cpu_start: Pro cpu start user code
+I (828) cpu_start: cpu freq: 360000000 Hz
+I (830) app_init: Application information:
+I (834) app_init: Project name:     xiaozhi
+I (838) app_init: App version:      2.2.4
+I (841) app_init: Compile time:     Jun 23 2026 18:51:50
+I (846) app_init: ELF file SHA256:  88d8bcd1c...
+I (851) app_init: ESP-IDF:          v5.5.3-dirty
+I (855) efuse_init: Min chip rev:     v0.0
+I (859) efuse_init: Max chip rev:     v1.99 
+I (863) efuse_init: Chip rev:         v1.3
+I (867) heap_init: Initializing. RAM available for dynamic allocation:
+I (873) heap_init: At 4FF27370 len 00013C50 (79 KiB): RETENT_RAM
+I (879) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM
+I (884) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM
+I (889) heap_init: At 30100068 len 00001F98 (7 KiB): TCM
+I (894) esp_psram: Adding pool of 26368K of PSRAM memory to heap allocator
+I (901) esp_psram: Adding pool of 21K of PSRAM memory gap generated due to end address alignment of irom to the heap allocator
+I (912) esp_psram: Adding pool of 37K of PSRAM memory gap generated due to end address alignment of drom to the heap allocator
+I (923) spi_flash: detected chip: gd
+I (926) spi_flash: flash io: qio
+I (969) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (975) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (982) main_task: Started on CPU0
+I (985) esp_psram: Reserving pool of 64K of internal memory for DMA/internal allocations
+I (993) main_task: Calling app_main()
+I (1004) Board: UUID=bfba9048-2a61-4c2a-a7b0-1de80e6c0f4d SKU=esp-p4-function-ev-board
+I (1004) button: IoT Button Version: 4.1.6
+W (1008) i2c.master: Please check pull-up resistances whether be connected properly. Otherwise unexpected behavior would happen. For more detailed information, please read docs
+I (1023) ESP32_P4_EV: MIPI DSI PHY Powered on
+I (1028) ESP32_P4_EV: Install MIPI DSI LCD control panel
+I (1032) ESP32_P4_EV: Install EK79007 LCD control panel
+I (1037) ek79007: version: 1.0.4
+I (1204) ESP32_P4_EV: Display initialized
+I (1204) Display: Power management not supported
+I (1204) LcdDisplay: Initialize LVGL library
+I (1205) LcdDisplay: Initialize LVGL port
+I (1208) LVGL: Starting LVGL task
+I (1211) LcdDisplay: Adding LCD display
+I (1222) GT911: I2C address initialization procedure skipped - using default GT9xx setup
+I (1223) GT911: TouchPad_ID:0x39,0x31,0x31
+I (1227) GT911: TouchPad_Config_Version:89
+I (1230) ESP32P4FuncEV: Touch controller registered with LVGL
+I (1236) ESP32P4_TF: Initializing TF card
+I (1740) ESP32P4_TF: SD card power enabled: GPIO45(SD_PWRn)=0, LDO_VO4=3300mV
+I (1740) ESP32P4_TF: Mounting TF card via SDMMC slot 0, 1-bit, 400kHz: CLK=43 CMD=44 D0=39
+I (1743) sdmmc_periph: sdmmc_host_init: SDMMC host already initialized, skipping init flow
+I (1869) ESP32P4_TF: TF card mounted successfully at /sdcard (SDMMC slot0, 1-bit)
+I (1869) ESP32P4_TF: TF card: name=SD speed=0.40MHz size=7624MiB sector=512 capacity=15613952 bus_width=1
+W (2629) ESP32P4_TF: Failed to replace UI asset /sdcard/xiaozhi_ui/floor_1.png (attempt=1 errno=2)
+W (3300) ESP32P4_TF: Failed to replace UI asset /sdcard/xiaozhi_ui/floor_1.png (attempt=2 errno=2)
+W (4053) ESP32P4_TF: Failed to replace UI asset /sdcard/xiaozhi_ui/floor_1.png (attempt=3 errno=2)
+W (4277) ESP32P4_TF: Failed to persist default UI asset floor_1.png
+W (4772) ESP32P4_TF: Failed to replace UI asset /sdcard/xiaozhi_ui/scene_away.png (attempt=1 errno=2)
+W (5448) ESP32P4_TF: Failed to replace UI asset /sdcard/xiaozhi_ui/scene_away.png (attempt=2 errno=2)
+E (5890) sdmmc_cmd: sdmmc_read_sectors_dma: sdmmc_send_cmd returned 0x107, status 0xb00
+E (5890) diskio_sdmmc: sdmmc_read_blocks failed (0x107)
+W (5891) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_away.png.tmp (attempt=3 errno=5)
+W (6051) ESP32P4_TF: Failed to persist default UI asset scene_away.png
+E (6061) sdmmc_cmd: sdmmc_read_sectors_dma: sdmmc_send_cmd returned 0x107, status 0x400900
+E (6062) diskio_sdmmc: sdmmc_read_blocks failed (0x107)
+W (6075) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_fire.png.tmp (attempt=1 errno=2)
+W (6226) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_fire.png.tmp (attempt=2 errno=2)
+W (6376) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_fire.png.tmp (attempt=3 errno=2)
+W (6526) ESP32P4_TF: Failed to persist default UI asset scene_fire.png
+W (6526) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_home.png.tmp (attempt=1 errno=2)
+W (6680) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_home.png.tmp (attempt=2 errno=2)
+W (6830) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_home.png.tmp (attempt=3 errno=2)
+W (6980) ESP32P4_TF: Failed to persist default UI asset scene_home.png
+W (6980) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_lights.png.tmp (attempt=1 errno=2)
+W (7134) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_lights.png.tmp (attempt=2 errno=2)
+W (7284) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_lights.png.tmp (attempt=3 errno=2)
+W (7434) ESP32P4_TF: Failed to persist default UI asset scene_lights.png
+W (7434) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_movie.png.tmp (attempt=1 errno=2)
+W (7589) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_movie.png.tmp (attempt=2 errno=2)
+W (7739) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_movie.png.tmp (attempt=3 errno=2)
+W (7889) ESP32P4_TF: Failed to persist default UI asset scene_movie.png
+W (7889) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_night.png.tmp (attempt=1 errno=2)
+W (8044) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_night.png.tmp (attempt=2 errno=2)
+W (8194) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_night.png.tmp (attempt=3 errno=2)
+W (8344) ESP32P4_TF: Failed to persist default UI asset scene_night.png
+W (8344) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_rain.png.tmp (attempt=1 errno=2)
+W (8498) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_rain.png.tmp (attempt=2 errno=2)
+W (8648) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_rain.png.tmp (attempt=3 errno=2)
+W (8798) ESP32P4_TF: Failed to persist default UI asset scene_rain.png
+W (8798) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_sleep.png.tmp (attempt=1 errno=2)
+W (8952) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_sleep.png.tmp (attempt=2 errno=2)
+W (9102) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/scene_sleep.png.tmp (attempt=3 errno=2)
+W (9252) ESP32P4_TF: Failed to persist default UI asset scene_sleep.png
+W (9252) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/siyin_logo.png.tmp (attempt=1 errno=2)
+W (9406) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/siyin_logo.png.tmp (attempt=2 errno=2)
+W (9556) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/siyin_logo.png.tmp (attempt=3 errno=2)
+W (9706) ESP32P4_TF: Failed to persist default UI asset siyin_logo.png
+W (9706) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/weather_cloud.png.tmp (attempt=1 errno=2)
+W (9861) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/weather_cloud.png.tmp (attempt=2 errno=2)
+W (10011) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/weather_cloud.png.tmp (attempt=3 errno=2)
+W (10161) ESP32P4_TF: Failed to persist default UI asset weather_cloud.png
+W (10161) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/weather_guangzhou.png.tmp (attempt=1 errno=2)
+W (10316) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/weather_guangzhou.png.tmp (attempt=2 errno=2)
+W (10466) ESP32P4_TF: Failed to open temp UI asset /sdcard/xiaozhi_ui/weather_guangzhou.png.tmp (attempt=3 errno=2)
+W (10616) ESP32P4_TF: Failed to persist default UI asset weather_guangzhou.png
+W (10616) ESP32P4_TF: UI asset version marker not updated because one or more writes failed
+I (10620) ESP32P4_TF: UI asset bootstrap complete: written=0 upgraded=0 preserved=6 custom=6 total=18
+W (10629) ESP32P4_TF: TF card mounted, but UI asset folder is missing: /sdcard/xiaozhi_ui (errno=2)
+W (10638) ESP32P4_TF: Expected TF layout: /sdcard/xiaozhi_ui/*.png
+I (10643) ESP32P4_TF: TF card root listing:
+I (10647) ESP32P4_TF:   /sdcard/�b���@
+E (10651) UI_ASSET: TF asset preload skipped: missing /sdcard/xiaozhi_ui (errno=2)
+I (10658) ESP32P4FuncEV: Initializing camera (MIPI-CSI)
+I (10663) sc2336: Detected Camera sensor PID=0xcb3a
+W (10694) ISP_AWB: Subwindow feature is not supported on REV < 3.0, subwindow will not be configured
+I (10695) ESP32P4FuncEV: MIPI-CSI camera initialized successfully
+I (10698) ESP32P4FuncEV: Initializing font support
+I (10702) ESP32P4FuncEV: Custom font loaded successfully: line_height=25
+W (10709) ledc: GPIO 26 is not usable, maybe conflict with others
+I (10715) Backlight: Set brightness to 75
+I (10718) StateMachine: State: unknown -> starting
+I (10769) Es8311AudioCodec: Duplex channels created
+I (10774) ES8311: Work in Slave mode
+I (10777) Es8311AudioCodec: Es8311AudioCodec initialized
+I (10778) AudioCodec: Audio codec started
+I (10779) MCP: Add tool: self.get_device_status
+I (10780) MCP: Add tool: self.audio_speaker.set_volume
+I (10785) MCP: Add tool: self.screen.set_brightness
+I (10789) MCP: Add tool: self.screen.set_theme
+I (10793) MCP: Add tool: self.camera.take_photo
+I (10798) MCP: Add tool: self.get_system_info [user]
+I (10802) MCP: Add tool: self.reboot [user]
+I (10806) MCP: Add tool: self.upgrade_firmware [user]
+I (10811) MCP: Add tool: self.screen.get_info [user]
+I (10816) MCP: Add tool: self.screen.snapshot [user]
+I (10820) MCP: Add tool: self.screen.preview_image [user]
+I (10825) Assets: The storage free size is 65536 KB
+I (10830) Assets: The partition size is 3072 KB
+I (10949) Assets: The checksum calculation time is 115 ms
+I (10950) MCP: Add tool: self.assets.set_download_url [user]
+I (10950) MCP: Add tool: self.iot.get_status
+I (10953) MCP: Add tool: self.iot.get_sensors
+I (10957) MCP: Add tool: self.iot.discover
+I (10961) MCP: Add tool: self.iot.set_gpio
+I (10965) MCP: Add tool: self.iot.set_light
+I (10969) MCP: Add tool: self.iot.set_rgb_light
+I (10973) MCP: Add tool: self.iot.set_scene
+I (10977) MCP: Add tool: self.iot.set_relay
+I (10981) MCP: Add tool: self.iot.set_servo_by_index
+I (10985) MCP: Add tool: self.iot.all_off
+I (10989) MCP: Add tool: self.iot.all_on
+I (10993) MCP: Add tool: self.iot.all_lights_off
+I (10997) MCP: Add tool: self.iot.all_lights_on
+I (11002) MCP: Add tool: self.face.list
+I (11005) MCP: Add tool: self.face.delete
+I (11009) MCP: Add tool: self.face.clear_all
+I (11013) MCP: Add tool: self.face.recognize
+I (11017) MCP: Add tool: self.face.capture
+I (11020) MCP: Add tool: self.face.register
+I (11024) FaceMcp: Face MCP tools registered
+I (11028) LOGIN_UI: Login UI initialized
+I (11032) Application: Face recognition task started
+I (11032) StateMachine: State: starting -> locked
+I (11049) LOGIN_UI: Login UI shown
+I (11049) Application: Login flow initialized, device locked
+I (11050) DEV_MODEL: Model initialized: 11 devices
+I (11054) EVT_CENTER: Event center initialized
+I (11059) AUTO_MODE: Auto mode initialized, global=1
+I (11063) RULE: Rule engine initialized
+I (11066) SH_MQTT: Smart-home MQTT initialized
+I (11071) SmartHomeTasks: Smart home task layer started
+I (11127) Application: Network start task started
+I (11127) WifiManager: Initializing...
+I (11128) transport: Attempt connection with slave: retry[0]
+I (11129) Application: Device locked, waiting for login
+I (11129) transport: Reset slave using GPIO[54]
+I (11138) os_wrapper_esp: GPIO [54] configured
+W (12437) FbsLoader: CONFIG_SPIRAM_RODATA or CONFIG_SPIRAM_XIP_FROM_PSRAM option is on, fbs model is copied to PSRAM.
+W (12486) dl::Model: Minimize() will delete variables not used in model inference, which will make it impossible to test or debug the model.
+W (12489) FbsLoader: CONFIG_SPIRAM_RODATA or CONFIG_SPIRAM_XIP_FROM_PSRAM option is on, fbs model is copied to PSRAM.
+W (12516) dl::Model: Minimize() will delete variables not used in model inference, which will make it impossible to test or debug the model.
+W (12519) FbsLoader: There is only one model in the flatbuffers, ignore the input model name!
+W (12526) FbsLoader: CONFIG_SPIRAM_RODATA or CONFIG_SPIRAM_XIP_FROM_PSRAM option is on, fbs model is copied to PSRAM.
+W (12651) dl::Model: Minimize() will delete variables not used in model inference, which will make it impossible to test or debug the model.
+I (12761) FaceRecog: Face recognition initialized (detector + recognizer)
+I (12762) Application: Face DB contains 1 enrolled face(s)
+I (12782) H_SDIO_DRV: Starting SDIO process rx task
+I (12782) sdio_wrapper: SDIO master: Slot 1, Data-Lines: 4-bit Freq(KHz)[40000 KHz]
+I (12783) sdio_wrapper: GPIOs: CLK[18] CMD[19] D0[14] D1[15] D2[16] D3[17] Slave_Reset[54]
+I (12791) sdio_wrapper: Queues: Tx[20] Rx[20] SDIO-Rx-Mode[1]
+Name: 
+Type: SDIO
+Speed: 40.00 MHz (limit: 40.00 MHz)
+Size: luMB
+CSD: ver=1, sector_size=0, capacity=0 read_bl_len=0
+SCR: sd_spec=0, bus_width=0
+TUPLE: DEVICE, size: 3: D9 01 FF 
+TUPLE: MANFID, size: 4
+  MANF: 0092, CARD: 6666
+TUPLE: FUNCID, size: 2: 0C 00 
+TUPLE: FUNCE, size: 4: 00 00 02 32 
+TUPLE: CONFIG, size: 5: 01 01 00 02 07 
+TUPLE: CFTABLE_ENTRY, size: 8
+  INDX: C1, Intface: 1, Default: 1, Conf-Entry-Num: 1
+  IF: 41
+  FS: 30, misc: 0, mem_space: 1, irq: 1, io_space: 0, timing: 0, power: 0
+  IR: 30, mask: 1,   IRQ: FF FF
+  LEN: FFFF
+TUPLE: END
+I (12869) sdio_wrapper: Function 0 Blocksize: 512
+I (12873) sdio_wrapper: Function 1 Blocksize: 512
+I (12877) H_SDIO_DRV: SDIO Host operating in STREAMING MODE
+I (12883) H_SDIO_DRV: generate slave intr
+I (12890) transport: Received INIT event from ESP32 peripheral
+I (12892) transport: EVENT: 12
+I (12895) transport: EVENT: 11
+I (12898) transport: capabilities: 0xd
+I (12901) transport: Features supported are:
+I (12905) transport: 	 * WLAN
+I (12908) transport: 	   - HCI over SDIO
+I (12911) transport: 	   - BLE only
+I (12915) transport: EVENT: 13
+I (12917) transport: ESP board type is : 13 
+
+I (12922) transport: Base transport is set-up
+
+I (12926) transport: Slave chip Id[12]
+I (12929) hci_stub_drv: Host BT Support: Disabled
+I (12934) H_SDIO_DRV: Received INIT event
+I (12951) rpc_wrap: --- ESP Event: Slave ESP Init ---
+I (13854) WifiManager: Initialized
+I (13855) WifiBoard: Starting WiFi connection attempt
+I (13855) WifiManager: Starting station
+I (13953) Application: Network start task finished
+I (13974) rpc_req: Scan start Req
+
+I (13984) WifiBoard: WiFi scanning
+I (15701) EspVideo: Camera init success, captured 150 frames in 5006ms
+I (16071) SH_MQTT: Waiting for WiFi before smart-home MQTT connect
+I (16403) WifiStation: Found AP: Ll, BSSID: 9a:5f:41:ea:cc:75, RSSI: -12, Channel: 11, Authmode: 3
+I (16403) WifiBoard: WiFi connecting to Ll
+I (16422) H_API: esp_wifi_remote_connect
+I (19431) esp_wifi_remote: esp_wifi_internal_reg_rxcb: sta: 0x482cdc00
+I (20779) SystemInfo: free sram: 71823 minimal sram: 55799
+I (21609) esp_netif_handlers: sta ip: 192.168.137.203, mask: 255.255.255.0, gw: 192.168.137.1
+I (21609) WifiStation: Got IP: 192.168.137.203
+I (21610) WifiBoard: Connected to WiFi: Ll
+I (21614) SmartHomeTasks: Initializing SNTP
+I (21618) SmartHomeTasks: SNTP started, waiting for time sync...
+I (21624) Application: Network connected
+create static modelsI (21628) MODEL_LOADER: Successfully load srmodels
+I (21634) Assets: Refreshing display theme...
+I (21641) Ota: Current version: 2.2.4
+I (22071) SH_MQTT: Connecting to mqtt://8.134.167.240:1883
+I (23069) SH_MQTT: Connected and subscribed to smart-home topics
+I (23992) SH_MQTT: Announce: device_id=10 name=智慧庭院 gpio_count=8
+I (24480) esp-x509-crt-bundle: Certificate validated
+I (25220) HttpClient: Established new connection to api.tenclass.net:443
+I (25332) HttpClient: HTTP connection closed
+I (25334) Ota: Current is the latest version
+I (25335) Ota: Running partition: app
+E (25335) Ota: Failed to get state of partition
+I (25340) MQTT: Connecting to endpoint mqtt.xiaozhi.me
+I (26502) esp-x509-crt-bundle: Certificate validated
+I (27574) MQTT: Connected to endpoint
+I (27574) Application: Activation done
+I (27574) SystemInfo: free sram: 38827 minimal sram: 32319
+I (27576) WifiStation: Setting WiFi power save level: LOW_POWER (MAX_MODEM)
+I (30779) SystemInfo: free sram: 47583 minimal sram: 32319
+I (40779) SystemInfo: free sram: 47583 minimal sram: 32319
+I (50779) SystemInfo: free sram: 47583 minimal sram: 32319
