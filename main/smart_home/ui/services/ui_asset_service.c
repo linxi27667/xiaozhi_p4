@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <time.h>
 
 static const char *TAG = "UI_ASSET";
 static lv_fs_drv_t s_drv;
@@ -46,6 +47,8 @@ typedef struct {
     const char *name;
     uint8_t *data;
     uint32_t data_size;
+    long file_size;
+    time_t file_mtime;
     bool valid;
 } ui_asset_cache_entry_t;
 
@@ -134,6 +137,15 @@ static bool asset_is_png(const uint8_t *data, uint32_t data_size)
     return data && data_size >= sizeof(magic) && memcmp(data, magic, sizeof(magic)) == 0;
 }
 
+static bool stat_asset_file(const char *name, struct stat *st)
+{
+    if (!name || !st) return false;
+
+    char host_path[160];
+    build_host_path(name, host_path, sizeof(host_path));
+    return stat(host_path, st) == 0 && S_ISREG(st->st_mode);
+}
+
 static ui_asset_cache_entry_t *find_cache_entry(const char *name)
 {
     if (!name || !name[0]) return NULL;
@@ -145,15 +157,57 @@ static ui_asset_cache_entry_t *find_cache_entry(const char *name)
     return NULL;
 }
 
-static const ui_asset_cache_entry_t *find_valid_cache_entry(const char *name)
+static void invalidate_cache_entry(ui_asset_cache_entry_t *entry, const char *reason)
 {
-    ui_asset_cache_entry_t *entry = find_cache_entry(name);
-    return (entry && entry->valid && entry->data && entry->data_size > 0) ? entry : NULL;
+    if (!entry || !entry->valid) return;
+
+    ESP_LOGI(TAG, "asset cache invalidate: %s (%s)",
+             entry->name ? entry->name : "(null)", reason ? reason : "changed");
+    if (entry->name) {
+        char src[96];
+        snprintf(src, sizeof(src), "%c:%s", UI_ASSET_DRIVE_LETTER, entry->name);
+        lv_image_cache_drop(src);
+    }
+    heap_caps_free(entry->data);
+    entry->data = NULL;
+    entry->data_size = 0;
+    entry->file_size = 0;
+    entry->file_mtime = 0;
+    entry->valid = false;
+}
+
+static bool cache_entry_matches_file(ui_asset_cache_entry_t *entry)
+{
+    if (!entry || !entry->valid || !entry->name) return false;
+
+    struct stat st;
+    if (!stat_asset_file(entry->name, &st)) {
+        invalidate_cache_entry(entry, "source missing");
+        return false;
+    }
+
+    if (entry->file_size != (long)st.st_size || entry->file_mtime != st.st_mtime) {
+        invalidate_cache_entry(entry, "source replaced");
+        return false;
+    }
+    return true;
+}
+
+static void update_cache_metadata(ui_asset_cache_entry_t *entry)
+{
+    if (!entry || !entry->name) return;
+
+    struct stat st;
+    if (stat_asset_file(entry->name, &st)) {
+        entry->file_size = (long)st.st_size;
+        entry->file_mtime = st.st_mtime;
+    }
 }
 
 static bool copy_cached_asset(const char *name, uint8_t **data, uint32_t *data_size)
 {
-    const ui_asset_cache_entry_t *entry = find_valid_cache_entry(name);
+    ui_asset_cache_entry_t *entry = find_cache_entry(name);
+    if (!cache_entry_matches_file(entry)) return false;
     if (!entry || !data || !data_size) return false;
 
     uint8_t *copy = (uint8_t *)asset_malloc(entry->data_size);
@@ -172,7 +226,15 @@ static bool copy_cached_asset(const char *name, uint8_t **data, uint32_t *data_s
 static bool ensure_sdcard_mounted(void)
 {
     if (s_assets_unavailable) {
-        return false;
+        struct stat sd = {0};
+        struct stat root = {0};
+        if (stat("/sdcard", &sd) == 0 && stat(UI_ASSET_ROOT, &root) == 0 && S_ISDIR(root.st_mode)) {
+            ESP_LOGI(TAG, "TF assets became available again: %s", UI_ASSET_ROOT);
+            s_assets_unavailable = false;
+            s_preload_done = false;
+        } else {
+            return false;
+        }
     }
 
     struct stat st;
@@ -363,7 +425,7 @@ void ui_asset_service_init(void)
 
 int ui_asset_service_preload_required(void)
 {
-    if (s_assets_unavailable) {
+    if (s_assets_unavailable && !ensure_sdcard_mounted()) {
         return 0;
     }
 
@@ -379,16 +441,12 @@ int ui_asset_service_preload_required(void)
 
     if (!ensure_sdcard_mounted()) {
         ESP_LOGE(TAG, "TF asset preload skipped: /sdcard is not mounted");
-        s_assets_unavailable = true;
-        s_preload_done = true;
         return 0;
     }
 
     struct stat st;
-    if (stat(UI_ASSET_ROOT, &st) != 0) {
+    if (stat(UI_ASSET_ROOT, &st) != 0 || !S_ISDIR(st.st_mode)) {
         ESP_LOGE(TAG, "TF asset preload skipped: missing %s (errno=%d)", UI_ASSET_ROOT, errno);
-        s_assets_unavailable = true;
-        s_preload_done = true;
         return 0;
     }
 
@@ -411,6 +469,7 @@ int ui_asset_service_preload_required(void)
         s_asset_cache[i].data = data;
         s_asset_cache[i].data_size = data_size;
         s_asset_cache[i].valid = true;
+        update_cache_metadata(&s_asset_cache[i]);
         s_preload_count++;
         s_preload_bytes += data_size;
         ESP_LOGD(TAG, "preload OK: %s (%lu bytes)", name, (unsigned long)data_size);
@@ -422,8 +481,8 @@ int ui_asset_service_preload_required(void)
              (unsigned)(sizeof(s_required_assets) / sizeof(s_required_assets[0])),
              (unsigned long)s_preload_bytes);
     if (s_preload_count == 0) {
-        s_assets_unavailable = true;
-        ESP_LOGE(TAG, "TF asset preload produced no usable PNG files; runtime TF reads disabled");
+        s_preload_done = false;
+        ESP_LOGE(TAG, "TF asset preload produced no usable PNG files; will retry later");
     }
     return s_preload_count;
 }
@@ -432,17 +491,13 @@ bool ui_asset_available(const char *name)
 {
     if (!name || !name[0]) return false;
 
-    const ui_asset_cache_entry_t *cached = find_valid_cache_entry(name);
-    if (cached) {
+    ui_asset_cache_entry_t *cached = find_cache_entry(name);
+    if (cache_entry_matches_file(cached)) {
         ESP_LOGD(TAG, "asset OK(cache): %s (%lu bytes)", name, (unsigned long)cached->data_size);
         return true;
     }
 
-    if (s_assets_unavailable) {
-        return false;
-    }
-
-    if (s_preload_done) {
+    if (s_assets_unavailable && !ensure_sdcard_mounted()) {
         return false;
     }
 

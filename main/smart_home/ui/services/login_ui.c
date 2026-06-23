@@ -67,6 +67,12 @@ static lv_obj_t *create_label(lv_obj_t *parent, const char *text, int size,
     return lbl;
 }
 
+static void set_label_text(lv_obj_t *label, const char *text)
+{
+    if (!label) return;
+    lv_label_set_text(label, text ? text : "");
+}
+
 // 清空内容容器
 static void clean_content(void)
 {
@@ -95,7 +101,7 @@ static void notify_login_success(void)
     if (s_login_completed) return;
     s_login_completed = true;
     ESP_LOGI(TAG, "Login success");
-    login_ui_set_status(tr("登录成功", "Login success"));
+    login_ui_set_status(tr("检测通过", "Login success"));
     ui_event_publish(UI_EVENT_LOGIN_SUCCESS);
     ui_events_dispatch_pending();
     // 延迟隐藏,让用户看到成功状态
@@ -116,7 +122,7 @@ static void notify_login_failed(const char *reason)
 static void verify_password(void)
 {
     if (s_password_len != PASSWORD_MAX_LEN) {
-        notify_login_failed(tr("请输入完整密码", "Please enter full password"));
+        notify_login_failed(tr("请输入密码", "Please enter password"));
         return;
     }
     if (strcmp(s_password, LOGIN_PASSWORD) == 0) {
@@ -301,14 +307,14 @@ static void build_face_ui(void)
 
     // 提示文字
     s_face_hint = create_label(s_content,
-        tr("正在识别人脸...", "Recognizing face..."),
+        tr("检测中...", "Recognizing..."),
         14, UI_COLOR_TEXT_SEC);
-    lv_obj_set_width(s_face_hint, CARD_W - 40);
+    lv_obj_set_width(s_face_hint, PREVIEW_W);
     lv_label_set_long_mode(s_face_hint, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_align(s_face_hint, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_pos(s_face_hint, 20, 10 + PREVIEW_H + 20);
+    lv_obj_set_pos(s_face_hint, (CARD_W - PREVIEW_W) / 2, 10 + PREVIEW_H + 16);
 
-    login_ui_set_status(tr("请将面部对准摄像头", "Please face the camera"));
+    login_ui_set_status(tr("请面向屏幕", "Please face the screen"));
 }
 
 // 创建选择界面
@@ -343,7 +349,7 @@ static void build_select_ui(void)
 
     lv_obj_t *ic1 = ui_create_icon(btn_pwd, ICON_LOCK, ui_font_icon(40), UI_COLOR_ACCENT);
     (void)ic1;
-    create_label(btn_pwd, tr("密码登录", "Password"), 18, UI_COLOR_TEXT_STRONG);
+    create_label(btn_pwd, tr("密码", "Password"), 18, UI_COLOR_TEXT_STRONG);
     create_label(btn_pwd, tr("使用数字密码", "Use numeric password"), 12, UI_COLOR_TEXT_SEC);
 
     // 人脸登录按钮
@@ -366,10 +372,10 @@ static void build_select_ui(void)
 
     lv_obj_t *ic2 = ui_create_icon(btn_face, ICON_USER, ui_font_icon(40), UI_COLOR_GREEN);
     (void)ic2;
-    create_label(btn_face, tr("人脸登录", "Face ID"), 18, UI_COLOR_TEXT_STRONG);
-    create_label(btn_face, tr("使用面部识别", "Use face recognition"), 12, UI_COLOR_TEXT_SEC);
+    create_label(btn_face, tr("面部", "Face ID"), 18, UI_COLOR_TEXT_STRONG);
+    create_label(btn_face, tr("使用面部检测", "Use face detection"), 12, UI_COLOR_TEXT_SEC);
 
-    login_ui_set_status(tr("请选择登录方式", "Please select login method"));
+    login_ui_set_status(tr("请选择", "Please select login method"));
 }
 
 // 构建内容区域
@@ -411,7 +417,7 @@ static void on_login_required(void *user_data)
 static void on_face_recognized(void *user_data)
 {
     (void)user_data;
-    login_ui_set_status(tr("识别成功", "Face recognized"));
+    login_ui_set_status(tr("检测通过", "Face recognized"));
     notify_login_success();
 }
 
@@ -419,14 +425,14 @@ static void on_face_recognized(void *user_data)
 static void on_face_not_recognized(void *user_data)
 {
     (void)user_data;
-    login_ui_set_status(tr("未识别到人脸,请重试", "Face not recognized, please retry"));
+    login_ui_set_status(tr("检测未通过", "Face not recognized, please retry"));
 }
 
 // 事件回调:检测到人脸
 static void on_face_detected(void *user_data)
 {
     (void)user_data;
-    login_ui_set_status(tr("正在识别...", "Recognizing..."));
+    login_ui_set_status(tr("检测中...", "Recognizing..."));
 }
 
 void login_ui_init(void)
@@ -482,7 +488,7 @@ void login_ui_show(void)
     lv_obj_clear_flag(s_card, LV_OBJ_FLAG_SCROLLABLE);
 
     // 标题
-    s_title_label = create_label(s_card, tr("系统登录", "System Login"),
+    s_title_label = create_label(s_card, tr("系统", "System Login"),
                                   22, UI_COLOR_TEXT_STRONG);
     lv_obj_set_pos(s_title_label, 0, 0);
 
@@ -503,6 +509,7 @@ void login_ui_show(void)
     // 状态标签
     s_status_label = create_label(s_card, "", 14, UI_COLOR_TEXT_SEC);
     lv_obj_set_width(s_status_label, CARD_W - 40);
+    lv_obj_set_height(s_status_label, 34);
     lv_label_set_long_mode(s_status_label, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_align(s_status_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_pos(s_status_label, 0, 36);
@@ -574,8 +581,10 @@ void login_ui_set_mode(login_mode_t mode)
 
 void login_ui_set_status(const char *text)
 {
-    if (!s_status_label) return;
-    lv_label_set_text(s_status_label, text ? text : "");
+    set_label_text(s_status_label, text);
+    if (s_mode == LOGIN_MODE_FACE) {
+        set_label_text(s_face_hint, text);
+    }
 }
 
 void login_ui_update_face_preview(const uint8_t *rgb565, int width, int height)

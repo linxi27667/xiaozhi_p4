@@ -116,14 +116,22 @@ static uint8_t *scale_rgb565_frame(const EspVideo::CapturedFrame &src, int dst_w
     return dst;
 }
 
-static uint8_t *copy_face_frame(const uint8_t *src)
+static uint8_t *copy_face_frame_mirrored(const uint8_t *src)
 {
     const size_t len = (size_t)FACE_PREVIEW_W * FACE_PREVIEW_H * 2;
     auto *dst = (uint8_t *)heap_caps_malloc(len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!dst) {
         return nullptr;
     }
-    memcpy(dst, src, len);
+    const auto *src16 = reinterpret_cast<const uint16_t *>(src);
+    auto *dst16 = reinterpret_cast<uint16_t *>(dst);
+    for (int y = 0; y < FACE_PREVIEW_H; ++y) {
+        const uint16_t *row = src16 + y * FACE_PREVIEW_W;
+        uint16_t *out = dst16 + y * FACE_PREVIEW_W;
+        for (int x = 0; x < FACE_PREVIEW_W; ++x) {
+            out[x] = row[FACE_PREVIEW_W - 1 - x];
+        }
+    }
     return dst;
 }
 
@@ -146,13 +154,14 @@ static void face_recognition_task(void *arg)
         ESP_LOGW(TAG, "Face recognition init failed, face login unavailable");
     }
 
-    const TickType_t frame_interval = pdMS_TO_TICKS(500);
-    const TickType_t detect_interval = pdMS_TO_TICKS(1500);
-    const TickType_t recognize_interval = pdMS_TO_TICKS(3000);
+    const TickType_t frame_interval = pdMS_TO_TICKS(400);
+    const TickType_t detect_interval = pdMS_TO_TICKS(900);
+    const TickType_t recognize_interval = pdMS_TO_TICKS(1200);
     int no_face_count = 0;
-    const int max_no_face = 4;  // 约6秒无人脸则提示
+    const int max_no_face = 4;  // 约4秒无人脸则提示
     bool preview_started = false;
     bool camera_wait_status_shown = false;
+    bool face_login_done = false;
     TickType_t last_detect_tick = 0;
     TickType_t last_recognize_tick = 0;
     int registered_face_count = face_init_ok ? face_recog.GetFaceCount() : 0;
@@ -163,7 +172,13 @@ static void face_recognition_task(void *arg)
     while (true) {
         // 只在登录 UI 可见且处于人脸模式时工作
         if (!login_ui_is_face_mode()) {
+            face_login_done = false;
             vTaskDelay(pdMS_TO_TICKS(500));
+            continue;
+        }
+
+        if (face_login_done) {
+            vTaskDelay(pdMS_TO_TICKS(300));
             continue;
         }
 
@@ -189,7 +204,7 @@ static void face_recognition_task(void *arg)
                 Application::GetInstance().Schedule([]() {
                     DisplayLockGuard lock(Board::GetInstance().GetDisplay());
                     if (login_ui_is_face_mode()) {
-                        login_ui_set_status("摄像头启动中...");
+                        login_ui_set_status("启动中...");
                     }
                 });
                 camera_wait_status_shown = true;
@@ -221,7 +236,7 @@ static void face_recognition_task(void *arg)
             continue;
         }
 
-        uint8_t *preview_frame = copy_face_frame(face_frame);
+        uint8_t *preview_frame = copy_face_frame_mirrored(face_frame);
         if (preview_frame) {
             Application::GetInstance().Schedule([preview_frame]() {
                 DisplayLockGuard lock(Board::GetInstance().GetDisplay());
@@ -250,16 +265,57 @@ static void face_recognition_task(void *arg)
         }
         last_detect_tick = now;
 
-        // 人脸检测
         std::vector<smart_home::FaceDetectResult> detect_results;
-        if (!face_recog.DetectFaces(face_frame, FACE_PREVIEW_W, FACE_PREVIEW_H, detect_results)) {
+        smart_home::FaceRecognizeResult recog_result;
+        bool recog_ok = false;
+
+        if (registered_face_count <= 0) {
+            std::string user_id;
+            if (!face_recog.DetectAndRegister(face_frame, FACE_PREVIEW_W, FACE_PREVIEW_H,
+                                              detect_results, "default", user_id)) {
+                no_face_count++;
+                if (no_face_count >= max_no_face) {
+                    Application::GetInstance().Schedule([]() {
+                        DisplayLockGuard lock(Board::GetInstance().GetDisplay());
+                        if (login_ui_is_face_mode()) {
+                            login_ui_set_status("请面向屏幕");
+                            login_ui_clear_face_detect();
+                        }
+                    });
+                    no_face_count = 0;
+                }
+                free(face_frame);
+                vTaskDelay(frame_interval);
+                continue;
+            }
+
+            registered_face_count = face_recog.GetFaceCount();
+            ESP_LOGI(TAG, "Default face enrolled: id=%s, total=%d",
+                     user_id.c_str(), registered_face_count);
+            face_login_done = true;
+        } else {
+            now = xTaskGetTickCount();
+            if ((now - last_recognize_tick) < recognize_interval) {
+                if (!face_recog.DetectFaces(face_frame, FACE_PREVIEW_W, FACE_PREVIEW_H, detect_results)) {
+                    no_face_count++;
+                }
+            } else {
+                last_recognize_tick = now;
+                recog_ok = face_recog.DetectAndRecognize(face_frame, FACE_PREVIEW_W, FACE_PREVIEW_H,
+                                                         detect_results, recog_result);
+                if (detect_results.empty()) {
+                    no_face_count++;
+                }
+            }
+        }
+
+        if (detect_results.empty()) {
             // 未检测到人脸
-            no_face_count++;
             if (no_face_count >= max_no_face) {
                 Application::GetInstance().Schedule([]() {
                     DisplayLockGuard lock(Board::GetInstance().GetDisplay());
                     if (login_ui_is_face_mode()) {
-                        login_ui_set_status("未检测到人脸,请将面部对准摄像头");
+                        login_ui_set_status("请面向屏幕");
                         login_ui_clear_face_detect();
                     }
                 });
@@ -279,57 +335,29 @@ static void face_recognition_task(void *arg)
         Application::GetInstance().Schedule([detect]() {
             DisplayLockGuard lock(Board::GetInstance().GetDisplay());
             if (login_ui_is_face_mode()) {
-                login_ui_update_face_detect(detect.x, detect.y, detect.width, detect.height);
-                login_ui_set_status("正在识别...");
+                int preview_x = FACE_PREVIEW_W - detect.x - detect.width;
+                login_ui_update_face_detect(preview_x, detect.y, detect.width, detect.height);
+                login_ui_set_status("检测中...");
                 publish_ui_event_now(UI_EVENT_FACE_DETECTED);
             }
         });
 
-        if (registered_face_count <= 0) {
-            std::string user_id;
-            if (face_recog.RegisterFace(face_frame, FACE_PREVIEW_W, FACE_PREVIEW_H,
-                                        detect, "default", user_id)) {
-                registered_face_count = face_recog.GetFaceCount();
-                ESP_LOGI(TAG, "Default face enrolled: id=%s, total=%d",
-                         user_id.c_str(), registered_face_count);
-                Application::GetInstance().Schedule([]() {
-                    DisplayLockGuard lock(Board::GetInstance().GetDisplay());
-                    publish_ui_event_now(UI_EVENT_FACE_RECOGNIZED);
-                });
-                free(face_frame);
-                vTaskDelay(pdMS_TO_TICKS(2000));
-                continue;
-            }
-            ESP_LOGW(TAG, "Default face enrollment failed");
-            free(face_frame);
-            vTaskDelay(frame_interval);
-            continue;
-        }
-
-        now = xTaskGetTickCount();
-        if ((now - last_recognize_tick) < recognize_interval) {
-            free(face_frame);
-            vTaskDelay(frame_interval);
-            continue;
-        }
-        last_recognize_tick = now;
-
-        // 人脸识别
-        smart_home::FaceRecognizeResult recog_result;
-        if (face_recog.RecognizeFace(face_frame, FACE_PREVIEW_W, FACE_PREVIEW_H,
-                                      detect, recog_result)) {
+        if (face_login_done || recog_ok) {
             // 识别成功
-            ESP_LOGI(TAG, "Face recognized: id=%u (%.2f)",
-                     (unsigned)recog_result.id, recog_result.similarity);
+            if (recog_ok) {
+                ESP_LOGI(TAG, "Face recognized: id=%u (%.2f)",
+                         (unsigned)recog_result.id, recog_result.similarity);
+            }
+            face_login_done = true;
             Application::GetInstance().Schedule([]() {
                 DisplayLockGuard lock(Board::GetInstance().GetDisplay());
                 publish_ui_event_now(UI_EVENT_FACE_RECOGNIZED);
             });
             free(face_frame);
             // 等待登录 UI 隐藏
-            vTaskDelay(pdMS_TO_TICKS(2000));
+            vTaskDelay(pdMS_TO_TICKS(300));
             continue;
-        } else {
+        } else if (!recog_result.error_msg.empty() && recog_result.error_msg != "No face detected") {
             // 识别失败
             ESP_LOGD(TAG, "Face not recognized: %s", recog_result.error_msg.c_str());
             Application::GetInstance().Schedule([]() {

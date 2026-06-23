@@ -186,6 +186,8 @@ extern "C" void weather_service_init(void)
 extern "C" void weather_service_start(void)
 {
     s_started = true;
+    // 启动阶段优先让小智协议/MQTT 完成连接,天气首次拉取延后到后台重试周期。
+    s_last_attempt_ms = now_ms();
 }
 
 extern "C" void weather_service_poll(void)

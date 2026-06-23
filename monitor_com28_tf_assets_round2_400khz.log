@@ -1,0 +1,219 @@
+I esp_psram: Found 32MB PSRAM device
+I esp_psram: Speed: 200MHz
+I (516) mmu_psram: .rodata xip on psram
+I (806) mmu_psram: .text xip on psram
+I (807) hex_psram: psram CS IO is dedicated
+I (807) cpu_start: Multicore app
+I (817) cpu_start: GPIO 38 and 37 are used as console UART I/O pins
+I (817) cpu_start: Pro cpu start user code
+I (818) cpu_start: cpu freq: 360000000 Hz
+I (819) app_init: Application information:
+I (823) app_init: Project name:     xiaozhi
+I (827) app_init: App version:      2.2.4
+I (831) app_init: Compile time:     Jun 23 2026 18:51:50
+I (836) app_init: ELF file SHA256:  e8c1f5213...
+I (840) app_init: ESP-IDF:          v5.5.3-dirty
+I (845) efuse_init: Min chip rev:     v0.0
+I (848) efuse_init: Max chip rev:     v1.99 
+I (852) efuse_init: Chip rev:         v1.3
+I (856) heap_init: Initializing. RAM available for dynamic allocation:
+I (862) heap_init: At 4FF270A0 len 00013F20 (79 KiB): RETENT_RAM
+I (868) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM
+I (873) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM
+I (878) heap_init: At 30100068 len 00001F98 (7 KiB): TCM
+I (884) esp_psram: Adding pool of 26496K of PSRAM memory to heap allocator
+I (890) esp_psram: Adding pool of 22K of PSRAM memory gap generated due to end address alignment of irom to the heap allocator
+I (901) esp_psram: Adding pool of 4K of PSRAM memory gap generated due to end address alignment of drom to the heap allocator
+I (912) spi_flash: detected chip: gd
+I (916) spi_flash: flash io: qio
+I (958) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (964) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (971) main_task: Started on CPU0
+I (974) esp_psram: Reserving pool of 64K of internal memory for DMA/internal allocations
+I (982) main_task: Calling app_main()
+I (993) Board: UUID=bfba9048-2a61-4c2a-a7b0-1de80e6c0f4d SKU=esp-p4-function-ev-board
+I (993) button: IoT Button Version: 4.1.6
+W (996) i2c.master: Please check pull-up resistances whether be connected properly. Otherwise unexpected behavior would happen. For more detailed information, please read docs
+I (1012) ESP32_P4_EV: MIPI DSI PHY Powered on
+I (1017) ESP32_P4_EV: Install MIPI DSI LCD control panel
+I (1021) ESP32_P4_EV: Install EK79007 LCD control panel
+I (1026) ek79007: version: 1.0.4
+I (1193) ESP32_P4_EV: Display initialized
+I (1193) Display: Power management not supported
+I (1193) LcdDisplay: Initialize LVGL library
+I (1194) LcdDisplay: Initialize LVGL port
+I (1197) LVGL: Starting LVGL task
+I (1200) LcdDisplay: Adding LCD display
+I (1211) GT911: I2C address initialization procedure skipped - using default GT9xx setup
+I (1212) GT911: TouchPad_ID:0x39,0x31,0x31
+I (1216) GT911: TouchPad_Config_Version:89
+I (1219) ESP32P4FuncEV: Touch controller registered with LVGL
+I (1225) ESP32P4_TF: Initializing TF card
+I (1729) ESP32P4_TF: SD card power enabled: GPIO45(SD_PWRn)=0, LDO_VO4=3300mV
+I (1729) ESP32P4_TF: Mounting TF card via SDMMC slot 0, 1-bit, 400kHz: CLK=43 CMD=44 D0=39
+I (1732) sdmmc_periph: sdmmc_host_init: SDMMC host already initialized, skipping init flow
+I (1817) ESP32P4_TF: TF card mounted successfully at /sdcard (SDMMC slot0, 1-bit)
+I (1817) ESP32P4_TF: TF card: name=SD speed=0.40MHz size=7624MiB sector=512 capacity=15613952 bus_width=1
+I (2479) ESP32P4_TF: UI asset bootstrap complete: written=0 preserved=18 total=18
+I (2492) ESP32P4_TF: UI asset folder found: /sdcard/xiaozhi_ui
+I (2492) UI_ASSET: Preloading TF UI assets from /sdcard/xiaozhi_ui before Wi-Fi SDIO runtime traffic
+I (5259) UI_ASSET: TF asset preload complete: 18/18 files, 50127 bytes
+I (5259) ESP32P4FuncEV: Initializing camera (MIPI-CSI)
+I (5260) sc2336: Detected Camera sensor PID=0xcb3a
+W (5291) ISP_AWB: Subwindow feature is not supported on REV < 3.0, subwindow will not be configured
+I (5291) ESP32P4FuncEV: MIPI-CSI camera initialized successfully
+I (5294) ESP32P4FuncEV: Initializing font support
+I (5299) ESP32P4FuncEV: Custom font loaded successfully: line_height=25
+W (5305) ledc: GPIO 26 is not usable, maybe conflict with others
+I (5311) Backlight: Set brightness to 75
+I (5314) StateMachine: State: unknown -> starting
+I (5365) Es8311AudioCodec: Duplex channels created
+I (5371) ES8311: Work in Slave mode
+I (5374) Es8311AudioCodec: Es8311AudioCodec initialized
+I (5374) AudioCodec: Audio codec started
+I (5376) MCP: Add tool: self.get_device_status
+I (5376) MCP: Add tool: self.audio_speaker.set_volume
+I (5381) MCP: Add tool: self.screen.set_brightness
+I (5385) MCP: Add tool: self.screen.set_theme
+I (5389) MCP: Add tool: self.camera.take_photo
+I (5393) MCP: Add tool: self.get_system_info [user]
+I (5398) MCP: Add tool: self.reboot [user]
+I (5402) MCP: Add tool: self.upgrade_firmware [user]
+I (5407) MCP: Add tool: self.screen.get_info [user]
+I (5411) MCP: Add tool: self.screen.snapshot [user]
+I (5416) MCP: Add tool: self.screen.preview_image [user]
+I (5421) Assets: The storage free size is 65536 KB
+I (5425) Assets: The partition size is 3072 KB
+I (5545) Assets: The checksum calculation time is 114 ms
+I (5545) MCP: Add tool: self.assets.set_download_url [user]
+I (5545) MCP: Add tool: self.iot.get_status
+I (5548) MCP: Add tool: self.iot.get_sensors
+I (5552) MCP: Add tool: self.iot.discover
+I (5556) MCP: Add tool: self.iot.set_gpio
+I (5559) MCP: Add tool: self.iot.set_light
+I (5563) MCP: Add tool: self.iot.set_rgb_light
+I (5567) MCP: Add tool: self.iot.set_scene
+I (5571) MCP: Add tool: self.iot.set_relay
+I (5575) MCP: Add tool: self.iot.set_servo_by_index
+I (5579) MCP: Add tool: self.iot.all_off
+I (5583) MCP: Add tool: self.iot.all_on
+I (5587) MCP: Add tool: self.iot.all_lights_off
+I (5591) MCP: Add tool: self.iot.all_lights_on
+I (5595) MCP: Add tool: self.face.list
+I (5599) MCP: Add tool: self.face.delete
+I (5602) MCP: Add tool: self.face.clear_all
+I (5606) MCP: Add tool: self.face.recognize
+I (5610) MCP: Add tool: self.face.capture
+I (5614) MCP: Add tool: self.face.register
+I (5618) FaceMcp: Face MCP tools registered
+I (5621) LOGIN_UI: Login UI initialized
+I (5625) StateMachine: State: starting -> locked
+I (5625) Application: Face recognition task started
+I (5638) LOGIN_UI: Login UI shown
+I (5638) Application: Login flow initialized, device locked
+I (5642) DEV_MODEL: Model initialized: 11 devices
+I (5647) EVT_CENTER: Event center initialized
+I (5651) AUTO_MODE: Auto mode initialized, global=1
+I (5655) RULE: Rule engine initialized
+I (5659) SH_MQTT: Smart-home MQTT initialized
+W (5659) FbsLoader: CONFIG_SPIRAM_RODATA or CONFIG_SPIRAM_XIP_FROM_PSRAM option is on, fbs model is copied to PSRAM.
+I (5663) SmartHomeTasks: Smart home task layer started
+W (5717) dl::Model: Minimize() will delete variables not used in model inference, which will make it impossible to test or debug the model.
+W (5720) FbsLoader: CONFIG_SPIRAM_RODATA or CONFIG_SPIRAM_XIP_FROM_PSRAM option is on, fbs model is copied to PSRAM.
+I (5726) Application: Device locked, waiting for login
+I (5726) Application: Network start task started
+I (5738) WifiManager: Initializing...
+I (5742) transport: Attempt connection with slave: retry[0]
+I (5747) transport: Reset slave using GPIO[54]
+I (5751) os_wrapper_esp: GPIO [54] configured
+W (5766) dl::Model: Minimize() will delete variables not used in model inference, which will make it impossible to test or debug the model.
+W (5769) FbsLoader: There is only one model in the flatbuffers, ignore the input model name!
+W (5776) FbsLoader: CONFIG_SPIRAM_RODATA or CONFIG_SPIRAM_XIP_FROM_PSRAM option is on, fbs model is copied to PSRAM.
+W (5902) dl::Model: Minimize() will delete variables not used in model inference, which will make it impossible to test or debug the model.
+I (6012) FaceRecog: Face recognition initialized (detector + recognizer)
+I (6012) Application: Face DB contains 1 enrolled face(s)
+I (7371) sdio_wrapper: SDIO master: Slot 1, Data-Lines: 4-bit Freq(KHz)[40000 KHz]
+I (7371) sdio_wrapper: GPIOs: CLK[18] CMD[19] D0[14] D1[15] D2[16] D3[17] Slave_Reset[54]
+I (7371) H_SDIO_DRV: Starting SDIO process rx task
+I (7375) sdio_wrapper: Queues: Tx[20] Rx[20] SDIO-Rx-Mode[1]
+Name: 
+Type: SDIO
+Speed: 40.00 MHz (limit: 40.00 MHz)
+Size: luMB
+CSD: ver=1, sector_size=0, capacity=0 read_bl_len=0
+SCR: sd_spec=0, bus_width=0
+TUPLE: DEVICE, size: 3: D9 01 FF 
+TUPLE: MANFID, size: 4
+  MANF: 0092, CARD: 6666
+TUPLE: FUNCID, size: 2: 0C 00 
+TUPLE: FUNCE, size: 4: 00 00 02 32 
+TUPLE: CONFIG, size: 5: 01 01 00 02 07 
+TUPLE: CFTABLE_ENTRY, size: 8
+  INDX: C1, Intface: 1, Default: 1, Conf-Entry-Num: 1
+  IF: 41
+  FS: 30, misc: 0, mem_space: 1, irq: 1, io_space: 0, timing: 0, power: 0
+  IR: 30, mask: 1,   IRQ: FF FF
+  LEN: FFFF
+TUPLE: END
+I (7458) sdio_wrapper: Function 0 Blocksize: 512
+I (7462) sdio_wrapper: Function 1 Blocksize: 512
+I (7466) H_SDIO_DRV: SDIO Host operating in STREAMING MODE
+I (7471) H_SDIO_DRV: generate slave intr
+I (7484) transport: Received INIT event from ESP32 peripheral
+I (7484) transport: EVENT: 12
+I (7484) transport: EVENT: 11
+I (7486) transport: capabilities: 0xd
+I (7489) transport: Features supported are:
+I (7493) transport: 	 * WLAN
+I (7496) transport: 	   - HCI over SDIO
+I (7499) transport: 	   - BLE only
+I (7503) transport: EVENT: 13
+I (7505) transport: ESP board type is : 13 
+
+I (7509) transport: Base transport is set-up
+
+I (7514) transport: Slave chip Id[12]
+I (7517) hci_stub_drv: Host BT Support: Disabled
+I (7521) H_SDIO_DRV: Received INIT event
+I (7565) rpc_wrap: --- ESP Event: Slave ESP Init ---
+I (8467) WifiManager: Initialized
+I (8468) WifiBoard: Starting WiFi connection attempt
+I (8468) WifiManager: Starting station
+I (8566) Application: Network start task finished
+I (8587) rpc_req: Scan start Req
+
+I (8597) WifiBoard: WiFi scanning
+I (10298) EspVideo: Camera init success, captured 150 frames in 5007ms
+I (11016) WifiStation: Found AP: Ll, BSSID: 9a:5f:41:ea:cc:75, RSSI: -17, Channel: 11, Authmode: 3
+I (11016) WifiBoard: WiFi connecting to Ll
+I (11035) H_API: esp_wifi_remote_connect
+I (14060) esp_wifi_remote: esp_wifi_internal_reg_rxcb: sta: 0x482cd5e0
+I (15376) SystemInfo: free sram: 63495 minimal sram: 49019
+I (16663) SH_MQTT: Waiting for WiFi before smart-home MQTT connect
+I (17166) esp_netif_handlers: sta ip: 192.168.137.203, mask: 255.255.255.0, gw: 192.168.137.1
+I (17166) WifiStation: Got IP: 192.168.137.203
+I (17167) WifiBoard: Connected to WiFi: Ll
+I (17171) SmartHomeTasks: Initializing SNTP
+I (17175) SmartHomeTasks: SNTP started, waiting for time sync...
+I (17181) Application: Network connected
+create static modelsI (17185) MODEL_LOADER: Successfully load srmodels
+I (17191) Assets: Refreshing display theme...
+I (17198) Ota: Current version: 2.2.4
+I (17663) SH_MQTT: Connecting to mqtt://8.134.167.240:1883
+I (19424) SH_MQTT: Connected and subscribed to smart-home topics
+I (20182) SH_MQTT: Announce: device_id=10 name=智慧庭院 gpio_count=8
+I (20305) esp-x509-crt-bundle: Certificate validated
+I (20963) HttpClient: Established new connection to api.tenclass.net:443
+I (21089) HttpClient: HTTP connection closed
+I (21091) Ota: Current is the latest version
+I (21092) Ota: Running partition: app
+E (21092) Ota: Failed to get state of partition
+I (21097) MQTT: Connecting to endpoint mqtt.xiaozhi.me
+I (21429) esp-x509-crt-bundle: Certificate validated
+I (22310) MQTT: Connected to endpoint
+I (22310) Application: Activation done
+I (22310) SystemInfo: free sram: 36347 minimal sram: 35055
+I (22312) WifiStation: Setting WiFi power save level: LOW_POWER (MAX_MODEM)
+I (25376) SystemInfo: free sram: 45151 minimal sram: 35055
+I (35376) SystemInfo: free sram: 45151 minimal sram: 35055
+I (45376) SystemInfo: free sram: 45151 minimal sram: 35055

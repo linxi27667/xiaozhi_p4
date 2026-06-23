@@ -49,6 +49,17 @@ public:
                        const FaceDetectResult &detect,
                        FaceRecognizeResult &result);
 
+    // 单次转换/检测后直接识别,避免 DetectFaces + RecognizeFace 重复跑检测模型
+    bool DetectAndRecognize(const uint8_t *data, int width, int height,
+                            std::vector<FaceDetectResult> &detect_results,
+                            FaceRecognizeResult &result);
+
+    // 单次转换/检测后注册第一张人脸
+    bool DetectAndRegister(const uint8_t *data, int width, int height,
+                           std::vector<FaceDetectResult> &detect_results,
+                           const std::string &user_name,
+                           std::string &user_id);
+
     // 注册人脸:采集当前帧,提取特征,保存到数据库
     // 返回 true 表示注册成功
     bool RegisterFace(const uint8_t *data, int width, int height,

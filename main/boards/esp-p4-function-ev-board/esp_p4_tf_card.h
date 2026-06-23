@@ -27,5 +27,7 @@ private:
     esp_err_t EnablePower();
     void ReleasePower();
     void LogRootEntries() const;
+    void LogCardInfo() const;
+    bool EnsureUiAssets() const;
     void VerifyAssetFolder() const;
 };

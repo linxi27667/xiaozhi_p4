@@ -3,6 +3,7 @@
 #include <cerrno>
 #include <cstddef>
 #include <cstdio>
+#include <cstring>
 #include <dirent.h>
 #include <sys/stat.h>
 
@@ -23,9 +24,73 @@ constexpr char kUiAssetRoot[] = "/sdcard/xiaozhi_ui";
 constexpr gpio_num_t kSdPowerEnableGpio = GPIO_NUM_45;  // SD_PWRn (active low)
 constexpr int kSdLdoChannel = 4;                         // LDO_VO4
 constexpr int kSdVoltageMv = 3300;
-constexpr int kSdPowerOnDelayMs = 50;                    // BSP uses 50ms
+constexpr int kSdPowerOnDelayMs = 500;
 constexpr int kSdMaxOpenFiles = 5;
 constexpr size_t kSdAllocationUnitSize = 64 * 1024;
+
+extern const uint8_t _binary_alarm_siren_png_start[] asm("_binary_alarm_siren_png_start");
+extern const uint8_t _binary_alarm_siren_png_end[] asm("_binary_alarm_siren_png_end");
+extern const uint8_t _binary_color_wheel_220_png_start[] asm("_binary_color_wheel_220_png_start");
+extern const uint8_t _binary_color_wheel_220_png_end[] asm("_binary_color_wheel_220_png_end");
+extern const uint8_t _binary_floor_1_png_start[] asm("_binary_floor_1_png_start");
+extern const uint8_t _binary_floor_1_png_end[] asm("_binary_floor_1_png_end");
+extern const uint8_t _binary_floor_2_png_start[] asm("_binary_floor_2_png_start");
+extern const uint8_t _binary_floor_2_png_end[] asm("_binary_floor_2_png_end");
+extern const uint8_t _binary_floor_3_png_start[] asm("_binary_floor_3_png_start");
+extern const uint8_t _binary_floor_3_png_end[] asm("_binary_floor_3_png_end");
+extern const uint8_t _binary_logo_robot_png_start[] asm("_binary_logo_robot_png_start");
+extern const uint8_t _binary_logo_robot_png_end[] asm("_binary_logo_robot_png_end");
+extern const uint8_t _binary_overview_home_png_start[] asm("_binary_overview_home_png_start");
+extern const uint8_t _binary_overview_home_png_end[] asm("_binary_overview_home_png_end");
+extern const uint8_t _binary_scene_away_png_start[] asm("_binary_scene_away_png_start");
+extern const uint8_t _binary_scene_away_png_end[] asm("_binary_scene_away_png_end");
+extern const uint8_t _binary_scene_fire_png_start[] asm("_binary_scene_fire_png_start");
+extern const uint8_t _binary_scene_fire_png_end[] asm("_binary_scene_fire_png_end");
+extern const uint8_t _binary_scene_home_png_start[] asm("_binary_scene_home_png_start");
+extern const uint8_t _binary_scene_home_png_end[] asm("_binary_scene_home_png_end");
+extern const uint8_t _binary_scene_lights_png_start[] asm("_binary_scene_lights_png_start");
+extern const uint8_t _binary_scene_lights_png_end[] asm("_binary_scene_lights_png_end");
+extern const uint8_t _binary_scene_movie_png_start[] asm("_binary_scene_movie_png_start");
+extern const uint8_t _binary_scene_movie_png_end[] asm("_binary_scene_movie_png_end");
+extern const uint8_t _binary_scene_night_png_start[] asm("_binary_scene_night_png_start");
+extern const uint8_t _binary_scene_night_png_end[] asm("_binary_scene_night_png_end");
+extern const uint8_t _binary_scene_rain_png_start[] asm("_binary_scene_rain_png_start");
+extern const uint8_t _binary_scene_rain_png_end[] asm("_binary_scene_rain_png_end");
+extern const uint8_t _binary_scene_sleep_png_start[] asm("_binary_scene_sleep_png_start");
+extern const uint8_t _binary_scene_sleep_png_end[] asm("_binary_scene_sleep_png_end");
+extern const uint8_t _binary_siyin_logo_png_start[] asm("_binary_siyin_logo_png_start");
+extern const uint8_t _binary_siyin_logo_png_end[] asm("_binary_siyin_logo_png_end");
+extern const uint8_t _binary_weather_cloud_png_start[] asm("_binary_weather_cloud_png_start");
+extern const uint8_t _binary_weather_cloud_png_end[] asm("_binary_weather_cloud_png_end");
+extern const uint8_t _binary_weather_guangzhou_png_start[] asm("_binary_weather_guangzhou_png_start");
+extern const uint8_t _binary_weather_guangzhou_png_end[] asm("_binary_weather_guangzhou_png_end");
+
+struct EmbeddedAsset {
+    const char *name;
+    const uint8_t *start;
+    const uint8_t *end;
+};
+
+constexpr EmbeddedAsset kDefaultUiAssets[] = {
+    {"alarm_siren.png", _binary_alarm_siren_png_start, _binary_alarm_siren_png_end},
+    {"color_wheel_220.png", _binary_color_wheel_220_png_start, _binary_color_wheel_220_png_end},
+    {"floor_1.png", _binary_floor_1_png_start, _binary_floor_1_png_end},
+    {"floor_2.png", _binary_floor_2_png_start, _binary_floor_2_png_end},
+    {"floor_3.png", _binary_floor_3_png_start, _binary_floor_3_png_end},
+    {"logo_robot.png", _binary_logo_robot_png_start, _binary_logo_robot_png_end},
+    {"overview_home.png", _binary_overview_home_png_start, _binary_overview_home_png_end},
+    {"scene_away.png", _binary_scene_away_png_start, _binary_scene_away_png_end},
+    {"scene_fire.png", _binary_scene_fire_png_start, _binary_scene_fire_png_end},
+    {"scene_home.png", _binary_scene_home_png_start, _binary_scene_home_png_end},
+    {"scene_lights.png", _binary_scene_lights_png_start, _binary_scene_lights_png_end},
+    {"scene_movie.png", _binary_scene_movie_png_start, _binary_scene_movie_png_end},
+    {"scene_night.png", _binary_scene_night_png_start, _binary_scene_night_png_end},
+    {"scene_rain.png", _binary_scene_rain_png_start, _binary_scene_rain_png_end},
+    {"scene_sleep.png", _binary_scene_sleep_png_start, _binary_scene_sleep_png_end},
+    {"siyin_logo.png", _binary_siyin_logo_png_start, _binary_siyin_logo_png_end},
+    {"weather_cloud.png", _binary_weather_cloud_png_start, _binary_weather_cloud_png_end},
+    {"weather_guangzhou.png", _binary_weather_guangzhou_png_start, _binary_weather_guangzhou_png_end},
+};
 
 esp_vfs_fat_sdmmc_mount_config_t MakeMountConfig()
 {
@@ -36,6 +101,12 @@ esp_vfs_fat_sdmmc_mount_config_t MakeMountConfig()
         .disk_status_check_enable = false,
         .use_one_fat = false,
     };
+}
+
+bool IsPngHeader(const uint8_t *data, size_t size)
+{
+    static constexpr uint8_t kPngMagic[] = {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+    return data && size >= sizeof(kPngMagic) && memcmp(data, kPngMagic, sizeof(kPngMagic)) == 0;
 }
 }
 
@@ -59,10 +130,10 @@ esp_err_t EspP4TfCard::Mount()
         return ret;
     }
 
-    // Step 2: Configure SDMMC host (1-bit, SDMMC_FREQ_DEFAULT, NO pwr_ctrl_handle)
+    // Step 2: Configure SDMMC host (1-bit, conservative frequency, NO pwr_ctrl_handle)
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     host.slot = SDMMC_HOST_SLOT_0;
-    host.max_freq_khz = SDMMC_FREQ_DEFAULT;
+    host.max_freq_khz = SDMMC_FREQ_PROBING;
     host.flags &= ~(SDMMC_HOST_FLAG_8BIT | SDMMC_HOST_FLAG_4BIT | SDMMC_HOST_FLAG_DDR);
     host.flags |= SDMMC_HOST_FLAG_1BIT;
     // IMPORTANT: Do NOT set host.pwr_ctrl_handle — the BSP official path leaves
@@ -95,7 +166,8 @@ esp_err_t EspP4TfCard::Mount()
 
     mounted_ = true;
     ESP_LOGI(TAG, "TF card mounted successfully at %s (SDMMC slot0, 1-bit)", kSdMountPoint);
-    sdmmc_card_print_info(stdout, card_);
+    LogCardInfo();
+    EnsureUiAssets();
     VerifyAssetFolder();
     return ESP_OK;
 }
@@ -188,6 +260,80 @@ void EspP4TfCard::LogRootEntries() const
         count++;
     }
     closedir(dir);
+}
+
+void EspP4TfCard::LogCardInfo() const
+{
+    if (card_ == nullptr) {
+        return;
+    }
+
+    const uint64_t bytes = (uint64_t)card_->csd.capacity * card_->csd.sector_size;
+    const uint32_t mib = (uint32_t)(bytes / (1024ULL * 1024ULL));
+    const uint32_t bus_width = 1U << card_->log_bus_width;
+    ESP_LOGI(TAG, "TF card: name=%s speed=%.2fMHz size=%uMiB sector=%u capacity=%u bus_width=%u",
+             card_->cid.name,
+             card_->real_freq_khz / 1000.0f,
+             mib,
+             (unsigned)card_->csd.sector_size,
+             (unsigned)card_->csd.capacity,
+             (unsigned)bus_width);
+}
+
+bool EspP4TfCard::EnsureUiAssets() const
+{
+    struct stat st;
+    if (stat(kUiAssetRoot, &st) != 0) {
+        if (mkdir(kUiAssetRoot, 0775) != 0 && errno != EEXIST) {
+            ESP_LOGW(TAG, "Failed to create UI asset folder %s (errno=%d)", kUiAssetRoot, errno);
+            return false;
+        }
+        ESP_LOGI(TAG, "Created UI asset folder: %s", kUiAssetRoot);
+        vTaskDelay(pdMS_TO_TICKS(50));
+    } else if (!S_ISDIR(st.st_mode)) {
+        ESP_LOGW(TAG, "UI asset path exists but is not a directory: %s", kUiAssetRoot);
+        return false;
+    }
+
+    int written = 0;
+    int preserved = 0;
+    for (const auto &asset : kDefaultUiAssets) {
+        const size_t size = (size_t)(asset.end - asset.start);
+        char path[160];
+        snprintf(path, sizeof(path), "%s/%s", kUiAssetRoot, asset.name);
+
+        bool should_write = true;
+        if (stat(path, &st) == 0 && S_ISREG(st.st_mode) && st.st_size > 0) {
+            should_write = false;
+            preserved++;
+        }
+        if (!should_write) {
+            continue;
+        }
+
+        if (!IsPngHeader(asset.start, size)) {
+            ESP_LOGW(TAG, "Embedded default asset is not PNG: %s", asset.name);
+            continue;
+        }
+
+        FILE *f = fopen(path, "wb");
+        if (!f) {
+            ESP_LOGW(TAG, "Failed to create default UI asset %s (errno=%d)", path, errno);
+            continue;
+        }
+        const size_t n = fwrite(asset.start, 1, size, f);
+        const int close_ret = fclose(f);
+        if (n != size || close_ret != 0) {
+            ESP_LOGW(TAG, "Failed to write complete UI asset %s (%u/%u, close=%d errno=%d)",
+                     asset.name, (unsigned)n, (unsigned)size, close_ret, errno);
+            continue;
+        }
+        written++;
+    }
+
+    ESP_LOGI(TAG, "UI asset bootstrap complete: written=%d preserved=%d total=%u",
+             written, preserved, (unsigned)(sizeof(kDefaultUiAssets) / sizeof(kDefaultUiAssets[0])));
+    return true;
 }
 
 void EspP4TfCard::VerifyAssetFolder() const

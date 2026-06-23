@@ -1,6 +1,7 @@
 #include "ui_font.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 LV_FONT_DECLARE(ui_font_cn_16);
 LV_FONT_DECLARE(ui_font_cn_20);
@@ -8,6 +9,24 @@ LV_FONT_DECLARE(ui_font_cn_30);
 LV_FONT_DECLARE(font_awesome_16_4);
 LV_FONT_DECLARE(font_awesome_20_4);
 LV_FONT_DECLARE(font_awesome_30_4);
+
+static lv_font_t s_cn_16_fallback;
+static lv_font_t s_cn_20_fallback;
+static lv_font_t s_cn_30_fallback;
+static bool s_cn_fallback_ready = false;
+
+static void init_cn_fallbacks(void)
+{
+    if (s_cn_fallback_ready) return;
+
+    s_cn_16_fallback = ui_font_cn_16;
+    s_cn_20_fallback = ui_font_cn_20;
+    s_cn_30_fallback = ui_font_cn_30;
+    s_cn_16_fallback.fallback = &lv_font_montserrat_14;
+    s_cn_20_fallback.fallback = &lv_font_montserrat_14;
+    s_cn_30_fallback.fallback = &lv_font_montserrat_14;
+    s_cn_fallback_ready = true;
+}
 
 #if LV_USE_TINY_TTF
 
@@ -40,6 +59,8 @@ static void *load_file(const char *path, size_t *out_size)
 
 void ui_font_init(void)
 {
+    init_cn_fallbacks();
+
     /* Load FontAwesome from SPIFFS */
     size_t fa_size = 0;
     void *fa_data = load_file("/spiffs/fa-solid-900.ttf", &fa_size);
@@ -56,9 +77,10 @@ void ui_font_init(void)
 
 const lv_font_t *ui_font_cn(uint8_t size)
 {
-    if (size <= 18) return &ui_font_cn_16;
-    if (size <= 24) return &ui_font_cn_20;
-    return &ui_font_cn_30;
+    init_cn_fallbacks();
+    if (size <= 18) return &s_cn_16_fallback;
+    if (size <= 24) return &s_cn_20_fallback;
+    return &s_cn_30_fallback;
 }
 
 const lv_font_t *ui_font_icon(uint8_t size)
@@ -73,13 +95,14 @@ const lv_font_t *ui_font_icon(uint8_t size)
 
 #else
 
-void ui_font_init(void) {}
+void ui_font_init(void) { init_cn_fallbacks(); }
 
 const lv_font_t *ui_font_cn(uint8_t size)
 {
-    if (size <= 18) return &ui_font_cn_16;
-    if (size <= 24) return &ui_font_cn_20;
-    return &ui_font_cn_30;
+    init_cn_fallbacks();
+    if (size <= 18) return &s_cn_16_fallback;
+    if (size <= 24) return &s_cn_20_fallback;
+    return &s_cn_30_fallback;
 }
 
 const lv_font_t *ui_font_icon(uint8_t size)
