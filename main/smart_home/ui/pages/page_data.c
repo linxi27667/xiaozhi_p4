@@ -431,9 +431,9 @@ static void build_visual(data_ctx_t *ctx)
     lv_obj_t *home_col = make_flex_col(home, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_flex_grow(home_col, 1);
     lv_obj_set_style_pad_row(home_col, 6, 0);
-    ui_create_label(home_col, tr("ESP32-P4 \xE4\xB8\xAD\xE6\x8E\xA7", "ESP32-P4 Hub"),
+    ui_create_label(home_col, tr("在线状态", "Online Status"),
                     ui_font_cn(22), UI_COLOR_TEXT_STRONG);
-    lv_snprintf(buf, sizeof(buf), "\xE5\xB9\xBF\xE5\xB7\x9E \xC2\xB7 3 \xE5\xB1\x82\xE5\x88\x86\xE5\xB8\x83\xE5\xBC\x8F \xC2\xB7 %u/3 \xE6\x8E\xA7\xE5\x88\xB6\xE5\x99\xA8\xE5\x9C\xA8\xE7\xBA\xBF",
+    lv_snprintf(buf, sizeof(buf), "智能家居3分布式 · %u/3 控制器在线",
                 (unsigned)controllers_online());
     ui_create_label(home_col, buf, ui_font_cn(15), UI_COLOR_TEXT_SEC);
     ui_create_label(home_col,
@@ -451,7 +451,7 @@ static void build_visual(data_ctx_t *ctx)
     lv_obj_set_width(weather_col, 0);
     lv_obj_set_flex_grow(weather_col, 1);
     lv_obj_set_style_pad_row(weather_col, 4, 0);
-    lv_obj_t *weather_title = ui_create_label(weather_col, tr("\xE5\xB9\xBF\xE5\xB7\x9E\xE5\xA4\xA9\xE6\xB0\x94", "Guangzhou Weather"),
+    lv_obj_t *weather_title = ui_create_label(weather_col, tr("天气", "Weather"),
                                               ui_font_cn(17), UI_COLOR_TEXT_STRONG);
     lv_label_set_long_mode(weather_title, LV_LABEL_LONG_DOT);
     lv_obj_set_width(weather_title, lv_pct(100));
@@ -599,12 +599,34 @@ lv_obj_t *page_data_create(lv_obj_t *parent)
     lv_obj_set_style_pad_column(title_group, 12, 0);
     lv_obj_clear_flag(title_group, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t *title = ui_kit_page_title(title_group, ICON_HOME,
-                                        tr("\xE6\x99\xBA\xE8\x83\xBD\xE5\xAE\xB6\xE5\xB1\x85\xE6\x80\xBB\xE8\xA7\x88", "Smart Home Overview"),
-                                        tr("\xE5\xB9\xBF\xE5\xB7\x9E \xC2\xB7 ESP32-P4 \xE4\xB8\xAD\xE6\x8E\xA7", "Guangzhou ESP32-P4 Hub"));
+    lv_obj_t *title = make_flex_row(title_group, LV_FLEX_ALIGN_START);
     lv_obj_set_width(title, 220);
+    lv_obj_set_style_pad_column(title, 12, 0);
+    lv_obj_set_style_pad_left(title, 4, 0);
 
-    /* 丝印图:放在标题"智能家居总览"右侧,优先加载 TF 卡中的 siyin_logo.png,缺失时回退到矢量 logo */
+    lv_obj_t *title_badge = lv_obj_create(title);
+    lv_obj_remove_style_all(title_badge);
+    lv_obj_set_size(title_badge, 34, 34);
+    lv_obj_set_style_bg_color(title_badge, UI_COLOR_ACCENT_SOFT, 0);
+    lv_obj_set_style_bg_opa(title_badge, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(title_badge, 8, 0);
+    lv_obj_clear_flag(title_badge, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *brand_icon = ui_asset_image_create(title_badge, "logo_robot.png");
+    if (brand_icon) {
+        lv_obj_center(brand_icon);
+    } else {
+        lv_obj_t *icon_obj = ui_create_icon(title_badge, ICON_HOME, ui_font_icon(20), UI_COLOR_ACCENT);
+        lv_obj_center(icon_obj);
+    }
+
+    lv_obj_t *title_text = make_flex_col(title, LV_FLEX_ALIGN_START);
+    lv_obj_set_flex_grow(title_text, 1);
+    lv_obj_set_style_pad_row(title_text, 2, 0);
+    ui_create_label(title_text, tr("智享家", "ZhiXiang Home"), ui_font_cn(22), UI_COLOR_TEXT_STRONG);
+    ui_create_label(title_text, tr("智能家居中控平台", "Smart Home Control Platform"), ui_font_cn(13), UI_COLOR_TEXT_SEC);
+
+    /* 丝印图:放在标题组右侧,优先加载 TF 卡中的 siyin_logo.png,缺失时回退到矢量 logo */
     lv_obj_t *siyin_box = lv_obj_create(title_group);
     lv_obj_remove_style_all(siyin_box);
     lv_obj_set_size(siyin_box, 330, 60);

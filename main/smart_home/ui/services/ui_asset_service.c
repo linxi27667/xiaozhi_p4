@@ -65,30 +65,36 @@ typedef struct {
     const uint8_t *embedded_start;
     const uint8_t *embedded_end;
     long legacy_size;
+    uint16_t target_w;
+    uint16_t target_h;
 } ui_asset_def_t;
 
 static const ui_asset_def_t s_required_assets[] = {
-    {"siyin_logo.png", _binary_siyin_logo_png_start, _binary_siyin_logo_png_end, 9857},
-    {"overview_home.png", _binary_overview_home_png_start, _binary_overview_home_png_end, 1838},
-    {"weather_guangzhou.png", _binary_weather_guangzhou_png_start, _binary_weather_guangzhou_png_end, 1381},
-    {"weather_cloud.png", _binary_weather_cloud_png_start, _binary_weather_cloud_png_end, 1511},
-    {"floor_1.png", _binary_floor_1_png_start, _binary_floor_1_png_end, 981},
-    {"floor_2.png", _binary_floor_2_png_start, _binary_floor_2_png_end, 999},
-    {"floor_3.png", _binary_floor_3_png_start, _binary_floor_3_png_end, 1005},
-    {"alarm_siren.png", _binary_alarm_siren_png_start, _binary_alarm_siren_png_end, 1428},
-    {"logo_robot.png", _binary_logo_robot_png_start, _binary_logo_robot_png_end, 2271},
-    {"scene_lights.png", _binary_scene_lights_png_start, _binary_scene_lights_png_end, 786},
-    {"scene_home.png", _binary_scene_home_png_start, _binary_scene_home_png_end, 724},
-    {"scene_away.png", _binary_scene_away_png_start, _binary_scene_away_png_end, 671},
-    {"scene_sleep.png", _binary_scene_sleep_png_start, _binary_scene_sleep_png_end, 772},
-    {"scene_movie.png", _binary_scene_movie_png_start, _binary_scene_movie_png_end, 652},
-    {"scene_night.png", _binary_scene_night_png_start, _binary_scene_night_png_end, 831},
-    {"scene_rain.png", _binary_scene_rain_png_start, _binary_scene_rain_png_end, 1485},
-    {"scene_fire.png", _binary_scene_fire_png_start, _binary_scene_fire_png_end, 2523},
-    {"color_wheel_220.png", _binary_color_wheel_220_png_start, _binary_color_wheel_220_png_end, 20412},
+    {"siyin_logo.png", _binary_siyin_logo_png_start, _binary_siyin_logo_png_end, 9857, 330, 60},
+    {"overview_home.png", _binary_overview_home_png_start, _binary_overview_home_png_end, 1838, 148, 82},
+    {"weather_guangzhou.png", _binary_weather_guangzhou_png_start, _binary_weather_guangzhou_png_end, 1381, 88, 70},
+    {"weather_cloud.png", _binary_weather_cloud_png_start, _binary_weather_cloud_png_end, 1511, 96, 72},
+    {"floor_1.png", _binary_floor_1_png_start, _binary_floor_1_png_end, 981, 82, 56},
+    {"floor_2.png", _binary_floor_2_png_start, _binary_floor_2_png_end, 999, 82, 56},
+    {"floor_3.png", _binary_floor_3_png_start, _binary_floor_3_png_end, 1005, 82, 56},
+    {"alarm_siren.png", _binary_alarm_siren_png_start, _binary_alarm_siren_png_end, 1428, 96, 72},
+    {"logo_robot.png", _binary_logo_robot_png_start, _binary_logo_robot_png_end, 2271, 28, 28},
+    {"scene_lights.png", _binary_scene_lights_png_start, _binary_scene_lights_png_end, 786, 36, 36},
+    {"scene_home.png", _binary_scene_home_png_start, _binary_scene_home_png_end, 724, 36, 36},
+    {"scene_away.png", _binary_scene_away_png_start, _binary_scene_away_png_end, 671, 36, 36},
+    {"scene_sleep.png", _binary_scene_sleep_png_start, _binary_scene_sleep_png_end, 772, 36, 36},
+    {"scene_movie.png", _binary_scene_movie_png_start, _binary_scene_movie_png_end, 652, 36, 36},
+    {"scene_night.png", _binary_scene_night_png_start, _binary_scene_night_png_end, 831, 36, 36},
+    {"scene_rain.png", _binary_scene_rain_png_start, _binary_scene_rain_png_end, 1485, 36, 36},
+    {"scene_fire.png", _binary_scene_fire_png_start, _binary_scene_fire_png_end, 2523, 36, 36},
+    {"color_wheel_220.png", _binary_color_wheel_220_png_start, _binary_color_wheel_220_png_end, 20412, 220, 220},
 };
 
 #define UI_ASSET_COUNT (sizeof(s_required_assets) / sizeof(s_required_assets[0]))
+#define UI_ASSET_MIN_CACHE_BUDGET_BYTES (64U * 1024U)
+#define UI_ASSET_MAX_CACHE_BUDGET_BYTES (256U * 1024U)
+#define UI_ASSET_CACHE_BUDGET_MULTIPLIER 4U
+#define UI_ASSET_BYTES_PER_PIXEL_GUARD 4U
 
 typedef struct {
     const char *name;
@@ -226,6 +232,50 @@ static const ui_asset_def_t *find_asset_def(const char *name)
     return NULL;
 }
 
+static uint32_t asset_cache_budget_bytes(const ui_asset_def_t *def)
+{
+    if (!def || def->target_w == 0 || def->target_h == 0) {
+        return UI_ASSET_MIN_CACHE_BUDGET_BYTES;
+    }
+
+    uint32_t budget = (uint32_t)def->target_w * (uint32_t)def->target_h *
+                      UI_ASSET_BYTES_PER_PIXEL_GUARD * UI_ASSET_CACHE_BUDGET_MULTIPLIER;
+    if (budget < UI_ASSET_MIN_CACHE_BUDGET_BYTES) {
+        budget = UI_ASSET_MIN_CACHE_BUDGET_BYTES;
+    }
+    if (budget > UI_ASSET_MAX_CACHE_BUDGET_BYTES) {
+        budget = UI_ASSET_MAX_CACHE_BUDGET_BYTES;
+    }
+    return budget;
+}
+
+static bool asset_png_header_ok_for_cache(const char *name,
+                                          const lv_image_header_t *header,
+                                          bool enforce_budget)
+{
+    if (!header || header->w == 0 || header->h == 0) {
+        return false;
+    }
+    if (!enforce_budget) {
+        return true;
+    }
+
+    const ui_asset_def_t *def = find_asset_def(name);
+    const uint32_t decoded_upper_bound =
+        (uint32_t)header->w * (uint32_t)header->h * UI_ASSET_BYTES_PER_PIXEL_GUARD;
+    const uint32_t budget = asset_cache_budget_bytes(def);
+    if (decoded_upper_bound > budget) {
+        ESP_LOGW(TAG, "asset oversized for UI/cache, fallback embedded: %s %ldx%ld decoded~%lu budget=%lu",
+                 name ? name : "(null)",
+                 (long)header->w,
+                 (long)header->h,
+                 (unsigned long)decoded_upper_bound,
+                 (unsigned long)budget);
+        return false;
+    }
+    return true;
+}
+
 static void invalidate_cache_entry(ui_asset_cache_entry_t *entry, const char *reason)
 {
     if (!entry || !entry->valid) return;
@@ -284,7 +334,8 @@ static void update_cache_metadata(ui_asset_cache_entry_t *entry)
 
 static bool decode_asset_to_cache(ui_asset_cache_entry_t *entry,
                                   const uint8_t *data,
-                                  uint32_t data_size)
+                                  uint32_t data_size,
+                                  bool enforce_budget)
 {
     if (!entry || !data || data_size == 0 || !asset_is_png(data, data_size)) {
         return false;
@@ -296,6 +347,12 @@ static bool decode_asset_to_cache(ui_asset_cache_entry_t *entry,
     tmp_dsc.data_size = data_size;
     tmp_dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
     tmp_dsc.header.cf = LV_COLOR_FORMAT_UNKNOWN;
+
+    lv_image_header_t header;
+    if (lv_image_decoder_get_info(&tmp_dsc, &header) != LV_RESULT_OK ||
+        !asset_png_header_ok_for_cache(entry->name, &header, enforce_budget)) {
+        return false;
+    }
 
     lv_image_decoder_dsc_t decoder_dsc;
     memset(&decoder_dsc, 0, sizeof(decoder_dsc));
@@ -365,7 +422,7 @@ static bool decode_embedded_asset_to_cache(ui_asset_cache_entry_t *entry)
     }
 
     const uint32_t size = (uint32_t)(def->embedded_end - def->embedded_start);
-    if (!decode_asset_to_cache(entry, def->embedded_start, size)) {
+    if (!decode_asset_to_cache(entry, def->embedded_start, size, false)) {
         ESP_LOGW(TAG, "embedded asset decode FAIL: %s", entry->name);
         return false;
     }
@@ -498,6 +555,11 @@ static lv_obj_t *asset_image_obj_create(lv_obj_t *parent, ui_asset_image_payload
 {
     lv_obj_t *img = lv_image_create(parent);
     lv_image_set_src(img, src);
+    const ui_asset_def_t *def = payload ? find_asset_def(payload->name) : NULL;
+    if (def && def->target_w > 0 && def->target_h > 0) {
+        lv_obj_set_size(img, def->target_w, def->target_h);
+        lv_image_set_inner_align(img, LV_IMAGE_ALIGN_CONTAIN);
+    }
     lv_obj_clear_flag(img, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(img, asset_image_delete_cb, LV_EVENT_DELETE, payload);
     return img;
@@ -672,12 +734,18 @@ int ui_asset_service_preload_required(void)
         heap_caps_free(s_asset_cache[i].data);
         s_asset_cache[i].data = NULL;
         s_asset_cache[i].data_size = 0;
-        if (decode_asset_to_cache(&s_asset_cache[i], data, data_size)) {
+        if (decode_asset_to_cache(&s_asset_cache[i], data, data_size, true)) {
             heap_caps_free(data);
         } else {
-            s_asset_cache[i].data = data;
-            s_asset_cache[i].data_size = data_size;
-            ESP_LOGW(TAG, "preload kept raw PNG fallback: %s", name);
+            heap_caps_free(data);
+            data = NULL;
+            if (decode_embedded_asset_to_cache(&s_asset_cache[i])) {
+                const uint32_t embedded_size =
+                    (uint32_t)(s_required_assets[i].embedded_end - s_required_assets[i].embedded_start);
+                s_preload_count++;
+                s_preload_bytes += embedded_size;
+            }
+            continue;
         }
         s_asset_cache[i].valid = true;
         update_cache_metadata(&s_asset_cache[i]);
@@ -787,98 +855,19 @@ lv_obj_t *ui_asset_image_create(lv_obj_t *parent, const char *name)
         return NULL;
     }
 
-    if (entry && decode_asset_to_cache(entry, data, data_size)) {
+    if (entry && decode_asset_to_cache(entry, data, data_size, true)) {
         entry->valid = true;
         update_cache_metadata(entry);
         heap_caps_free(data);
         return asset_image_obj_create(parent, payload, &entry->decoded_dsc);
     }
 
-    /* Set up a temporary dsc with raw PNG data for decoding.
-     * LV_COLOR_FORMAT_UNKNOWN tells LVGL to detect format from image data. */
-    lv_image_dsc_t tmp_dsc;
-    tmp_dsc.data = data;
-    tmp_dsc.data_size = data_size;
-    tmp_dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
-    tmp_dsc.header.cf = LV_COLOR_FORMAT_UNKNOWN;
-
-    lv_image_header_t header;
-    if (lv_image_decoder_get_info(&tmp_dsc, &header) != LV_RESULT_OK) {
-        heap_caps_free(data);
-        return asset_file_image_create(parent, payload, "decode header failed");
+    heap_caps_free(data);
+    if (entry && decode_embedded_asset_to_cache(entry)) {
+        return asset_image_obj_create(parent, payload, &entry->decoded_dsc);
     }
-
-    /* Pre-decode PNG to ARGB8888 once at load time. This eliminates the
-     * per-frame lodepng software decode during rendering, which is the
-     * primary cause of UI frame rate drops on page switches. */
-    lv_image_decoder_dsc_t decoder_dsc;
-    lv_image_decoder_args_t decoder_args = {
-        .no_cache = true,
-    };
-    lv_result_t open_res = lv_image_decoder_open(&decoder_dsc, &tmp_dsc, &decoder_args);
-
-    if (open_res == LV_RESULT_OK && decoder_dsc.decoded != NULL) {
-        const lv_draw_buf_t *decoded_buf = decoder_dsc.decoded;
-        uint32_t decoded_size = decoded_buf->data_size;
-        const uint8_t *decoded_data = decoded_buf->data;
-        lv_color_format_t decoded_cf = decoded_buf->header.cf;
-        uint32_t decoded_w = decoded_buf->header.w;
-        uint32_t decoded_h = decoded_buf->header.h;
-        uint32_t decoded_stride = decoded_buf->header.stride;
-
-        if (decoded_size > 0 && decoded_data != NULL) {
-            uint8_t *argb_data = (uint8_t *)asset_malloc(decoded_size);
-            if (argb_data) {
-                memcpy(argb_data, decoded_data, decoded_size);
-
-                /* Release original PNG bytes; decoded ARGB8888 replaces it. */
-                heap_caps_free(data);
-                data = NULL;
-
-                payload->data = argb_data;
-                payload->data_size = decoded_size;
-                payload->owns_data = true;
-                payload->dsc.data = argb_data;
-                payload->dsc.data_size = decoded_size;
-                payload->dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
-                payload->dsc.header.cf = decoded_cf;
-                payload->dsc.header.w = decoded_w;
-                payload->dsc.header.h = decoded_h;
-                payload->dsc.header.stride = decoded_stride;
-
-                lv_image_decoder_close(&decoder_dsc);
-
-                lv_obj_t *img = asset_image_obj_create(parent, payload, &payload->dsc);
-
-                ESP_LOGD(TAG, "asset image pre-decoded: %s size=%ldx%ld bytes=%lu",
-                         payload->name, (long)decoded_w, (long)decoded_h, (unsigned long)decoded_size);
-                return img;
-            }
-            ESP_LOGW(TAG, "image_create ARGB malloc FAIL, fallback to raw: %s", payload->name);
-        } else {
-            ESP_LOGW(TAG, "image_create decode empty, fallback to raw: %s", payload->name);
-        }
-        lv_image_decoder_close(&decoder_dsc);
-    } else {
-        ESP_LOGW(TAG, "image_create decode FAIL, fallback to raw: %s", payload->name);
-    }
-
-    /* Fallback: keep raw PNG data and let LVGL decode per-frame (original path). */
-    payload->data = data;
-    payload->data_size = data_size;
-    payload->owns_data = true;
-    payload->dsc.data = payload->data;
-    payload->dsc.data_size = payload->data_size;
-    payload->dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
-    payload->dsc.header.cf = LV_COLOR_FORMAT_UNKNOWN;
-    payload->dsc.header.w = header.w;
-    payload->dsc.header.h = header.h;
-
-    lv_obj_t *img = asset_image_obj_create(parent, payload, &payload->dsc);
-
-    ESP_LOGD(TAG, "asset image ready (raw): %s size=%ldx%ld bytes=%lu",
-             payload->name, (long)header.w, (long)header.h, (unsigned long)data_size);
-    return img;
+    heap_caps_free(payload);
+    return NULL;
 }
 
 void ui_asset_service_diagnose(void)
