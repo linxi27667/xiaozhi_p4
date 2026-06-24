@@ -22,7 +22,7 @@ namespace {
 constexpr char kSdMountPoint[] = "/sdcard";
 constexpr char kUiAssetRoot[] = "/sdcard/xiaozhi_ui";
 constexpr char kUiAssetVersionPath[] = "/sdcard/xiaozhi_ui/.xiaozhi_assets_version";
-constexpr char kUiAssetVersion[] = "premium-2026-06-v2\n";
+constexpr char kUiAssetVersion[] = "premium-2026-06-v3\n";
 constexpr gpio_num_t kSdPowerEnableGpio = GPIO_NUM_45;  // SD_PWRn (active low)
 constexpr int kSdLdoChannel = 4;                         // LDO_VO4
 constexpr int kSdVoltageMv = 3300;
@@ -106,7 +106,7 @@ constexpr LegacyAssetFingerprint kLegacyDefaultAssets[] = {
     {"floor_1.png", 981, 0x78525619},
     {"floor_2.png", 999, 0xbd955424},
     {"floor_3.png", 1005, 0x5e49d0b8},
-    {"logo_robot.png", 2271, 0x837be4cc},
+    {"logo_robot.png", 5188, 0x7a3bc676},
     {"overview_home.png", 1838, 0xb83c74b6},
     {"scene_away.png", 671, 0x53a9beb0},
     {"scene_fire.png", 2523, 0xebadac3d},

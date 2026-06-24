@@ -606,7 +606,7 @@ lv_obj_t *page_data_create(lv_obj_t *parent)
 
     lv_obj_t *title_badge = lv_obj_create(title);
     lv_obj_remove_style_all(title_badge);
-    lv_obj_set_size(title_badge, 34, 34);
+    lv_obj_set_size(title_badge, 60, 60);
     lv_obj_set_style_bg_color(title_badge, UI_COLOR_ACCENT_SOFT, 0);
     lv_obj_set_style_bg_opa(title_badge, LV_OPA_COVER, 0);
     lv_obj_set_style_radius(title_badge, 8, 0);

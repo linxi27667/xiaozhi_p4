@@ -78,7 +78,7 @@ static const ui_asset_def_t s_required_assets[] = {
     {"floor_2.png", _binary_floor_2_png_start, _binary_floor_2_png_end, 999, 82, 56},
     {"floor_3.png", _binary_floor_3_png_start, _binary_floor_3_png_end, 1005, 82, 56},
     {"alarm_siren.png", _binary_alarm_siren_png_start, _binary_alarm_siren_png_end, 1428, 96, 72},
-    {"logo_robot.png", _binary_logo_robot_png_start, _binary_logo_robot_png_end, 2271, 28, 28},
+    {"logo_robot.png", _binary_logo_robot_png_start, _binary_logo_robot_png_end, 5188, 56, 56},
     {"scene_lights.png", _binary_scene_lights_png_start, _binary_scene_lights_png_end, 786, 36, 36},
     {"scene_home.png", _binary_scene_home_png_start, _binary_scene_home_png_end, 724, 36, 36},
     {"scene_away.png", _binary_scene_away_png_start, _binary_scene_away_png_end, 671, 36, 36},
