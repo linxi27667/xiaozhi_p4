@@ -81,6 +81,11 @@ static void refresh_device_value(rc_device_t *d)
             lv_snprintf(d->value_text, sizeof(d->value_text),
                 d->power_on ? "角度 %u°" : "已关闭", (unsigned)d->value);
             break;
+        case RC_DEVICE_MAIN_POWER:
+            d->value = d->power_on ? 1 : 0;
+            lv_snprintf(d->value_text, sizeof(d->value_text),
+                d->power_on ? "已开启" : "已关闭");
+            break;
     }
 }
 
@@ -100,7 +105,8 @@ static void add_device(rc_floor_t floor, rc_device_type_t type,
     d->floor_id = floor_id;
     d->cmd_type = cmd_type;
     d->gpio_index = gpio_index;
-    d->servo_open_angle = 180;  /* 默认全开180度,3F天窗会在init中覆盖为135 */
+    d->servo_open_angle = 180;
+    d->servo_close_angle = 0;
     refresh_device_value(d);
 }
 
@@ -113,6 +119,42 @@ static rc_device_t *find_device(const char *id)
         }
     }
     return NULL;
+}
+
+static bool rain_hanger_lock_active_locked(void)
+{
+    return s_model.rain_status_floor_valid[2] && s_model.rain_floor_status[2] != 0;
+}
+
+static bool is_rain_locked_hanger(const rc_device_t *d)
+{
+    return d && (strcmp(d->id, "floor2_hanger") == 0 ||
+                 strcmp(d->id, "floor3_hanger") == 0);
+}
+
+static void refresh_all_main_power_locked(void)
+{
+    rc_device_t *all = find_device("floor_all_main_power");
+    if (!all) return;
+
+    bool any_known = false;
+    bool all_on = true;
+    for (uint16_t i = 0; i < s_model.device_count; i++) {
+        rc_device_t *d = &s_model.devices[i];
+        if (d->type != RC_DEVICE_MAIN_POWER || d->floor == RC_FLOOR_ALL) {
+            continue;
+        }
+        if (d->connected) {
+            any_known = true;
+            if (!d->power_on) {
+                all_on = false;
+            }
+        }
+    }
+
+    all->connected = any_known;
+    all->power_on = any_known && all_on;
+    refresh_device_value(all);
 }
 
 void device_model_init(void)
@@ -132,26 +174,40 @@ void device_model_init(void)
     snprintf(s_model.weather_location, sizeof(s_model.weather_location), "%s", "广州");
 
     /*                    floor   type            id                      name       ctrl  floor_id  cmd_type           gpio_idx */
+    add_device(RC_FLOOR_ALL, RC_DEVICE_MAIN_POWER, "floor_all_main_power", "\xE6\x80\xBB\xE5\xBC\x80\xE5\x85\xB3", true, 0, IOT_CMD_SET_MAIN_POWER, 0); /* 总开关 */
+    add_device(RC_FLOOR_1, RC_DEVICE_MAIN_POWER, "floor1_main_power", "\xE4\xB8\x80\xE6\xA5\xBC\xE6\x80\xBB\xE5\xBC\x80\xE5\x85\xB3", true, 1, IOT_CMD_SET_MAIN_POWER, 0); /* 一楼总开关 */
     add_device(RC_FLOOR_1, RC_DEVICE_DOOR,   "floor1_gate",         "\xE5\xA4\xA7\xE9\x97\xA8",     true, 1, IOT_CMD_SET_SERVO, 6);   /* 大门 */
     add_device(RC_FLOOR_1, RC_DEVICE_LIGHT,  "floor1_hall_light",   "\xE5\xA4\xA7\xE5\x8E\x85\xE7\x81\xAF", true, 1, IOT_CMD_SET_LIGHT, 0); /* 大厅灯 */
-    add_device(RC_FLOOR_2, RC_DEVICE_RGB_LIGHT, "floor2_master_light", "\xE4\xB8\xBB\xE5\x8D\xA7\xE7\x81\xAF", true, 2, IOT_CMD_SET_RGB_LIGHT, 0); /* 主卧灯(RGB, 由WS2812B驱动) */
+    add_device(RC_FLOOR_2, RC_DEVICE_MAIN_POWER, "floor2_main_power", "\xE4\xBA\x8C\xE6\xA5\xBC\xE6\x80\xBB\xE5\xBC\x80\xE5\x85\xB3", true, 2, IOT_CMD_SET_MAIN_POWER, 0); /* 二楼总开关 */
+    add_device(RC_FLOOR_2, RC_DEVICE_RGB_LIGHT, "floor2_master_light", "\xE5\x8D\xA7\xE5\xAE\xA4\xE7\x81\xAF", true, 2, IOT_CMD_SET_RGB_LIGHT, 0); /* 卧室灯(RGB, 由WS2812B驱动) */
     add_device(RC_FLOOR_2, RC_DEVICE_LIGHT,  "floor2_living_light", "\xE5\xAE\xA2\xE5\x8E\x85\xE7\x81\xAF", true, 2, IOT_CMD_SET_LIGHT, 1); /* 客厅灯 */
     add_device(RC_FLOOR_2, RC_DEVICE_LIGHT,  "floor2_toilet_light", "\xE5\x8E\x95\xE6\x89\x80\xE7\x81\xAF", true, 2, IOT_CMD_SET_LIGHT, 2); /* 厕所灯 */
     add_device(RC_FLOOR_2, RC_DEVICE_FAN,    "floor2_fan",          "\xE9\xA3\x8E\xE6\x89\x87",     true, 2, IOT_CMD_SET_RELAY, 0);   /* 风扇 */
-    add_device(RC_FLOOR_2, RC_DEVICE_WINDOW, "floor2_hanger",       "\xE4\xBA\x8C\xE6\xA5\xBC\xE6\x99\xBE\xE8\xA1\xA3\xE6\x9D\x86", true, 2, IOT_CMD_SET_SERVO, 6); /* 二楼晾衣杆 */
+    add_device(RC_FLOOR_2, RC_DEVICE_WINDOW, "floor2_hanger",       "\xE4\xBA\x8C\xE6\xA5\xBC\xE6\x99\xBE\xE8\xA1\xA3\xE6\x9D\x86", true, 2, IOT_CMD_SET_SERVO, 8); /* 二楼晾衣杆 */
+    add_device(RC_FLOOR_3, RC_DEVICE_MAIN_POWER, "floor3_main_power", "\xE4\xB8\x89\xE6\xA5\xBC\xE6\x80\xBB\xE5\xBC\x80\xE5\x85\xB3", true, 3, IOT_CMD_SET_MAIN_POWER, 0); /* 三楼总开关 */
     add_device(RC_FLOOR_3, RC_DEVICE_LIGHT,  "floor3_balcony_light","\xE9\x98\xB3\xE5\x8F\xB0\xE7\x81\xAF", true, 3, IOT_CMD_SET_LIGHT, 0); /* 阳台灯 */
-    add_device(RC_FLOOR_3, RC_DEVICE_WINDOW, "floor3_left_skylight","\xE5\xB7\xA6\xE5\xA4\xA9\xE7\xAA\x97", true, 3, IOT_CMD_SET_SERVO, 6); /* 左天窗 */
-    add_device(RC_FLOOR_3, RC_DEVICE_WINDOW, "floor3_right_skylight","\xE5\x8F\xB3\xE5\xA4\xA9\xE7\xAA\x97", true, 3, IOT_CMD_SET_SERVO, 7); /* 右天窗 */
+    add_device(RC_FLOOR_3, RC_DEVICE_WINDOW, "floor3_right_skylight","\xE5\x8F\xB3\xE5\xA4\xA9\xE7\xAA\x97", true, 3, IOT_CMD_SET_SERVO, 6); /* 右天窗 */
+    add_device(RC_FLOOR_3, RC_DEVICE_WINDOW, "floor3_left_skylight","\xE5\xB7\xA6\xE5\xA4\xA9\xE7\xAA\x97", true, 3, IOT_CMD_SET_SERVO, 7); /* 左天窗 */
     add_device(RC_FLOOR_3, RC_DEVICE_WINDOW, "floor3_hanger",       "\xE4\xB8\x89\xE6\xA5\xBC\xE6\x99\xBE\xE8\xA1\xA3\xE6\x9D\x86", true, 3, IOT_CMD_SET_SERVO, 8); /* 三楼晾衣杆 */
 
-    /* 3F 天窗机械限位: 只接受 0/25/70/135 度, 全开=135 而非 180 */
+    rc_device_t *gate = find_device("floor1_gate");
+    if (gate) {
+        gate->servo_open_angle = 135;
+        gate->servo_close_angle = 0;
+    }
+
+    /* 3F 天窗机械限位: GPIO8右天窗 90开/180关；GPIO11左天窗 90开/0关 */
     for (uint16_t i = 0; i < s_model.device_count; i++) {
         rc_device_t *d = &s_model.devices[i];
         if (d->floor == RC_FLOOR_3 && d->type == RC_DEVICE_WINDOW &&
-            d->cmd_type == IOT_CMD_SET_SERVO &&
-            (strcmp(d->id, "floor3_left_skylight") == 0 ||
-             strcmp(d->id, "floor3_right_skylight") == 0)) {
-            d->servo_open_angle = 135;
+            d->cmd_type == IOT_CMD_SET_SERVO) {
+            if (strcmp(d->id, "floor3_right_skylight") == 0) {
+                d->servo_open_angle = 90;
+                d->servo_close_angle = 180;
+            } else if (strcmp(d->id, "floor3_left_skylight") == 0) {
+                d->servo_open_angle = 90;
+                d->servo_close_angle = 0;
+            }
         }
     }
 
@@ -190,6 +246,7 @@ const rc_device_t *device_model_at(uint16_t index)
 const char *device_model_floor_name(rc_floor_t floor)
 {
     switch (floor) {
+        case RC_FLOOR_ALL: return "全部";
         case RC_FLOOR_1: return "一楼";
         case RC_FLOOR_2: return "二楼";
         case RC_FLOOR_3: return "三楼";
@@ -205,6 +262,7 @@ const char *device_model_type_name(rc_device_type_t type)
         case RC_DEVICE_FAN:   return "通风";
         case RC_DEVICE_DOOR:  return "门禁";
         case RC_DEVICE_WINDOW:return "窗控";
+        case RC_DEVICE_MAIN_POWER: return "总开关";
         default: return "设备";
     }
 }
@@ -217,6 +275,7 @@ const char *device_model_type_icon(rc_device_type_t type)
         case RC_DEVICE_FAN:   return ICON_FAN;
         case RC_DEVICE_DOOR:  return ICON_HOME;
         case RC_DEVICE_WINDOW:return ICON_WINDOW;
+        case RC_DEVICE_MAIN_POWER: return ICON_POWER;
         default: return ICON_POWER;
     }
 }
@@ -229,6 +288,40 @@ void device_model_toggle_device(uint16_t index)
     device_model_set_power(index, !d->power_on);
 }
 
+static void apply_power_state_locked(rc_device_t *d, bool on)
+{
+    if (!d) return;
+
+    d->connected = true;
+    d->power_on = on;
+
+    if (d->type == RC_DEVICE_RGB_LIGHT) {
+        if (on && d->red == 0 && d->green == 0 && d->blue == 0) {
+            d->red = 255;
+            d->green = 160;
+            d->blue = 80;
+        }
+        d->brightness = on ? 100 : 0;
+    } else if (d->cmd_type == IOT_CMD_SET_SERVO) {
+        d->value = on ? d->servo_open_angle : d->servo_close_angle;
+    } else {
+        d->value = on ? 1 : 0;
+    }
+
+    refresh_device_value(d);
+}
+
+static void apply_all_main_power_locked(bool on)
+{
+    for (uint16_t i = 0; i < s_model.device_count; i++) {
+        rc_device_t *d = &s_model.devices[i];
+        if (d->type == RC_DEVICE_MAIN_POWER) {
+            apply_power_state_locked(d, on);
+        }
+    }
+    refresh_all_main_power_locked();
+}
+
 static void set_power_internal(uint16_t index, bool on, bool publish_mqtt)
 {
     if (index >= s_model.device_count) return;
@@ -236,51 +329,78 @@ static void set_power_internal(uint16_t index, bool on, bool publish_mqtt)
     rc_device_t *d = &s_model.devices[index];
     if (!d->controllable) { model_unlock(); return; }
 
-    if (publish_mqtt) {
-        if (d->cmd_type == IOT_CMD_SET_RGB_LIGHT) {
-            /* RGB 灯走专用通道: 开=恢复颜色, 关=全黑 */
-            if (on) {
-                uint8_t r = d->red   ? d->red   : 255;
-                uint8_t g = d->green ? d->green : 160;
-                uint8_t b = d->blue  ? d->blue  : 80;
-                uint8_t br = d->brightness ? d->brightness : 60;
-                model_unlock();
-                mqtt_send_rgb_light(d->floor_id, d->gpio_index, r, g, b, br, d->effect, 0);
-            } else {
-                uint8_t floor_id = d->floor_id;
-                uint8_t gpio_index = d->gpio_index;
-                model_unlock();
-                mqtt_send_rgb_light(floor_id, gpio_index, 0, 0, 0, 0, IOT_LIGHT_EFFECT_STATIC, 0);
-            }
-        } else if (d->cmd_type == IOT_CMD_SET_SERVO) {
-            uint8_t value = on ? d->servo_open_angle : 0;
-            uint8_t floor_id = d->floor_id;
-            uint8_t cmd_type = d->cmd_type;
-            uint8_t gpio_index = d->gpio_index;
-            model_unlock();
-            mqtt_send_command(floor_id, cmd_type, gpio_index, value);
-        } else {
-            uint8_t value = on ? 1 : 0;  /* light/relay: on=1, off=0 */
-            uint8_t floor_id = d->floor_id;
-            uint8_t cmd_type = d->cmd_type;
-            uint8_t gpio_index = d->gpio_index;
-            model_unlock();
+    if (on && is_rain_locked_hanger(d) && rain_hanger_lock_active_locked()) {
+        uint8_t floor_id = d->floor_id;
+        uint8_t cmd_type = d->cmd_type;
+        uint8_t gpio_index = d->gpio_index;
+        uint8_t value = d->servo_close_angle;
+        d->connected = true;
+        d->power_on = false;
+        d->value = value;
+        refresh_device_value(d);
+        publish_update();
+        model_unlock();
+        if (publish_mqtt) {
             mqtt_send_command(floor_id, cmd_type, gpio_index, value);
         }
         return;
     }
 
-    d->power_on = on;
-    d->connected = true;
-    if (d->type == RC_DEVICE_RGB_LIGHT) {
-        d->brightness = on ? (d->brightness ? d->brightness : 60) : 0;
-        if (on && d->red == 0 && d->green == 0 && d->blue == 0) {
-            d->red = 255;
-            d->green = 160;
-            d->blue = 80;
+    if (publish_mqtt) {
+        uint8_t floor_id = d->floor_id;
+        uint8_t cmd_type = d->cmd_type;
+        uint8_t gpio_index = d->gpio_index;
+        uint8_t value = on ? 1 : 0;
+        uint8_t r = d->red;
+        uint8_t g = d->green;
+        uint8_t b = d->blue;
+        uint8_t brightness = d->brightness;
+        uint8_t effect = d->effect;
+
+        if (cmd_type == IOT_CMD_SET_MAIN_POWER && floor_id == 0) {
+            apply_all_main_power_locked(on);
+        } else {
+            apply_power_state_locked(d, on);
+            if (cmd_type == IOT_CMD_SET_MAIN_POWER) {
+                refresh_all_main_power_locked();
+            }
+        }
+
+        if (cmd_type == IOT_CMD_SET_RGB_LIGHT) {
+            r = d->red;
+            g = d->green;
+            b = d->blue;
+            brightness = d->brightness;
+            effect = d->effect;
+        } else if (cmd_type == IOT_CMD_SET_SERVO) {
+            value = d->value;
+        }
+
+        publish_update();
+        model_unlock();
+
+        if (cmd_type == IOT_CMD_SET_RGB_LIGHT) {
+            mqtt_send_rgb_light(floor_id, gpio_index, r, g, b, brightness, effect, 0);
+        } else if (cmd_type == IOT_CMD_SET_MAIN_POWER) {
+            if (floor_id == 0) {
+                mqtt_send_all_main_power(on);
+            } else {
+                mqtt_send_main_power(floor_id, on);
+            }
+        } else {
+            mqtt_send_command(floor_id, cmd_type, gpio_index, value);
+        }
+        return;
+    }
+
+    if (d->cmd_type == IOT_CMD_SET_MAIN_POWER && d->floor_id == 0) {
+        apply_all_main_power_locked(on);
+    } else {
+        apply_power_state_locked(d, on);
+        if (d->cmd_type == IOT_CMD_SET_MAIN_POWER) {
+            refresh_all_main_power_locked();
         }
     }
-    refresh_device_value(d);
     publish_update();
     model_unlock();
 }
@@ -312,6 +432,10 @@ void device_model_update_from_mqtt(const char *device_id, bool power_on, uint16_
 void device_model_apply_command_ack(uint8_t floor_id, uint8_t cmd_type, uint8_t gpio_index, uint8_t value)
 {
     bool changed = false;
+    uint8_t canonical_gpio_index = gpio_index;
+    if (cmd_type == IOT_CMD_SET_SERVO && canonical_gpio_index < 6) {
+        canonical_gpio_index += 6;
+    }
     model_lock();
     if (floor_id >= 1 && floor_id <= 3) {
         s_model.controller_online[floor_id - 1] = true;
@@ -319,11 +443,12 @@ void device_model_apply_command_ack(uint8_t floor_id, uint8_t cmd_type, uint8_t 
 
     for (uint16_t i = 0; i < s_model.device_count; i++) {
         rc_device_t *d = &s_model.devices[i];
-        if (d->floor_id != floor_id || d->cmd_type != cmd_type || d->gpio_index != gpio_index) {
+        if (d->floor_id != floor_id || d->cmd_type != cmd_type || d->gpio_index != canonical_gpio_index) {
             continue;
         }
         d->connected = true;
-        d->power_on = value != 0;
+        d->power_on = (d->cmd_type == IOT_CMD_SET_SERVO) ?
+            (value == d->servo_open_angle) : (value != 0);
         d->value = value;
         if (d->type == RC_DEVICE_RGB_LIGHT) {
             d->brightness = value ? (d->brightness ? d->brightness : 60) : 0;
@@ -339,6 +464,7 @@ void device_model_apply_command_ack(uint8_t floor_id, uint8_t cmd_type, uint8_t 
     }
 
     if (changed) {
+        refresh_all_main_power_locked();
         publish_update();
     }
     model_unlock();
@@ -414,24 +540,43 @@ void device_model_apply_heartbeat(const iot_heartbeat_v2_packet_t *heartbeat)
             if (servo_index < heartbeat->servo_count && servo_index < IOT_MAX_SERVOS) {
                 /* 从机心跳上报的是 servo_angle_enum_t 枚举值(0~4), 需映射回角度 */
                 uint8_t servo_enum = heartbeat->servos[servo_index];
-                static const uint8_t servo_angle_map_45[5]  = {0, 45, 90, 135, 180};  /* 一楼/二楼: 45度分档 */
-                static const uint8_t servo_angle_map_3f[5]  = {0, 25, 70, 135, 180};  /* 三楼天窗: 25/70度分档 */
-                const uint8_t *map = (floor_id == 3) ? servo_angle_map_3f : servo_angle_map_45;
+                static const uint8_t servo_angle_map_45[5] = {0, 45, 90, 135, 180};  /* 一楼/二楼: 45度分档 */
+                static const uint8_t servo_angle_map_3f_right_skylight[5] = {0, 25, 90, 135, 180};
+                static const uint8_t servo_angle_map_3f_left_skylight[5] = {0, 90, 90, 90, 90};
+                static const uint8_t servo_angle_map_3f_hanger[5] = {0, 25, 90, 135, 180};
+                const uint8_t *map = servo_angle_map_45;
+                if (floor_id == 3) {
+                    if (servo_index == 0) {
+                        map = servo_angle_map_3f_right_skylight;
+                    } else if (servo_index == 1) {
+                        map = servo_angle_map_3f_left_skylight;
+                    } else {
+                        map = servo_angle_map_3f_hanger;
+                    }
+                }
                 value = (servo_enum < 5) ? map[servo_enum] : 0;
                 known = true;
             }
+        } else if (d->cmd_type == IOT_CMD_SET_MAIN_POWER) {
+            value = heartbeat->main_power_status;
+            known = true;
         }
 
         if (known) {
             d->connected = true;
-            d->power_on = value != 0;
+            d->power_on = (d->cmd_type == IOT_CMD_SET_SERVO) ?
+                (value == d->servo_open_angle) : (value != 0);
             d->value = value;
             refresh_device_value(d);
         }
     }
 
-    if (heartbeat->sensor_count > 0) {
-        /* 按楼层存储传感器数据 */
+    if (floor_id == 2) {
+        s_model.rain_floor_valid[floor_idx] = false;
+        s_model.rain_status_floor_valid[floor_idx] = false;
+    }
+    if (floor_id == 3 && heartbeat->sensor_count > 0) {
+        /* 仅三楼保留雨滴传感器数据 */
         s_model.rain_floor_value[floor_idx] = heartbeat->rain_mv;
         s_model.rain_floor_valid[floor_idx] = true;
         s_model.rain_floor_status[floor_idx] = heartbeat->rain_status;
@@ -443,7 +588,7 @@ void device_model_apply_heartbeat(const iot_heartbeat_v2_packet_t *heartbeat)
             s_model.rain_valid = true;
         }
     }
-    if (heartbeat->sensor_count >= 3 || heartbeat->smoke_mv != 0 || heartbeat->fire_status != 0) {
+    if (heartbeat->smoke_mv != 0 || heartbeat->fire_status != 0) {
         s_model.smoke_floor_value[floor_idx] = heartbeat->smoke_mv;
         s_model.smoke_floor_valid[floor_idx] = true;
         s_model.fire_floor_status[floor_idx] = heartbeat->fire_status;
@@ -461,13 +606,10 @@ void device_model_apply_heartbeat(const iot_heartbeat_v2_packet_t *heartbeat)
         }
         smart_home_alarm_on_fire_status(floor_id, heartbeat->fire_status >= 2);
     }
-    if (heartbeat->sensor_count >= 3 || heartbeat->help_status != 0) {
-        s_model.help_floor_status[floor_idx] = heartbeat->help_status;
-        s_model.help_floor_valid[floor_idx] = true;
-        smart_home_alarm_on_help_status(floor_id, heartbeat->help_status != 0);
-    }
+    s_model.help_floor_valid[floor_idx] = false;
 
     s_model.sensor_rx_count++;
+    refresh_all_main_power_locked();
     publish_update();
     model_unlock();
 }
@@ -629,8 +771,18 @@ void device_model_update_sensor_value(uint8_t floor_id, uint8_t sensor_type, uin
         s_model.controller_online[idx] = true;
     }
 
+    if ((sensor_type == IOT_SENSOR_RAIN_MV || sensor_type == IOT_SENSOR_RAIN_STATUS) &&
+        floor_id != 3) {
+        model_unlock();
+        return;
+    }
+    if (sensor_type == IOT_SENSOR_HELP_STATUS) {
+        model_unlock();
+        return;
+    }
+
     switch (sensor_type) {
-        case IOT_SENSOR_SMOKE_MV:
+        case IOT_SENSOR_FLAME_MV:
             s_model.smoke_value = value;
             s_model.smoke_valid = true;
             if (floor_id >= 1 && floor_id <= 3) {
@@ -664,13 +816,6 @@ void device_model_update_sensor_value(uint8_t floor_id, uint8_t sensor_type, uin
                 smart_home_alarm_on_fire_status(floor_id, value >= 2);
             }
             break;
-        case IOT_SENSOR_HELP_STATUS:
-            if (floor_id >= 1 && floor_id <= 3) {
-                s_model.help_floor_status[idx] = (uint8_t)value;
-                s_model.help_floor_valid[idx] = true;
-                smart_home_alarm_on_help_status(floor_id, value != 0);
-            }
-            break;
         default:
             model_unlock();
             return;
@@ -697,6 +842,11 @@ bool device_model_get_smoke_value(uint8_t floor_id, uint16_t *value)
     if (!s_model.smoke_floor_valid[idx]) return false;
     if (value) *value = s_model.smoke_floor_value[idx];
     return true;
+}
+
+bool device_model_get_flame_sensor_mv(uint8_t floor_id, uint16_t *value)
+{
+    return device_model_get_smoke_value(floor_id, value);
 }
 
 bool device_model_get_flame_value(uint8_t floor_id, uint16_t *value)
@@ -741,12 +891,9 @@ uint16_t device_model_sensor_online_count(void)
     if (s_model.temperature_valid) count++;
     if (s_model.humidity_valid) count++;
     if (s_model.pm25_valid) count++;
-    if (s_model.smoke_valid) count++;
-    for (uint8_t i = 0; i < 3; i++) {
-        if (s_model.rain_floor_valid[i]) count++;
-        if (s_model.fire_floor_valid[i]) count++;
-        if (s_model.help_floor_valid[i]) count++;
-    }
+    if (s_model.rain_floor_valid[2]) count++;
+    if (s_model.smoke_floor_valid[2]) count++;
+    if (s_model.fire_floor_valid[2]) count++;
     return count;
 }
 

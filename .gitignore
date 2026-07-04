@@ -2,6 +2,7 @@ tmp/
 components/
 managed_components/
 build/
+build_ninja/
 dist/
 .vscode/
 .devcontainer/
@@ -15,6 +16,10 @@ main/mmap_generate_emoji.h
 .DS_Store
 .cache
 *.pyc
+*.log
+build_log*.txt
+idf_py_stdout_output_*
+idf_py_stderr_output_*
 *.bin
 mmap_generate_*.h
 .clangd

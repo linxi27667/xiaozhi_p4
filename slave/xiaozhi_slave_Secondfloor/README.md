@@ -6,8 +6,8 @@ IoT 控制系统从机设备，通过 ESP-NOW 接收主机命令控制 GPIO 和�
 
 - 连接WiFi路由器（与主机同一网络）
 - 通过 ESP-NOW 接收主机的控制命令
-- 控制 4 个 LED（可扩展为继电器等其他设备）
-- 控制 2 个舵机（预留接口）
+- 控制二楼灯光、风扇和总闸
+- 控制 1 个晾衣杆舵机（另外 2 个舵机口为预留）
 - 自动发现主机并注册
 - 心跳保活机制
 
@@ -17,23 +17,21 @@ IoT 控制系统从机设备，通过 ESP-NOW 接收主机命令控制 GPIO 和�
 
 | GPIO | 名称 | 功能 | 说明 |
 |------|------|------|------|
-| GPIO2 | led1 | LED 1 | 可改为继电器 |
-| GPIO4 | led2 | LED 2 | 可改为继电器 |
-| GPIO5 | led3 | LED 3 | 可改为继电器 |
-| GPIO18 | led4 | LED 4 | 可改为继电器 |
-| GPIO19 | servo1 | 舵机 1 | PWM控制 |
-| GPIO21 | servo2 | 舵机 2 | PWM控制 |
+| GPIO4 | rgb | 卧室灯带 | WS2812B |
+| GPIO5 | light2 | 客厅灯 | GPIO输出 |
+| GPIO6 | light3 | 厕所灯 | GPIO输出 |
+| GPIO7 | relay1 | 风扇 | 继电器 |
+| GPIO40 | main_power | 二楼总闸 | GPIO输出 |
+| GPIO8 | servo1 | 预留舵机1 | MQTT servo index=6 |
+| GPIO11 | servo2 | 预留舵机2 | MQTT servo index=7 |
+| GPIO14 | servo3 | 二楼晾衣杆 | MQTT servo index=8 |
 
-**修改方法**：在 `main/iot_slave_main.c` 中修改以下宏定义：
+**修改方法**：在 `main/APP/Src/iot_control_task.c` 中修改以下宏定义：
 
 ```c
-#define LED_GPIO_1      GPIO_NUM_2
-#define LED_GPIO_2      GPIO_NUM_4
-#define LED_GPIO_3      GPIO_NUM_5
-#define LED_GPIO_4      GPIO_NUM_18
-
-#define SERVO_GPIO_1    GPIO_NUM_19
-#define SERVO_GPIO_2    GPIO_NUM_21
+#define SERVO_GPIO_1    GPIO_NUM_8
+#define SERVO_GPIO_2    GPIO_NUM_11
+#define SERVO_GPIO_3    GPIO_NUM_14
 ```
 
 ## WiFi 配置

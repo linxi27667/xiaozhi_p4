@@ -39,6 +39,7 @@ typedef enum {
 #define SERVO_1_CHINESE   "一楼大门"
 
 typedef struct {
+    device_onoff_enum_t main_power;
     device_onoff_enum_t light[LIGHT_COUNT];
     device_onoff_enum_t relay[(RELAY_COUNT > 0) ? RELAY_COUNT : 1];
     servo_angle_enum_t  servo[SERVO_COUNT];

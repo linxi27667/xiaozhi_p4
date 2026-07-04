@@ -19,6 +19,8 @@ static bool s_fire_active;
 static bool s_fire_acknowledged;
 static bool s_initialized;
 static lv_timer_t *s_poll_timer;
+static lv_timer_t *s_flash_timer;
+static uint8_t s_flash_phase;
 
 static const char *floor_name(uint8_t floor_id)
 {
@@ -32,11 +34,39 @@ static const char *floor_name(uint8_t floor_id)
 
 static void close_modal(void)
 {
+    if (s_flash_timer) {
+        lv_timer_delete(s_flash_timer);
+        s_flash_timer = NULL;
+    }
+    s_flash_phase = 0;
     if (s_modal) {
         /* Use async close to safely release msgbox + backdrop from event callbacks */
         lv_msgbox_close_async(s_modal);
         s_modal = NULL;
     }
+}
+
+static void fire_flash_timer_cb(lv_timer_t *timer)
+{
+    (void)timer;
+    if (!s_modal) {
+        return;
+    }
+
+    s_flash_phase ^= 1;
+    lv_obj_set_style_border_width(s_modal, s_flash_phase ? 5 : 3, 0);
+    lv_obj_set_style_shadow_opa(s_modal, s_flash_phase ? LV_OPA_70 : LV_OPA_30, 0);
+    lv_obj_set_style_shadow_width(s_modal, s_flash_phase ? 36 : 24, 0);
+    lv_obj_set_style_bg_opa(s_modal, s_flash_phase ? LV_OPA_COVER : LV_OPA_90, 0);
+    lv_obj_invalidate(s_modal);
+}
+
+static void start_fire_flash(void)
+{
+    if (!s_flash_timer) {
+        s_flash_timer = lv_timer_create(fire_flash_timer_cb, 240, NULL);
+    }
+    fire_flash_timer_cb(s_flash_timer);
 }
 
 static void on_alarm_ack(lv_event_t *e)
@@ -59,6 +89,8 @@ static void show_fire_modal(void)
 
     /* Create modal msgbox on active screen (parent=NULL => modal with backdrop) */
     s_modal = lv_msgbox_create(NULL);
+    lv_obj_set_size(s_modal, 560, 318);
+    lv_obj_center(s_modal);
 
     /* Title: 火灾警报 */
     /* UTF-8: 火灾警报 = E781ABE781BEE8ADA6E68AA5 */
@@ -70,19 +102,19 @@ static void show_fire_modal(void)
     if (header) {
         lv_obj_t *icon = ui_asset_image_create(header, "alarm_siren.png");
         if (!icon) {
-            icon = ui_create_icon(header, ICON_FIRE, ui_font_icon(24), lv_color_white());
+            icon = ui_create_icon(header, ICON_FIRE, ui_font_icon(36), lv_color_white());
         }
         if (icon) {
             lv_obj_move_to_index(icon, 0);
         }
     }
 
-    /* Body text: 检测到%s发生火灾风险，请立即检查烟雾/火焰传感器和现场设备。 */
+    /* Body text: 检测到%s发生火灾风险，请立即检查火焰传感器和现场设备。 */
     char body[160];
     lv_snprintf(body, sizeof(body),
-        "\xE6\xA3\x80\xE6\xB5\x8B\xE5\x88\xB0%s\xE5\x8F\x91\xE7\x94\x9F\xE7\x81\xAB\xE7\x81\xBE\xE9\xA3\x8E\xE9\x99\xA9\xEF\xBC\x8C\xE8\xAF\xB7\xE7\xAB\x8B\xE5\x8D\xB3\xE6\xA3\x80\xE6\x9F\xA5\xE7\x83\x9F\xE9\x9B\xBE/\xE7\x81\xAB\xE7\x84\xB0\xE4\xBC\xA0\xE6\x84\x9F\xE5\x99\xA8\xE5\x92\x8C\xE7\x8E\xB0\xE5\x9C\xBA\xE8\xAE\xBE\xE5\xA4\x87\xE3\x80\x82",
+        "检测到%s发生火灾风险，请立即检查火焰传感器和现场设备。",
         floor_name(s_fire_floor_id));
-    lv_msgbox_add_text(s_modal, body);
+    lv_obj_t *body_label = lv_msgbox_add_text(s_modal, body);
 
     /* Footer button: 紧急处理 */
     /* UTF-8: 紧急处理 = E7B4A7E680A5E5A484E79086 */
@@ -98,9 +130,13 @@ static void show_fire_modal(void)
     lv_obj_set_style_bg_color(s_modal, red, 0);
     lv_obj_set_style_bg_opa(s_modal, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(s_modal, dark_red, 0);
-    lv_obj_set_style_border_width(s_modal, 2, 0);
+    lv_obj_set_style_border_width(s_modal, 3, 0);
     lv_obj_set_style_radius(s_modal, 12, 0);
-    lv_obj_set_style_pad_all(s_modal, 20, 0);
+    lv_obj_set_style_pad_all(s_modal, 28, 0);
+    lv_obj_set_style_shadow_color(s_modal, lv_color_hex(0xFF3B30), 0);
+    lv_obj_set_style_shadow_width(s_modal, 24, 0);
+    lv_obj_set_style_shadow_spread(s_modal, 4, 0);
+    lv_obj_set_style_shadow_opa(s_modal, LV_OPA_30, 0);
 
     /* Style header: transparent bg, white title */
     if (header) {
@@ -109,7 +145,7 @@ static void show_fire_modal(void)
         lv_obj_t *title_label = lv_msgbox_get_title(s_modal);
         if (title_label) {
             lv_obj_set_style_text_color(title_label, lv_color_white(), 0);
-            lv_obj_set_style_text_font(title_label, ui_font_cn(24), 0);
+            lv_obj_set_style_text_font(title_label, ui_font_cn(32), 0);
         }
     }
 
@@ -117,13 +153,18 @@ static void show_fire_modal(void)
     lv_obj_t *content = lv_msgbox_get_content(s_modal);
     if (content) {
         lv_obj_set_style_bg_opa(content, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_pad_ver(content, 8, 0);
+        lv_obj_set_style_pad_ver(content, 16, 0);
         uint32_t cnt = lv_obj_get_child_count(content);
         for (uint32_t i = 0; i < cnt; i++) {
             lv_obj_t *child = lv_obj_get_child(content, i);
             lv_obj_set_style_text_color(child, lv_color_white(), 0);
-            lv_obj_set_style_text_font(child, ui_font_cn(16), 0);
+            lv_obj_set_style_text_font(child, ui_font_cn(19), 0);
+            lv_obj_set_style_text_line_space(child, 8, 0);
         }
+    }
+    if (body_label) {
+        lv_obj_set_width(body_label, 500);
+        lv_label_set_long_mode(body_label, LV_LABEL_LONG_WRAP);
     }
 
     /* Style footer: transparent bg, white button with red text */
@@ -136,13 +177,14 @@ static void show_fire_modal(void)
             lv_obj_set_style_bg_color(child, lv_color_white(), 0);
             lv_obj_set_style_bg_opa(child, LV_OPA_COVER, 0);
             lv_obj_set_style_text_color(child, red, 0);
-            lv_obj_set_style_text_font(child, ui_font_cn(16), 0);
+            lv_obj_set_style_text_font(child, ui_font_cn(18), 0);
             lv_obj_set_style_radius(child, 6, 0);
-            lv_obj_set_style_pad_hor(child, 24, 0);
-            lv_obj_set_style_pad_ver(child, 10, 0);
+            lv_obj_set_style_pad_hor(child, 34, 0);
+            lv_obj_set_style_pad_ver(child, 14, 0);
         }
     }
 
+    start_fire_flash();
     ESP_LOGW(TAG, "Fire modal shown for floor %d", s_fire_floor_id);
 }
 

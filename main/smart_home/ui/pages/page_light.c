@@ -93,6 +93,7 @@ typedef struct {
     bool dev_connected;
 
     bool updating;   /* suppress callbacks during programmatic UI update */
+    uint32_t ignore_model_until_ms;  /* keep local preview stable while ACKs catch up */
     bool deleted;
 } light_ctx_t;
 
@@ -190,9 +191,16 @@ static const rc_device_t *find_master_light(uint8_t *floor_id, uint8_t *gpio_ind
 static void send_current(light_ctx_t *ctx)
 {
     if (!ctx || !ctx->dev_found) return;
+    ctx->ignore_model_until_ms = lv_tick_get() + 600;
     mqtt_send_rgb_light(ctx->dev_floor_id, ctx->dev_gpio_index,
                         ctx->red, ctx->green, ctx->blue,
                         ctx->brightness, ctx->effect, 50);
+}
+
+static bool should_ignore_model_refresh(const light_ctx_t *ctx)
+{
+    if (!ctx || ctx->ignore_model_until_ms == 0) return false;
+    return (int32_t)(ctx->ignore_model_until_ms - lv_tick_get()) > 0;
 }
 
 /* ===== Flex helpers ===== */
@@ -292,6 +300,12 @@ static void on_arc_changed(lv_event_t *e)
 
     update_color_display(ctx);
     update_preset_active(ctx);
+}
+
+static void on_arc_released(lv_event_t *e)
+{
+    light_ctx_t *ctx = (light_ctx_t *)lv_event_get_user_data(e);
+    if (!ctx || ctx->updating || ctx->deleted) return;
     send_current(ctx);
 }
 
@@ -307,7 +321,12 @@ static void on_brightness_changed(lv_event_t *e)
         lv_snprintf(buf, sizeof(buf), "%u%%", (unsigned)ctx->brightness);
         lv_label_set_text(ctx->brightness_label, buf);
     }
+}
 
+static void on_brightness_released(lv_event_t *e)
+{
+    light_ctx_t *ctx = (light_ctx_t *)lv_event_get_user_data(e);
+    if (!ctx || ctx->updating || ctx->deleted) return;
     send_current(ctx);
 }
 
@@ -428,7 +447,9 @@ static void refresh_light(light_ctx_t *ctx)
 
 static void on_model_updated(void *user_data)
 {
-    refresh_light((light_ctx_t *)user_data);
+    light_ctx_t *ctx = (light_ctx_t *)user_data;
+    if (should_ignore_model_refresh(ctx)) return;
+    refresh_light(ctx);
 }
 
 /* ===== Lifecycle ===== */
@@ -555,6 +576,7 @@ lv_obj_t *page_light_create(lv_obj_t *parent)
     lv_obj_set_style_radius(ctx->arc, LV_RADIUS_CIRCLE, LV_PART_KNOB);
 
     lv_obj_add_event_cb(ctx->arc, on_arc_changed, LV_EVENT_VALUE_CHANGED, ctx);
+    lv_obj_add_event_cb(ctx->arc, on_arc_released, LV_EVENT_RELEASED, ctx);
 
     /* Center preview circle (80x80, radius=40), floating overlay on arc */
     ctx->preview = lv_obj_create(wheel_box);
@@ -598,6 +620,8 @@ lv_obj_t *page_light_create(lv_obj_t *parent)
     lv_obj_set_style_bg_color(ctx->brightness_slider, UI_COLOR_ACCENT, LV_PART_KNOB);
     lv_obj_add_event_cb(ctx->brightness_slider, on_brightness_changed,
                         LV_EVENT_VALUE_CHANGED, ctx);
+    lv_obj_add_event_cb(ctx->brightness_slider, on_brightness_released,
+                        LV_EVENT_RELEASED, ctx);
 
     ctx->brightness_label = ui_create_label(bright_row, "60%",
         ui_font_cn(14), UI_COLOR_TEXT_STRONG);

@@ -3,6 +3,8 @@
 #include "rule_engine.h"
 #include "smart_home_alarm_ui.h"
 #include "smart_home_event_center.h"
+#include "mqtt_iot_protocol.h"
+#include "xiaozhi_mqtt.h"
 
 #include <atomic>
 #include <cstdio>
@@ -24,6 +26,26 @@ static bool sensor_rising_edge(std::atomic<uint8_t>& mask, uint8_t floor_id, boo
                                   : static_cast<uint8_t>(old_mask & ~bit);
         if (mask.compare_exchange_weak(old_mask, new_mask)) {
             return active && ((old_mask & bit) == 0);
+        }
+    }
+}
+
+static bool sensor_state_changed(std::atomic<uint8_t>& mask, uint8_t floor_id, bool active)
+{
+    if (floor_id < 1 || floor_id > 3) {
+        return false;
+    }
+
+    const uint8_t bit = static_cast<uint8_t>(1u << (floor_id - 1));
+    uint8_t old_mask = mask.load();
+    while (true) {
+        uint8_t new_mask = active ? static_cast<uint8_t>(old_mask | bit)
+                                  : static_cast<uint8_t>(old_mask & ~bit);
+        if (new_mask == old_mask) {
+            return false;
+        }
+        if (mask.compare_exchange_weak(old_mask, new_mask)) {
+            return true;
         }
     }
 }
@@ -61,8 +83,17 @@ extern "C" void smart_home_alarm_on_fire_status(uint8_t floor_id, bool active)
 
 extern "C" void smart_home_alarm_on_rain_status(uint8_t floor_id, bool active)
 {
-    if (sensor_rising_edge(s_rain_active_mask, floor_id, active)) {
+    if (!sensor_state_changed(s_rain_active_mask, floor_id, active)) {
+        return;
+    }
+
+    if (active) {
         post_rule_event(SH_EVENT_RAIN_ALARM, floor_id, 1, "Rain detected");
+        mqtt_send_command(2, IOT_CMD_SET_SERVO, 8, 0);
+        mqtt_send_command(3, IOT_CMD_SET_SERVO, 8, 0);
+    } else {
+        mqtt_send_command(2, IOT_CMD_SET_SERVO, 8, 180);
+        mqtt_send_command(3, IOT_CMD_SET_SERVO, 8, 180);
     }
 }
 

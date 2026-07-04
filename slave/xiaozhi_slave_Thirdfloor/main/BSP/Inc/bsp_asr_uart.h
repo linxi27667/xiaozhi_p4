@@ -16,6 +16,7 @@
 typedef struct asr_uart_dev {
     uint32_t baud_rate;
     uint8_t  tx_pin;
+    uint8_t  rx_pin;
     bool     is_init;
 
     bool (*Hw_Init)(struct asr_uart_dev *dev);

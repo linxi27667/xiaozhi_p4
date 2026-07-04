@@ -40,27 +40,27 @@ typedef struct {
 static const scene_item_t s_scenes[] = {
     { IOT_SCENE_HOME,  SCENE_ACTION_SCENE,  ICON_HOME,      "scene_home.png",
       "\xE5\x9B\x9E\xE5\xAE\xB6", "Home",
-      "\xE5\xA4\xA7\xE5\x8E\x85\xE7\x81\xAF+\xE4\xB8\xBB\xE5\x8D\xA7\xE6\x9A\x96\xE5\x85\x89", "Hall + warm RGB",
+      "\xE5\xBC\x80\xE5\xA4\xA7\xE9\x97\xA8+\xE5\x85\xA8\xE5\xB1\x8B\xE7\x81\xAF\xE5\x85\x89", "Gate + all lights",
       0x2F6BFF },
     { IOT_SCENE_SLEEP, SCENE_ACTION_SCENE,  ICON_MOON,      "scene_sleep.png",
       "\xE7\x9D\xA1\xE7\x9C\xA0", "Sleep",
-      "\xE5\x85\xB3\xE9\x97\xAD\xE4\xB8\xBB\xE7\x81\xAF+\xE4\xBD\x8E\xE4\xBA\xAE\xE5\xA4\x9C\xE7\x81\xAF", "Main lights off",
+      "\xE5\x85\xB3\xE7\x81\xAF+\xE5\x85\xB3\xE7\xAA\x97+\xE5\x8D\xA7\xE5\xAE\xA4\xE5\xBC\xB1\xE5\x85\x89", "Lights off + dim RGB",
       0x3B82F6 },
     { IOT_SCENE_MOVIE, SCENE_ACTION_SCENE,  ICON_STAR,      "scene_movie.png",
       "\xE8\xA7\x82\xE5\xBD\xB1", "Movie",
-      "\xE5\x85\xB3\xE9\x97\xAD\xE4\xB8\xBB\xE7\x81\xAF+\xE5\xBD\xB1\xE9\x99\xA2\xE8\x93\x9D", "Cinema blue",
+      "\xE5\x85\xB3\xE7\x81\xAF+\xE5\xBD\xB1\xE9\x99\xA2\xE8\x93\x9D\xE5\xBC\xB1\xE5\x85\x89", "Lights off + cinema blue",
       0x6554FF },
     { IOT_SCENE_NIGHT, SCENE_ACTION_SCENE,  ICON_LIGHTBULB, "scene_night.png",
       "\xE8\xB5\xB7\xE5\xA4\x9C", "Night",
-      "\xE5\xBC\x80\xE5\x90\xAF\xE5\x8E\x95\xE6\x89\x80\xE7\x81\xAF+\xE6\xA9\x99\xE8\x89\xB2\xE5\xBC\xB1\xE5\x85\x89", "Bathroom + dim RGB",
+      "\xE5\x8E\x95\xE6\x89\x80\xE7\x81\xAF+\xE5\x8D\xA7\xE5\xAE\xA4\xE6\x9A\x96\xE8\x89\xB2\xE5\xBC\xB1\xE5\x85\x89", "Toilet + dim RGB",
       0xF59E0B },
     { IOT_SCENE_BRIGHT, SCENE_ACTION_SCENE,  ICON_SUN,       "scene_lights.png",
       "\xE6\x98\x8E\xE4\xBA\xAE", "Bright",
-      "\xE5\xBC\x80\xE5\x90\xAF\xE5\xB8\xB8\xE7\x94\xA8\xE7\x81\xAF\xE5\x85\x89", "Common lights on",
+      "\xE5\x85\xA8\xE5\xB1\x8B\xE7\x81\xAF\xE5\x85\x89+\xE9\xAB\x98\xE4\xBA\xAE\xE6\x9A\x96\xE5\x85\x89", "All lights + bright RGB",
       0xF59E0B },
     { IOT_SCENE_AWAY,  SCENE_ACTION_SCENE,  ICON_LOCK,      "scene_away.png",
       "\xE7\xA6\xBB\xE5\xAE\xB6", "Away",
-      "\xE5\x85\xA8\xE5\xB1\x8B\xE7\x81\xAF\xE5\x85\x89+\xE8\xBE\x93\xE5\x87\xBA\xE5\x85\xB3\xE9\x97\xAD", "All outputs off",
+      "\xE5\x85\xB3\xE7\x81\xAF+\xE5\x85\xB3\xE9\x97\xA8+\xE5\x85\xB3\xE7\xAA\x97", "Lights + gate + windows off",
       0x6554FF },
     { IOT_SCENE_FIRE,  SCENE_ACTION_SCENE,  ICON_FIRE,      "scene_fire.png",
       "\xE7\x81\xAB\xE7\x81\xBE", "Fire",
@@ -68,7 +68,7 @@ static const scene_item_t s_scenes[] = {
       0xC62828 },
     { IOT_SCENE_RAIN,  SCENE_ACTION_SCENE,  ICON_WATER,     "scene_rain.png",
       "\xE9\x9B\xA8\xE5\xA4\xA9", "Rain",
-      "\xE4\xBC\xA0\xE6\x84\x9F\xE5\x99\xA8\xE8\xA7\xA6\xE5\x8F\x91\xE5\x9C\xBA\xE6\x99\xAF", "Sensor-triggered",
+      "\xE8\x87\xAA\xE5\x8A\xA8\xE6\x94\xB6\xE8\xA1\xA3+\xE5\x85\xB3\xE9\x97\xAD\xE5\xA4\xA9\xE7\xAA\x97", "Auto collect + close skylights",
       0x3B82F6 },
     /* Auto mode toggle (id=0xFF, not a real scene) */
     { 0xFF,            SCENE_ACTION_AUTO,   ICON_SETTINGS,  NULL,
@@ -151,12 +151,6 @@ static void add_scene_image(lv_obj_t *parent, const scene_item_t *item, bool dis
     lv_obj_center(ico);
 }
 
-static void send_bright_mode(void)
-{
-    mqtt_send_broadcast(IOT_CMD_BROADCAST_LIGHTS_ON);
-    mqtt_send_rgb_light(2, 0, 255, 210, 150, 58, IOT_LIGHT_EFFECT_STATIC, 20);
-}
-
 static void on_scene_click(lv_event_t *e)
 {
     const scene_item_t *item = (const scene_item_t *)lv_event_get_user_data(e);
@@ -166,10 +160,6 @@ static void on_scene_click(lv_event_t *e)
         auto_mode_set_global(!auto_mode_get_global());
     } else {
         mqtt_send_scene(item->id);
-        /* Bright scene also sends broadcast to turn lights on */
-        if (item->id == IOT_SCENE_BRIGHT) {
-            send_bright_mode();
-        }
     }
 }
 

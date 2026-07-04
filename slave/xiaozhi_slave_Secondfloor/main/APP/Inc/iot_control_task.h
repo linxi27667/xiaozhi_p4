@@ -45,12 +45,13 @@ typedef enum {
 #define RELAY_2_CHINESE   "二楼继电器2"
 #define RELAY_3_CHINESE   "二楼继电器3"
 
-#define SERVO_1_CHINESE   "二楼晾衣架"
-#define SERVO_2_CHINESE   "二楼舵机2"
-#define SERVO_3_CHINESE   "二楼舵机3"
+#define SERVO_1_CHINESE   "二楼预留舵机1"
+#define SERVO_2_CHINESE   "二楼预留舵机2"
+#define SERVO_3_CHINESE   "二楼晾衣杆"
 
 /* ================= 设备标志位结构体 ================= */
 typedef struct {
+    device_onoff_enum_t main_power;
     device_onoff_enum_t light[LIGHT_COUNT];
     device_onoff_enum_t relay[RELAY_COUNT];
     servo_angle_enum_t  servo[SERVO_COUNT];

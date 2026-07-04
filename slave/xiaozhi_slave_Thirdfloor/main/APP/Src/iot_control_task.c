@@ -96,18 +96,20 @@ static void HW_Servo_Set_Angle(ledc_channel_t channel, int16_t angle) {
 }
 
 /* ================= 2. GPIO 绾兒娆㈢€规矮绠?(娴滃搫浼愰崣顖涙暭) ================= */
-#define LIGHT_GPIO_1     GPIO_NUM_2   /* 阳台灯 */
+#define MAIN_POWER_GPIO  GPIO_NUM_40  /* 三楼总闸 */
 
-#define SERVO_GPIO_1     GPIO_NUM_18  /* 左天窗 */
-#define SERVO_GPIO_2     GPIO_NUM_21  /* 右天窗 */
-#define SERVO_GPIO_3     GPIO_NUM_40  /* 晾衣杆 */
+#define LIGHT_GPIO_1     GPIO_NUM_7   /* 阳台灯 */
+
+#define SERVO_GPIO_1     GPIO_NUM_8   /* 右天窗 */
+#define SERVO_GPIO_2     GPIO_NUM_11  /* 左天窗 */
+#define SERVO_GPIO_3     GPIO_NUM_14  /* 晾衣杆 */
 
 #define REFRESH_INTERVAL_MS     100
 
 /* ================= 3. 舵机角度映射表 ================= */
 #define SERVO_ANGLE_0     0
 #define SERVO_ANGLE_25    25
-#define SERVO_ANGLE_70    70
+#define SERVO_ANGLE_90    90
 #define SERVO_ANGLE_135   135
 #define SERVO_ANGLE_180   180
 
@@ -117,7 +119,7 @@ static void HW_Servo_Set_Angle(ledc_channel_t channel, int16_t angle) {
 static const int16_t g_servo_angle_map[5] = {
     [SERVO_0]   = SERVO_ANGLE_0,
     [SERVO_25]  = SERVO_ANGLE_25,
-    [SERVO_70]  = SERVO_ANGLE_70,
+    [SERVO_90]  = SERVO_ANGLE_90,
     [SERVO_135] = SERVO_ANGLE_135,
     [SERVO_180] = SERVO_ANGLE_180
 };
@@ -128,6 +130,8 @@ static gpio_num_t g_light_gpios[LIGHT_COUNT] = {
     LIGHT_GPIO_1
 };
 
+static gpio_num_t g_main_power_gpio = MAIN_POWER_GPIO;
+
 static gpio_num_t g_relay_gpios[(RELAY_COUNT > 0) ? RELAY_COUNT : 1] = {0};
 
 static gpio_num_t g_servo_gpios[SERVO_COUNT] = {
@@ -135,9 +139,10 @@ static gpio_num_t g_servo_gpios[SERVO_COUNT] = {
 };
 
 volatile device_flags_enum_t g_device_flags = {
+    .main_power = ON,
     .light = {OFF},
     .relay = {OFF},
-    .servo = {SERVO_25, SERVO_25, SERVO_25},
+    .servo = {SERVO_180, SERVO_0, SERVO_0},
     .fire_status = FIRE_STATUS_NORMAL,
     .rain_status = RAIN_STATUS_DRY,
     .help_status = HELP_STATUS_INACTIVE
@@ -184,6 +189,10 @@ static void Device_Refresh_Task(void* arg) {
     ESP_LOGI(TAG, "DEBUG MODE ENABLED (GPIO%d, step=%d deg)", DEBUG_BTN_GPIO, DEBUG_STEP_DEGREES);
 #endif
 
+    HW_Gpio_Init(g_main_power_gpio);
+    HW_Gpio_Write(g_main_power_gpio, g_device_flags.main_power);
+    ESP_LOGI(TAG, "MainPower[0] (三楼总闸) -> GPIO%d", g_main_power_gpio);
+
     for (int i = 0; i < LIGHT_COUNT; i++) {
         HW_Gpio_Init(g_light_gpios[i]);
         ESP_LOGI(TAG, "Light[%d] -> GPIO%d", i, g_light_gpios[i]);
@@ -199,8 +208,11 @@ static void Device_Refresh_Task(void* arg) {
         ESP_LOGI(TAG, "Servo[%d] -> GPIO%d", i, g_servo_gpios[i]);
     }
 
+#if DEBUG_MODE == 1
     static uint8_t last_btn_state = 1;
+#endif
     static uint8_t last_fire_status = FIRE_STATUS_NORMAL;
+    static int8_t last_servo_state[SERVO_COUNT] = {-1, -1, -1};
 
     while (1) {
 #if DEBUG_MODE == 1
@@ -210,6 +222,8 @@ static void Device_Refresh_Task(void* arg) {
         }
         last_btn_state = btn_state;
 #endif
+
+        HW_Gpio_Write(g_main_power_gpio, g_device_flags.main_power);
 
         if (last_fire_status != g_device_flags.fire_status) {
             last_fire_status = g_device_flags.fire_status;
@@ -226,7 +240,18 @@ static void Device_Refresh_Task(void* arg) {
 
         for (int i = 0; i < SERVO_COUNT; i++) {
 #if DEBUG_MODE != 1
-            HW_Servo_Set_Angle(g_servo_channels[i], g_servo_angle_map[g_device_flags.servo[i]]);
+            servo_angle_enum_t state = g_device_flags.servo[i];
+            if (state < SERVO_0 || state > SERVO_180) {
+                ESP_LOGW(TAG, "Servo[%d] invalid state=%d, fallback to 0 deg", i, state);
+                state = SERVO_0;
+                g_device_flags.servo[i] = state;
+            }
+            HW_Servo_Set_Angle(g_servo_channels[i], g_servo_angle_map[state]);
+            if (last_servo_state[i] != (int8_t)state) {
+                last_servo_state[i] = (int8_t)state;
+                ESP_LOGI(TAG, "Servo[%d] GPIO%d -> %d deg (state=%d)",
+                         i, g_servo_gpios[i], g_servo_angle_map[state], state);
+            }
 #endif
         }
 

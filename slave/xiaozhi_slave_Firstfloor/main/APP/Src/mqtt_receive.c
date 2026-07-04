@@ -111,6 +111,13 @@ static void Process_Command(const iot_command_packet_t* cmd) {
             }
             break;
 
+        case IOT_CMD_SET_MAIN_POWER:
+            g_device_flags.main_power = (cmd->value == 1) ? ON : OFF;
+            ESP_LOGW(TAG, "Main power = %s", cmd->value ? "ON" : "OFF");
+            Send_Response(cmd->command, 0, cmd->value ? 1 : 0);
+            MQTT_Heartbeat_Publish_Now();
+            break;
+
         case IOT_CMD_SET_SERVO:
             if (cmd->gpio_index >= 6 && cmd->gpio_index < 6 + SERVO_COUNT && cmd->value <= 180) {
                 uint8_t servo_local_index = cmd->gpio_index - 6;
@@ -191,6 +198,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
             ESP_LOGI(TAG, "MQTT connected");
             esp_mqtt_client_subscribe(s_mqtt_client, MQTT_TOPIC_CMD_BROADCAST, 1);
             esp_mqtt_client_subscribe(s_mqtt_client, MQTT_TOPIC_CMD_PREFIX DEVICE_ID_FIRSTFLOOR, 1);
+            esp_mqtt_client_subscribe(s_mqtt_client, MQTT_TOPIC_POWER_BROADCAST, 1);
+            esp_mqtt_client_subscribe(s_mqtt_client, MQTT_TOPIC_POWER_PREFIX DEVICE_ID_FIRSTFLOOR, 1);
             Send_Announce();
             break;
 

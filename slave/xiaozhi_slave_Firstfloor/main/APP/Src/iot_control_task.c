@@ -6,7 +6,7 @@
  * - 维护设备标志位（枚举类型）
  * - 定时刷新 GPIO 输出
  *
- * 设备配置：1灯(大厅灯, GPIO2) + 1舵机(大门, GPIO18)
+ * 设备配置：1总闸(GPIO40) + 1灯(大厅灯, GPIO7) + 1舵机(大门, GPIO8)
  *
  * 架构原则：
  * - 设备状态全部使用枚举类型（易读、易扩展）
@@ -97,8 +97,9 @@ static void HW_Servo_Set_Angle(ledc_channel_t channel, int16_t angle) {
 }
 
 /* ================= 2. GPIO 硬件定义 ================= */
-#define LIGHT_GPIO_1    GPIO_NUM_2
-#define SERVO_GPIO_1    GPIO_NUM_18
+#define LIGHT_GPIO_1    GPIO_NUM_7
+#define MAIN_POWER_GPIO GPIO_NUM_40
+#define SERVO_GPIO_1    GPIO_NUM_8
 
 #define REFRESH_INTERVAL_MS     100
 
@@ -124,6 +125,8 @@ static gpio_num_t g_light_gpios[LIGHT_COUNT] = {
     LIGHT_GPIO_1
 };
 
+static gpio_num_t g_main_power_gpio = MAIN_POWER_GPIO;
+
 static gpio_num_t g_relay_gpios[(RELAY_COUNT > 0) ? RELAY_COUNT : 1] = {0};
 
 static gpio_num_t g_servo_gpios[SERVO_COUNT] = {
@@ -131,6 +134,7 @@ static gpio_num_t g_servo_gpios[SERVO_COUNT] = {
 };
 
 volatile device_flags_enum_t g_device_flags = {
+    .main_power = ON,
     .light = {OFF},
     .relay = {OFF},
     .servo = {SERVO_0}
@@ -177,6 +181,10 @@ static void Device_Refresh_Task(void* arg) {
     ESP_LOGI(TAG, "DEBUG MODE ENABLED (GPIO%d, step=%d deg)", DEBUG_BTN_GPIO, DEBUG_STEP_DEGREES);
 #endif
 
+    HW_Gpio_Init(g_main_power_gpio);
+    HW_Gpio_Write(g_main_power_gpio, g_device_flags.main_power);
+    ESP_LOGI(TAG, "MainPower[0] (一楼总闸) -> GPIO%d", g_main_power_gpio);
+
     for (int i = 0; i < LIGHT_COUNT; i++) {
         HW_Gpio_Init(g_light_gpios[i]);
         ESP_LOGI(TAG, "Light[%d] (大厅灯) -> GPIO%d", i, g_light_gpios[i]);
@@ -197,6 +205,8 @@ static void Device_Refresh_Task(void* arg) {
         }
         last_btn_state = btn_state;
 #endif
+
+        HW_Gpio_Write(g_main_power_gpio, g_device_flags.main_power);
 
         for (int i = 0; i < LIGHT_COUNT; i++) {
             HW_Gpio_Write(g_light_gpios[i], g_device_flags.light[i]);

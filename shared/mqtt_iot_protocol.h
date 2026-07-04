@@ -13,6 +13,8 @@
 #define MQTT_TOPIC_ANNOUNCE         "xiaozhi/iot/announce"
 #define MQTT_TOPIC_ANNOUNCE_PREFIX  "xiaozhi/iot/announce/"
 #define MQTT_TOPIC_SENSOR_PREFIX    "xiaozhi/iot/sensor/"
+#define MQTT_TOPIC_POWER_BROADCAST  "xiaozhi/iot/power/broadcast"
+#define MQTT_TOPIC_POWER_PREFIX     "xiaozhi/iot/power/"
 
 /* ================= Command codes ================= */
 typedef enum {
@@ -28,6 +30,7 @@ typedef enum {
     IOT_CMD_SET_LIGHT = 0x11,
     IOT_CMD_SET_RELAY = 0x12,
     IOT_CMD_SENSOR_REPORT = 0x13,
+    IOT_CMD_SET_MAIN_POWER = 0x14,
     IOT_CMD_BROADCAST_ALL_OFF = 0x30,
     IOT_CMD_BROADCAST_ALL_ON = 0x31,
     IOT_CMD_BROADCAST_LIGHTS_OFF = 0x32,
@@ -140,13 +143,14 @@ typedef struct {
     uint8_t lights[IOT_MAX_LIGHTS];
     uint8_t relays[IOT_MAX_RELAYS];
     uint8_t servos[IOT_MAX_SERVOS];
-    uint16_t smoke_mv;
+    uint16_t smoke_mv;  /* legacy field name: carries 3F flame sensor voltage */
     uint16_t rain_mv;
     uint8_t fire_status;
     uint8_t rain_status;
     uint8_t help_status;
     uint32_t uptime_s;
-    uint8_t reserved[8];
+    uint8_t main_power_status;
+    uint8_t reserved[7];
 } __attribute__((packed)) iot_heartbeat_v2_packet_t;
 
 typedef struct {
@@ -163,7 +167,8 @@ typedef struct {
 } __attribute__((packed)) iot_heartbeat_v3_packet_t;
 
 typedef enum {
-    IOT_SENSOR_SMOKE_MV    = 0,
+    IOT_SENSOR_SMOKE_MV    = 0,  /* legacy name kept for wire compatibility */
+    IOT_SENSOR_FLAME_MV    = IOT_SENSOR_SMOKE_MV,
     IOT_SENSOR_RAIN_MV     = 1,
     IOT_SENSOR_FIRE_STATUS = 2,
     IOT_SENSOR_RAIN_STATUS = 3,

@@ -16,7 +16,6 @@
  */
 #include "iot_control_task.h"
 #include "app_ambient_light.h"
-#include "sensor_config.h"
 
 #include "esp_log.h"
 #include "driver/gpio.h"
@@ -100,6 +99,8 @@ static void HW_Servo_Set_Angle(ledc_channel_t channel, int16_t angle) {
 }
 
 /* ================= 2. GPIO 硬件定义 (人工可改) ================= */
+#define MAIN_POWER_GPIO  GPIO_NUM_40
+
 #define LIGHT_GPIO_1     GPIO_NUM_NC
 #define LIGHT_GPIO_2     GPIO_NUM_5
 #define LIGHT_GPIO_3     GPIO_NUM_6
@@ -108,9 +109,9 @@ static void HW_Servo_Set_Angle(ledc_channel_t channel, int16_t angle) {
 #define RELAY_GPIO_2     GPIO_NUM_9
 #define RELAY_GPIO_3     GPIO_NUM_10
 
-#define SERVO_GPIO_1     GPIO_NUM_8
-#define SERVO_GPIO_2     GPIO_NUM_11
-#define SERVO_GPIO_3     GPIO_NUM_12
+#define SERVO_GPIO_1     GPIO_NUM_8   /* 预留舵机1 */
+#define SERVO_GPIO_2     GPIO_NUM_11  /* 预留舵机2 */
+#define SERVO_GPIO_3     GPIO_NUM_14  /* 晾衣杆 */
 
 #define REFRESH_INTERVAL_MS     100
 
@@ -134,6 +135,8 @@ static gpio_num_t g_light_gpios[LIGHT_COUNT] = {
     LIGHT_GPIO_1, LIGHT_GPIO_2, LIGHT_GPIO_3
 };
 
+static gpio_num_t g_main_power_gpio = MAIN_POWER_GPIO;
+
 static gpio_num_t g_relay_gpios[RELAY_COUNT] = {
     RELAY_GPIO_1, RELAY_GPIO_2, RELAY_GPIO_3
 };
@@ -143,6 +146,7 @@ static gpio_num_t g_servo_gpios[SERVO_COUNT] = {
 };
 
 volatile device_flags_enum_t g_device_flags = {
+    .main_power = ON,
     .light = {OFF, OFF, OFF},
     .relay = {OFF, OFF, OFF},
     .servo = {SERVO_0, SERVO_0, SERVO_0}
@@ -189,6 +193,10 @@ static void Device_Refresh_Task(void* arg) {
     ESP_LOGI(TAG, "DEBUG MODE ENABLED (GPIO%d, step=%d deg)", DEBUG_BTN_GPIO, DEBUG_STEP_DEGREES);
 #endif
 
+    HW_Gpio_Init(g_main_power_gpio);
+    HW_Gpio_Write(g_main_power_gpio, g_device_flags.main_power);
+    ESP_LOGI(TAG, "MainPower[0] (二楼总闸) -> GPIO%d", g_main_power_gpio);
+
     for (int i = 0; i < LIGHT_COUNT; i++) {
         if (g_light_gpios[i] != GPIO_NUM_NC) {
             HW_Gpio_Init(g_light_gpios[i]);
@@ -208,7 +216,9 @@ static void Device_Refresh_Task(void* arg) {
 
     App_Ambient_Light_Init();
 
+#if DEBUG_MODE == 1
     static uint8_t last_btn_state = 1;
+#endif
 
     while (1) {
 #if DEBUG_MODE == 1
@@ -218,6 +228,8 @@ static void Device_Refresh_Task(void* arg) {
         }
         last_btn_state = btn_state;
 #endif
+
+        HW_Gpio_Write(g_main_power_gpio, g_device_flags.main_power);
 
         for (int i = 0; i < LIGHT_COUNT; i++) {
             if (i == 0) {

@@ -33,7 +33,8 @@ void MQTT_Heartbeat_Publish_Now(void) {
         .relay_count = RELAY_COUNT,
         .servo_count = SERVO_COUNT,
         .sensor_count = 0,
-        .uptime_s = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS / 1000)
+        .uptime_s = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS / 1000),
+        .main_power_status = g_device_flags.main_power
     };
 
     snprintf(heartbeat.device_name, sizeof(heartbeat.device_name), "%s", DEVICE_NAME);

@@ -63,8 +63,8 @@ static cJSON* build_sensors_json() {
         uint16_t value = 0;
         uint8_t status = 0;
         cJSON_AddNumberToObject(item, "floor", floor);
-        if (device_model_get_smoke_value(floor, &value)) {
-            cJSON_AddNumberToObject(item, "smoke_mv", value);
+        if (device_model_get_flame_sensor_mv(floor, &value)) {
+            cJSON_AddNumberToObject(item, "flame_mv", value);
         }
         if (device_model_get_rain_value(floor, &value)) {
             cJSON_AddNumberToObject(item, "rain_mv", value);
@@ -76,13 +76,92 @@ static cJSON* build_sensors_json() {
         if (device_model_get_rain_status(floor, &status)) {
             cJSON_AddNumberToObject(item, "rain_status", status);
         }
-        if (device_model_get_help_status(floor, &status)) {
-            cJSON_AddNumberToObject(item, "help_status", status);
-        }
         cJSON_AddItemToArray(floors, item);
     }
 
     return root;
+}
+
+static const rc_device_t* find_device_by_id(const std::string& device_id) {
+    for (uint16_t i = 0; i < device_model_count(); i++) {
+        const rc_device_t* d = device_model_at(i);
+        if (d && device_id == d->id) {
+            return d;
+        }
+    }
+    return nullptr;
+}
+
+static cJSON* build_servo_list_json() {
+    cJSON* root = cJSON_CreateObject();
+    cJSON* devices = cJSON_AddArrayToObject(root, "servos");
+
+    for (uint16_t i = 0; i < device_model_count(); i++) {
+        const rc_device_t* d = device_model_at(i);
+        if (!d || d->cmd_type != IOT_CMD_SET_SERVO) {
+            continue;
+        }
+
+        cJSON* item = cJSON_CreateObject();
+        cJSON_AddStringToObject(item, "device_id", d->id);
+        cJSON_AddStringToObject(item, "name", d->name);
+        cJSON_AddStringToObject(item, "floor", device_model_floor_name(d->floor));
+        cJSON_AddNumberToObject(item, "floor_id", d->floor_id);
+        cJSON_AddNumberToObject(item, "protocol_index", d->gpio_index);
+        cJSON_AddNumberToObject(item, "open_angle", d->servo_open_angle);
+        cJSON_AddNumberToObject(item, "close_angle", d->servo_close_angle);
+        cJSON_AddBoolToObject(item, "online", d->connected);
+        cJSON_AddBoolToObject(item, "open", d->power_on);
+        cJSON_AddNumberToObject(item, "current_angle", d->value);
+        cJSON_AddStringToObject(item, "value_text", d->value_text);
+        cJSON_AddItemToArray(devices, item);
+    }
+
+    return root;
+}
+
+static cJSON* build_servo_command_result(const rc_device_t* d, uint8_t requested_angle,
+                                         uint8_t sent_angle) {
+    cJSON* root = cJSON_CreateObject();
+    cJSON_AddBoolToObject(root, "mqtt_connected", mqtt_client_is_connected());
+    cJSON_AddStringToObject(root, "device_id", d->id);
+    cJSON_AddStringToObject(root, "name", d->name);
+    cJSON_AddStringToObject(root, "floor", device_model_floor_name(d->floor));
+    cJSON_AddNumberToObject(root, "floor_id", d->floor_id);
+    cJSON_AddNumberToObject(root, "protocol_index", d->gpio_index);
+    cJSON_AddNumberToObject(root, "requested_angle", requested_angle);
+    cJSON_AddNumberToObject(root, "sent_angle", sent_angle);
+    cJSON_AddNumberToObject(root, "open_angle", d->servo_open_angle);
+    cJSON_AddNumberToObject(root, "close_angle", d->servo_close_angle);
+
+    uint8_t rain_status = 0;
+    bool rain_locked = device_model_get_rain_status(3, &rain_status) && rain_status != 0 &&
+                       (strcmp(d->id, "floor2_hanger") == 0 ||
+                        strcmp(d->id, "floor3_hanger") == 0) &&
+                       sent_angle == 0 && requested_angle > 0;
+    cJSON_AddBoolToObject(root, "rain_locked", rain_locked);
+    return root;
+}
+
+static cJSON* send_servo_device(const std::string& device_id, uint8_t angle) {
+    const rc_device_t* d = find_device_by_id(device_id);
+    if (!d) {
+        throw std::runtime_error("Unknown servo device_id: " + device_id);
+    }
+    if (d->cmd_type != IOT_CMD_SET_SERVO) {
+        throw std::runtime_error("Device is not a servo: " + device_id);
+    }
+
+    uint8_t sent_angle = angle;
+    uint8_t rain_status = 0;
+    if (device_model_get_rain_status(3, &rain_status) && rain_status != 0 &&
+        (strcmp(d->id, "floor2_hanger") == 0 || strcmp(d->id, "floor3_hanger") == 0) &&
+        sent_angle > 0) {
+        sent_angle = 0;
+    }
+
+    mqtt_send_command(d->floor_id, IOT_CMD_SET_SERVO, d->gpio_index, sent_angle);
+    return build_servo_command_result(d, angle, sent_angle);
 }
 
 static uint8_t command_from_type(const std::string& type) {
@@ -98,7 +177,14 @@ static uint8_t command_from_type(const std::string& type) {
     if (type == "gpio") {
         return IOT_CMD_SET_GPIO;
     }
+    if (type == "main_power" || type == "power") {
+        return IOT_CMD_SET_MAIN_POWER;
+    }
     throw std::runtime_error("Unsupported device type: " + type);
+}
+
+static uint8_t canonical_servo_index(uint8_t index) {
+    return (index < 6) ? static_cast<uint8_t>(index + 6) : index;
 }
 
 extern "C" void SmartHomeMcp_RegisterTools(void) {
@@ -130,7 +216,7 @@ extern "C" void SmartHomeMcp_RegisterTools(void) {
         });
 
     server.AddTool("self.iot.set_gpio",
-        "Set a GPIO-like smart-home output. type can be light, relay, servo, or gpio.",
+        "Set a GPIO-like smart-home output. type can be light, relay, servo, gpio, or main_power. For Chinese/natural servo commands prefer self.iot.set_servo_power. Servo index accepts local 0-2 or protocol 6-8: da men/front gate=1F index 6, 2F hanger=8, 3F right skylight=6, 3F left skylight=7, 3F hanger=8.",
         PropertyList({
             Property("floor", kPropertyTypeInteger, 1, 3),
             Property("type", kPropertyTypeString, "light"),
@@ -142,7 +228,73 @@ extern "C" void SmartHomeMcp_RegisterTools(void) {
             uint8_t cmd = command_from_type(properties["type"].value<std::string>());
             uint8_t index = static_cast<uint8_t>(properties["index"].value<int>());
             uint8_t value = static_cast<uint8_t>(properties["value"].value<int>());
+            if (cmd == IOT_CMD_SET_SERVO) {
+                index = canonical_servo_index(index);
+            }
             mqtt_send_command(floor, cmd, index, value);
+            return true;
+        });
+
+    server.AddTool("self.iot.list_servos",
+        "List smart-home servo devices and their stable device_id values, protocol indexes, open angles, close angles, and current state.",
+        PropertyList(),
+        [](const PropertyList& properties) -> ReturnValue {
+            (void)properties;
+            return build_servo_list_json();
+        });
+
+    server.AddTool("self.iot.set_servo",
+        "Set a smart-home servo by stable device_id instead of guessing indexes. Device mapping: da men/front gate/floor1_gate, er lou liangyigan/floor2_hanger, san lou you tianchuang/floor3_right_skylight, san lou zuo tianchuang/floor3_left_skylight, san lou liangyigan/floor3_hanger. Rain status locks floor2_hanger and floor3_hanger closed.",
+        PropertyList({
+            Property("device_id", kPropertyTypeString),
+            Property("angle", kPropertyTypeInteger, 0, 180),
+        }),
+        [](const PropertyList& properties) -> ReturnValue {
+            return send_servo_device(
+                properties["device_id"].value<std::string>(),
+                static_cast<uint8_t>(properties["angle"].value<int>()));
+        });
+
+    server.AddTool("self.iot.set_servo_power",
+        "Open or close a smart-home servo by stable device_id using the same angles as the LVGL buttons. Use this for Chinese/natural commands: da men/front gate/floor1_gate, er lou liangyigan/floor2_hanger, san lou you tianchuang/floor3_right_skylight, san lou zuo tianchuang/floor3_left_skylight, san lou liangyigan/floor3_hanger. Rain status locks floor2_hanger and floor3_hanger closed.",
+        PropertyList({
+            Property("device_id", kPropertyTypeString),
+            Property("open", kPropertyTypeBoolean),
+        }),
+        [](const PropertyList& properties) -> ReturnValue {
+            std::string device_id = properties["device_id"].value<std::string>();
+            const rc_device_t* d = find_device_by_id(device_id);
+            if (!d) {
+                throw std::runtime_error("Unknown servo device_id: " + device_id);
+            }
+            if (d->cmd_type != IOT_CMD_SET_SERVO) {
+                throw std::runtime_error("Device is not a servo: " + device_id);
+            }
+            uint8_t angle = properties["open"].value<bool>() ?
+                d->servo_open_angle : d->servo_close_angle;
+            return send_servo_device(device_id, angle);
+        });
+
+    server.AddTool("self.iot.set_main_power",
+        "Turn one floor's main power breaker on or off.",
+        PropertyList({
+            Property("floor", kPropertyTypeInteger, 1, 3),
+            Property("on", kPropertyTypeBoolean),
+        }),
+        [](const PropertyList& properties) -> ReturnValue {
+            mqtt_send_main_power(
+                static_cast<uint8_t>(properties["floor"].value<int>()),
+                properties["on"].value<bool>());
+            return true;
+        });
+
+    server.AddTool("self.iot.set_all_main_power",
+        "Turn all floor main power breakers on or off.",
+        PropertyList({
+            Property("on", kPropertyTypeBoolean),
+        }),
+        [](const PropertyList& properties) -> ReturnValue {
+            mqtt_send_all_main_power(properties["on"].value<bool>());
             return true;
         });
 
@@ -185,9 +337,9 @@ extern "C" void SmartHomeMcp_RegisterTools(void) {
         });
 
     server.AddTool("self.iot.set_scene",
-        "Run a smart-home scene. scene_id: 1 sleep, 2 movie, 3 night, 4 fire demo, 5 rain, 6 away, 7 home.",
+        "Run a smart-home scene. scene_id: 1 sleep, 2 movie, 3 night, 4 fire demo, 5 rain, 6 away, 7 home, 8 bright.",
         PropertyList({
-            Property("scene_id", kPropertyTypeInteger, 1, 7),
+            Property("scene_id", kPropertyTypeInteger, 1, 8),
         }),
         [](const PropertyList& properties) -> ReturnValue {
             mqtt_send_scene(static_cast<uint8_t>(properties["scene_id"].value<int>()));
@@ -211,7 +363,7 @@ extern "C" void SmartHomeMcp_RegisterTools(void) {
         });
 
     server.AddTool("self.iot.set_servo_by_index",
-        "Set a smart-home servo angle.",
+        "Set a smart-home servo angle by floor/index for protocol debugging. Prefer self.iot.set_servo_power for Chinese/natural language control. Index accepts local servo 0-2 or protocol index 6-8: da men/front gate=1F index 6, 2F hanger=8, 3F right skylight=6, 3F left skylight=7, 3F hanger=8.",
         PropertyList({
             Property("floor", kPropertyTypeInteger, 1, 3),
             Property("index", kPropertyTypeInteger, 0, 15),
@@ -221,7 +373,7 @@ extern "C" void SmartHomeMcp_RegisterTools(void) {
             mqtt_send_command(
                 static_cast<uint8_t>(properties["floor"].value<int>()),
                 IOT_CMD_SET_SERVO,
-                static_cast<uint8_t>(properties["index"].value<int>()),
+                canonical_servo_index(static_cast<uint8_t>(properties["index"].value<int>())),
                 static_cast<uint8_t>(properties["angle"].value<int>()));
             return true;
         });

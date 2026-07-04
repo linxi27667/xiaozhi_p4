@@ -16,6 +16,8 @@
 #include "smart_home/ui/core/ui_events.h"
 #include "smart_home/ui/services/login_ui.h"
 #include "smart_home/services/face_recognition.h"
+#include "smart_home/services/xiaozhi_mqtt.h"
+#include "mqtt_iot_protocol.h"
 #include "esp_video.h"
 
 #include <cstring>
@@ -1055,6 +1057,11 @@ void Application::OnLoginSuccess() {
     }
 
     SetDeviceState(kDeviceStateIdle);
+    if (mqtt_client_is_connected()) {
+        mqtt_send_scene(IOT_SCENE_HOME);
+    } else {
+        device_model_set_scene(IOT_SCENE_HOME);
+    }
 }
 
 void Application::HandleToggleChatEvent() {

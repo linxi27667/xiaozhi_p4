@@ -6,7 +6,7 @@
  * - 维护设备标志位（枚举类型）
  * - 定时刷新 GPIO 输出
  *
- * 设备配置：1灯(阳台灯) + 0继电器 + 3舵机(左天窗/右天窗/晾衣杆) + 烟雾传感器 + 雨滴传感器 + 求助按键
+ * 设备配置：1灯(阳台灯) + 0继电器 + 3舵机(右天窗/左天窗/晾衣杆) + 火焰传感器 + 雨滴传感器
  *
  * 架构原则：
  * - 设备状态全部使用枚举类型（易读、易扩展）
@@ -31,7 +31,7 @@ typedef enum {
 typedef enum {
     SERVO_0   = 0,
     SERVO_25  = 1,
-    SERVO_70  = 2,
+    SERVO_90  = 2,
     SERVO_135 = 3,
     SERVO_180 = 4
 } servo_angle_enum_t;
@@ -55,12 +55,13 @@ typedef enum {
 /* ================= 中文设备名称绑定（与主机MCP描述一致） ================= */
 #define LIGHT_1_CHINESE   "三楼阳台灯"
 
-#define SERVO_1_CHINESE   "三楼左天窗"
-#define SERVO_2_CHINESE   "三楼右天窗"
-#define SERVO_3_CHINESE   "三楼晾衣架"
+#define SERVO_1_CHINESE   "三楼右天窗"
+#define SERVO_2_CHINESE   "三楼左天窗"
+#define SERVO_3_CHINESE   "三楼晾衣杆"
 
 /* ================= 设备标志位结构体 ================= */
 typedef struct {
+    device_onoff_enum_t main_power;
     device_onoff_enum_t light[LIGHT_COUNT];
     device_onoff_enum_t relay[(RELAY_COUNT > 0) ? RELAY_COUNT : 1];  /* 避免零长度数组 */
     servo_angle_enum_t  servo[SERVO_COUNT];

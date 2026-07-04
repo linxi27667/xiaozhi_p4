@@ -11,7 +11,7 @@
  * - mqtt_receive.c   : MQTT 接收 + 命令解析
  * - mqtt_heartbeat.c : 心跳包发送
  * - iot_control_task.c  : 设备标志位刷新 + GPIO 控制
- * - sensor_adc_task.c   : 烟雾/雨滴/求助传感器检测
+ * - sensor_adc_task.c   : 火焰/雨滴传感器检测
  */
 #include <stdio.h>
 #include <string.h>

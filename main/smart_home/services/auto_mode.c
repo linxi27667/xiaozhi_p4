@@ -120,14 +120,20 @@ void auto_mode_on_event(const smart_home_event_t *event)
     if (!event) return;
 
     if (event->type == SH_EVENT_FIRE_ALARM) {
-        mqtt_send_broadcast(IOT_CMD_BROADCAST_ALL_OFF);
-        mqtt_send_ambient_scene(2, 0, IOT_AMBIENT_SCENE_WARNING);
+        mqtt_send_command(3, IOT_CMD_SET_SERVO, 6, 90);
+        mqtt_send_command(3, IOT_CMD_SET_SERVO, 7, 90);
+        mqtt_send_broadcast(IOT_CMD_BROADCAST_LIGHTS_ON);
+        mqtt_send_command(1, IOT_CMD_SET_SERVO, 6, 135);
+        mqtt_send_command(1, IOT_CMD_SET_LIGHT, 0, 1);
+        mqtt_send_rgb_light(2, 0, 255, 0, 0, 100, IOT_LIGHT_EFFECT_WARNING, 5);
+        mqtt_send_command(2, IOT_CMD_SET_LIGHT, 1, 1);
+        mqtt_send_command(2, IOT_CMD_SET_LIGHT, 2, 1);
         return;
     }
 
     if (event->type == SH_EVENT_RAIN_ALARM) {
         if (can_trigger(AUTO_TARGET_FLOOR2_HANGER)) {
-            do_trigger(AUTO_TARGET_FLOOR2_HANGER, 2, IOT_CMD_SET_SERVO, 6, 0);
+            do_trigger(AUTO_TARGET_FLOOR2_HANGER, 2, IOT_CMD_SET_SERVO, 8, 0);
         }
         if (can_trigger(AUTO_TARGET_FLOOR3_HANGER)) {
             do_trigger(AUTO_TARGET_FLOOR3_HANGER, 3, IOT_CMD_SET_SERVO, 8, 0);
@@ -138,7 +144,7 @@ void auto_mode_on_event(const smart_home_event_t *event)
             mqtt_send_ambient_scene(2, 0, IOT_AMBIENT_SCENE_RAIN);
         }
         if (can_trigger(AUTO_TARGET_FLOOR3_SKYLIGHT)) {
-            do_trigger(AUTO_TARGET_FLOOR3_SKYLIGHT, 3, IOT_CMD_SET_SERVO, 6, 0);
+            do_trigger(AUTO_TARGET_FLOOR3_SKYLIGHT, 3, IOT_CMD_SET_SERVO, 6, 180);
             do_trigger(AUTO_TARGET_FLOOR3_SKYLIGHT, 3, IOT_CMD_SET_SERVO, 7, 0);
         }
         return;

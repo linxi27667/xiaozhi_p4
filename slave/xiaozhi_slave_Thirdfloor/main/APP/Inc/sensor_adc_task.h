@@ -8,8 +8,7 @@
 #include <stdint.h>
 
 void Sensor_ADC_Task_Init(void);
-void Sensor_ADC_Get_Snapshot(uint16_t *smoke_mv, uint16_t *rain_mv,
-                             uint8_t *fire_status, uint8_t *rain_status,
-                             uint8_t *help_status);
+void Sensor_ADC_Get_Snapshot(uint16_t *flame_mv, uint16_t *rain_mv,
+                             uint8_t *fire_status, uint8_t *rain_status);
 
 #endif

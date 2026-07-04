@@ -10,7 +10,7 @@
 
 #include "bsp_asr_uart.h"
 
-#define ASR_CMD_FIRE_ALERT    0x01
+#define ASR_CMD_FIRE_ALERT    0x03
 #define ASR_CMD_HELP_ALERT    0x02
 #define ASR_CMD_EMERGENCY     0x03
 

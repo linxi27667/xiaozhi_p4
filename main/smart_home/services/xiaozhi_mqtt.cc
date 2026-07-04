@@ -38,6 +38,21 @@ static int64_t s_last_network_wait_log_ms = 0;
 /* MAC->楼层映射表: 从机 announce/heartbeat 时注册, 用于 response topic 反查楼层 */
 static char s_floor_mac[4][13] = {{0}};
 
+static uint8_t canonical_servo_index(uint8_t gpio_index) {
+    return (gpio_index < 6) ? (uint8_t)(gpio_index + 6) : gpio_index;
+}
+
+static bool rain_hanger_lock_active(void) {
+    uint8_t rain_status = 0;
+    return device_model_get_rain_status(3, &rain_status) && rain_status != 0;
+}
+
+static bool is_hanger_servo_command(uint8_t floor_id, uint8_t cmd_type, uint8_t gpio_index) {
+    return cmd_type == IOT_CMD_SET_SERVO &&
+           (floor_id == 2 || floor_id == 3) &&
+           canonical_servo_index(gpio_index) == 8;
+}
+
 static bool topic_starts_with(const std::string& topic, const char* prefix) {
     return topic.rfind(prefix, 0) == 0;
 }
@@ -344,6 +359,16 @@ extern "C" void mqtt_send_command(uint8_t floor_id, uint8_t cmd_type, uint8_t gp
         return;
     }
 
+    if (cmd_type == IOT_CMD_SET_SERVO) {
+        gpio_index = canonical_servo_index(gpio_index);
+    }
+    if (is_hanger_servo_command(floor_id, cmd_type, gpio_index) &&
+        value > 0 && rain_hanger_lock_active()) {
+        ESP_LOGW(TAG, "Rain lock: force floor %u hanger closed, requested angle=%u",
+                 floor_id, value);
+        value = 0;
+    }
+
     iot_command_packet_t pkt = {};
     pkt.command = cmd_type;
     pkt.device_id = floor_id;
@@ -356,6 +381,44 @@ extern "C" void mqtt_send_command(uint8_t floor_id, uint8_t cmd_type, uint8_t gp
     std::string payload(reinterpret_cast<const char*>(&pkt), sizeof(pkt));
     s_mqtt->Publish(topic, payload, 0);
     ESP_LOGI(TAG, "CMD -> %s: cmd=0x%02X gpio=%u val=%u", topic, cmd_type, gpio_index, value);
+}
+
+extern "C" void mqtt_send_main_power(uint8_t floor_id, bool on) {
+    if (!mqtt_client_is_connected()) {
+        ESP_LOGW(TAG, "Cannot send main power: MQTT not connected");
+        return;
+    }
+    if (floor_id < 1 || floor_id > 3) {
+        ESP_LOGW(TAG, "Invalid main power floor: %u", floor_id);
+        return;
+    }
+
+    iot_command_packet_t pkt = {};
+    pkt.command = IOT_CMD_SET_MAIN_POWER;
+    pkt.device_id = floor_id;
+    pkt.value = on ? 1 : 0;
+
+    char topic[48];
+    snprintf(topic, sizeof(topic), "%s%u", MQTT_TOPIC_POWER_PREFIX, floor_id);
+
+    std::string payload(reinterpret_cast<const char*>(&pkt), sizeof(pkt));
+    s_mqtt->Publish(topic, payload, 1);
+    ESP_LOGW(TAG, "MAIN_POWER -> %s: %s", topic, on ? "ON" : "OFF");
+}
+
+extern "C" void mqtt_send_all_main_power(bool on) {
+    if (!mqtt_client_is_connected()) {
+        ESP_LOGW(TAG, "Cannot broadcast main power: MQTT not connected");
+        return;
+    }
+
+    iot_command_packet_t pkt = {};
+    pkt.command = IOT_CMD_SET_MAIN_POWER;
+    pkt.value = on ? 1 : 0;
+
+    std::string payload(reinterpret_cast<const char*>(&pkt), sizeof(pkt));
+    s_mqtt->Publish(MQTT_TOPIC_POWER_BROADCAST, payload, 1);
+    ESP_LOGW(TAG, "MAIN_POWER -> broadcast: %s", on ? "ON" : "OFF");
 }
 
 extern "C" void mqtt_send_command_v3(uint8_t floor_id, uint8_t cmd_type, uint8_t gpio_index, uint8_t value, uint8_t source) {
@@ -378,13 +441,13 @@ extern "C" void mqtt_send_ambient_scene(uint8_t floor_id, uint8_t index, uint8_t
             mqtt_send_rgb_light(floor_id, index, 24, 30, 96, 18, IOT_LIGHT_EFFECT_STATIC, 20);
             break;
         case IOT_AMBIENT_SCENE_RAIN:
-            mqtt_send_rgb_light(floor_id, index, 0, 120, 255, 35, IOT_LIGHT_EFFECT_BREATHE, 15);
+            mqtt_send_rgb_light(floor_id, index, 0, 120, 255, 65, IOT_LIGHT_EFFECT_WARNING, 5);
             break;
         case IOT_AMBIENT_SCENE_WARNING:
-            mqtt_send_rgb_light(floor_id, index, 255, 0, 0, 80, IOT_LIGHT_EFFECT_WARNING, 5);
+            mqtt_send_rgb_light(floor_id, index, 255, 0, 0, 100, IOT_LIGHT_EFFECT_WARNING, 5);
             break;
         case IOT_AMBIENT_SCENE_WARM_HOME:
-            mqtt_send_rgb_light(floor_id, index, 255, 166, 82, 45, IOT_LIGHT_EFFECT_BREATHE, 18);
+            mqtt_send_rgb_light(floor_id, index, 255, 166, 82, 45, IOT_LIGHT_EFFECT_STATIC, 0);
             break;
         default:
             break;
@@ -438,35 +501,67 @@ extern "C" void mqtt_send_scene(uint8_t scene_id) {
 
     switch (scene_id) {
         case IOT_SCENE_SLEEP:
+            mqtt_send_broadcast(IOT_CMD_BROADCAST_LIGHTS_OFF);
             mqtt_send_rgb_light(2, 0, 24, 30, 96, 18, IOT_LIGHT_EFFECT_STATIC, 20);
             mqtt_send_command(2, IOT_CMD_SET_LIGHT, 1, 0);
             mqtt_send_command(2, IOT_CMD_SET_LIGHT, 2, 0);
             mqtt_send_command(2, IOT_CMD_SET_RELAY, 0, 0);
+            mqtt_send_command(3, IOT_CMD_SET_SERVO, 6, 180);
+            mqtt_send_command(3, IOT_CMD_SET_SERVO, 7, 0);
+            mqtt_send_command(3, IOT_CMD_SET_SERVO, 8, 0);
             break;
         case IOT_SCENE_MOVIE:
+            mqtt_send_broadcast(IOT_CMD_BROADCAST_LIGHTS_OFF);
             mqtt_send_rgb_light(2, 0, 52, 68, 210, 24, IOT_LIGHT_EFFECT_STATIC, 20);
             mqtt_send_command(2, IOT_CMD_SET_LIGHT, 1, 0);
+            mqtt_send_command(2, IOT_CMD_SET_LIGHT, 2, 0);
+            mqtt_send_command(2, IOT_CMD_SET_RELAY, 0, 0);
+            mqtt_send_command(3, IOT_CMD_SET_SERVO, 6, 180);
+            mqtt_send_command(3, IOT_CMD_SET_SERVO, 7, 0);
             break;
         case IOT_SCENE_NIGHT:
             mqtt_send_rgb_light(2, 0, 255, 154, 68, 8, IOT_LIGHT_EFFECT_STATIC, 10);
+            mqtt_send_command(2, IOT_CMD_SET_LIGHT, 1, 0);
             mqtt_send_command(2, IOT_CMD_SET_LIGHT, 2, 1);
+            mqtt_send_command(3, IOT_CMD_SET_LIGHT, 0, 0);
             break;
         case IOT_SCENE_FIRE:
-            mqtt_send_rgb_light(2, 0, 255, 0, 0, 80, IOT_LIGHT_EFFECT_WARNING, 5);
+            mqtt_send_command(3, IOT_CMD_SET_SERVO, 6, 90);
+            mqtt_send_command(3, IOT_CMD_SET_SERVO, 7, 90);
             mqtt_send_broadcast(IOT_CMD_BROADCAST_LIGHTS_ON);
-            mqtt_send_broadcast(IOT_CMD_EMERGENCY);
+            mqtt_send_command(1, IOT_CMD_SET_SERVO, 6, 135);
+            mqtt_send_command(1, IOT_CMD_SET_LIGHT, 0, 1);
+            mqtt_send_rgb_light(2, 0, 255, 0, 0, 100, IOT_LIGHT_EFFECT_WARNING, 5);
+            mqtt_send_command(2, IOT_CMD_SET_LIGHT, 1, 1);
+            mqtt_send_command(2, IOT_CMD_SET_LIGHT, 2, 1);
             break;
         case IOT_SCENE_RAIN:
-            mqtt_send_rgb_light(2, 0, 0, 120, 255, 35, IOT_LIGHT_EFFECT_BREATHE, 15);
-            mqtt_send_command(2, IOT_CMD_SET_SERVO, 6, 0);
+            mqtt_send_ambient_scene(2, 0, IOT_AMBIENT_SCENE_RAIN);
+            mqtt_send_command(2, IOT_CMD_SET_SERVO, 8, 0);
             mqtt_send_command(3, IOT_CMD_SET_SERVO, 8, 0);
+            mqtt_send_command(3, IOT_CMD_SET_SERVO, 6, 180);
+            mqtt_send_command(3, IOT_CMD_SET_SERVO, 7, 0);
             break;
         case IOT_SCENE_AWAY:
             mqtt_send_broadcast(IOT_CMD_BROADCAST_ALL_OFF);
+            mqtt_send_command(1, IOT_CMD_SET_SERVO, 6, 0);
+            mqtt_send_command(3, IOT_CMD_SET_SERVO, 6, 180);
+            mqtt_send_command(3, IOT_CMD_SET_SERVO, 7, 0);
+            mqtt_send_command(3, IOT_CMD_SET_SERVO, 8, 0);
             break;
         case IOT_SCENE_HOME:
+            mqtt_send_all_main_power(true);
+            mqtt_send_broadcast(IOT_CMD_BROADCAST_LIGHTS_ON);
+            mqtt_send_command(1, IOT_CMD_SET_SERVO, 6, 135);
             mqtt_send_command(1, IOT_CMD_SET_LIGHT, 0, 1);
-            mqtt_send_rgb_light(2, 0, 255, 166, 82, 45, IOT_LIGHT_EFFECT_BREATHE, 18);
+            mqtt_send_command(2, IOT_CMD_SET_LIGHT, 1, 1);
+            mqtt_send_command(2, IOT_CMD_SET_LIGHT, 2, 1);
+            mqtt_send_command(3, IOT_CMD_SET_LIGHT, 0, 1);
+            mqtt_send_rgb_light(2, 0, 255, 190, 120, 68, IOT_LIGHT_EFFECT_STATIC, 0);
+            break;
+        case IOT_SCENE_BRIGHT:
+            mqtt_send_broadcast(IOT_CMD_BROADCAST_LIGHTS_ON);
+            mqtt_send_rgb_light(2, 0, 255, 220, 170, 85, IOT_LIGHT_EFFECT_STATIC, 20);
             break;
         default:
             break;

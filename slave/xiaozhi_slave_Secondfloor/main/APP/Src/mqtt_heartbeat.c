@@ -3,7 +3,6 @@
 #include "iot_control_task.h"
 #include "app_ambient_light.h"
 #include "mqtt_iot_protocol.h"
-#include "sensor_adc_task.h"
 
 #include "esp_log.h"
 #include "mqtt_client.h"
@@ -25,10 +24,6 @@ void MQTT_Heartbeat_Publish_Now(void) {
         return;
     }
 
-    uint16_t rain_mv = 0;
-    uint8_t rain_status = 0;
-    Sensor_ADC_Get_Snapshot(&rain_mv, &rain_status);
-
     iot_heartbeat_v3_packet_t heartbeat = {0};
     heartbeat.v2.command = IOT_CMD_HEARTBEAT;
     heartbeat.v2.protocol_version = IOT_PROTOCOL_VERSION_V3;
@@ -37,10 +32,11 @@ void MQTT_Heartbeat_Publish_Now(void) {
     heartbeat.v2.light_count = LIGHT_COUNT;
     heartbeat.v2.relay_count = RELAY_COUNT;
     heartbeat.v2.servo_count = SERVO_COUNT;
-    heartbeat.v2.sensor_count = 1;
-    heartbeat.v2.rain_mv = rain_mv;
-    heartbeat.v2.rain_status = rain_status;
+    heartbeat.v2.sensor_count = 0;
+    heartbeat.v2.rain_mv = 0;
+    heartbeat.v2.rain_status = 0;
     heartbeat.v2.uptime_s = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS / 1000);
+    heartbeat.v2.main_power_status = g_device_flags.main_power;
 
     snprintf(heartbeat.v2.device_name, sizeof(heartbeat.v2.device_name), "%s", DEVICE_NAME);
     snprintf(heartbeat.v2.mac_str, sizeof(heartbeat.v2.mac_str), "%s", mac_str);

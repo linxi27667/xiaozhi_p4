@@ -24,12 +24,11 @@ void MQTT_Heartbeat_Publish_Now(void) {
         return;
     }
 
-    uint16_t smoke_mv = 0;
+    uint16_t flame_mv = 0;
     uint16_t rain_mv = 0;
     uint8_t fire_status = 0;
     uint8_t rain_status = 0;
-    uint8_t help_status = 0;
-    Sensor_ADC_Get_Snapshot(&smoke_mv, &rain_mv, &fire_status, &rain_status, &help_status);
+    Sensor_ADC_Get_Snapshot(&flame_mv, &rain_mv, &fire_status, &rain_status);
 
     iot_heartbeat_v2_packet_t heartbeat = {
         .command = IOT_CMD_HEARTBEAT,
@@ -39,13 +38,14 @@ void MQTT_Heartbeat_Publish_Now(void) {
         .light_count = LIGHT_COUNT,
         .relay_count = RELAY_COUNT,
         .servo_count = SERVO_COUNT,
-        .sensor_count = 3,
-        .smoke_mv = smoke_mv,
+        .sensor_count = 2,
+        .smoke_mv = flame_mv,
         .rain_mv = rain_mv,
         .fire_status = fire_status,
         .rain_status = rain_status,
-        .help_status = help_status,
-        .uptime_s = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS / 1000)
+        .help_status = 0,
+        .uptime_s = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS / 1000),
+        .main_power_status = g_device_flags.main_power
     };
 
     snprintf(heartbeat.device_name, sizeof(heartbeat.device_name), "%s", DEVICE_NAME);

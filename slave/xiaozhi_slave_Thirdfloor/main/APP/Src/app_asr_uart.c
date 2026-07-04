@@ -10,7 +10,8 @@
 static const char* TAG = "APP_ASR_UART";
 
 #define ASR_UART_NUM       UART_NUM_1
-#define ASR_UART_TX_PIN    GPIO_NUM_17
+#define ASR_UART_TX_PIN    GPIO_NUM_16
+#define ASR_UART_RX_PIN    GPIO_NUM_17
 #define ASR_UART_BAUD      115200
 #define ASR_UART_BUF_SIZE  256
 
@@ -29,7 +30,7 @@ static bool HW_ASR_UART_Init(asr_uart_t *dev) {
         return false;
     }
 
-    if (uart_set_pin(ASR_UART_NUM, ASR_UART_TX_PIN, UART_PIN_NO_CHANGE,
+    if (uart_set_pin(ASR_UART_NUM, dev->tx_pin, dev->rx_pin,
                      UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE) != ESP_OK) {
         ESP_LOGE(TAG, "UART pin set failed");
         return false;
@@ -40,8 +41,8 @@ static bool HW_ASR_UART_Init(asr_uart_t *dev) {
         return false;
     }
 
-    ESP_LOGI(TAG, "ASR UART initialized: TX=%d, Baud=%d",
-             ASR_UART_TX_PIN, ASR_UART_BAUD);
+    ESP_LOGI(TAG, "ASR UART initialized: TX=%d, RX=%d, Baud=%d",
+             dev->tx_pin, dev->rx_pin, dev->baud_rate);
     return true;
 }
 
@@ -54,6 +55,7 @@ static bool HW_ASR_Send_Command(asr_uart_t *dev, uint8_t cmd) {
 asr_uart_t g_asr_uart_dev = {
     .baud_rate = ASR_UART_BAUD,
     .tx_pin = ASR_UART_TX_PIN,
+    .rx_pin = ASR_UART_RX_PIN,
     .is_init = false,
     .Hw_Init = HW_ASR_UART_Init,
     .Hw_Send_Command = HW_ASR_Send_Command,

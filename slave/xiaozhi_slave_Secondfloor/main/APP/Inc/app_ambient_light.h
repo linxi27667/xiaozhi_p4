@@ -6,7 +6,7 @@
 
 #define AMBIENT_STRIP_COUNT     1
 #define AMBIENT_BEDROOM_INDEX   0
-#define AMBIENT_WS2812_COUNT    8
+#define AMBIENT_WS2812_COUNT    30
 
 typedef enum {
     AMBIENT_SCENE_OFF = 0,

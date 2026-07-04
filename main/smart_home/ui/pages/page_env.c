@@ -38,20 +38,14 @@ static const char *TAG = "PAGE_ENV";
 #define STR_UPDATED_MIN_EN    "%u min ago"
 
 /* Indoor sensor labels */
-#define STR_2F_RAIN_VAL_ZH    "\xE4\xBA\x8C\xE6\xA5\xBC\xE9\x9B\xA8\xE6\xBB\xB4\xE5\x80\xBC"  /* 二楼雨滴值 */
-#define STR_2F_RAIN_VAL_EN    "2F Rain Value"
-#define STR_2F_RAIN_STA_ZH    "\xE4\xBA\x8C\xE6\xA5\xBC\xE9\x9B\xA8\xE6\xBB\xB4\xE7\x8A\xB6\xE6\x80\x81"  /* 二楼雨滴状态 */
-#define STR_2F_RAIN_STA_EN    "2F Rain Status"
-#define STR_3F_RAIN_VAL_ZH    "\xE4\xB8\x89\xE6\xA5\xBC\xE9\x9B\xA8\xE6\xBB\xB4\xE5\x80\xBC"  /* 三楼雨滴值 */
-#define STR_3F_RAIN_VAL_EN    "3F Rain Value"
-#define STR_3F_RAIN_STA_ZH    "\xE4\xB8\x89\xE6\xA5\xBC\xE9\x9B\xA8\xE6\xBB\xB4\xE7\x8A\xB6\xE6\x80\x81"  /* 三楼雨滴状态 */
-#define STR_3F_RAIN_STA_EN    "3F Rain Status"
-#define STR_3F_SMOKE_ZH       "\xE4\xB8\x89\xE6\xA5\xBC\xE7\x83\x9F\xE9\x9B\xBE"  /* 三楼烟雾 */
-#define STR_3F_SMOKE_EN       "3F Smoke"
-#define STR_3F_FIRE_ZH        "\xE4\xB8\x89\xE6\xA5\xBC\xE7\x81\xAB\xE7\x81\xBE"  /* 三楼火灾 */
-#define STR_3F_FIRE_EN        "3F Fire"
-#define STR_3F_HELP_ZH        "\xE4\xB8\x89\xE6\xA5\xBC\xE6\xB1\x82\xE5\x8A\xA9"  /* 三楼求助 */
-#define STR_3F_HELP_EN        "3F Help"
+#define STR_RAIN_SENSOR_ZH    "\xE9\x9B\xA8\xE6\xBB\xB4\xE4\xBC\xA0\xE6\x84\x9F\xE5\x99\xA8"  /* 雨滴传感器 */
+#define STR_RAIN_SENSOR_EN    "Rain Sensor"
+#define STR_RAIN_STATUS_ZH    "\xE9\x9B\xA8\xE6\xBB\xB4\xE7\x8A\xB6\xE6\x80\x81"  /* 雨滴状态 */
+#define STR_RAIN_STATUS_EN    "Rain Status"
+#define STR_FLAME_SENSOR_ZH   "\xE7\x81\xAB\xE7\x84\xB0\xE4\xBC\xA0\xE6\x84\x9F\xE5\x99\xA8"  /* 火焰传感器 */
+#define STR_FLAME_SENSOR_EN   "Flame Sensor"
+#define STR_FIRE_STATUS_ZH    "\xE7\x81\xAB\xE7\x81\xBE\xE7\x8A\xB6\xE6\x80\x81"  /* 火灾状态 */
+#define STR_FIRE_STATUS_EN    "Fire Status"
 
 /* Outdoor weather labels */
 #define STR_TEMP_ZH       "\xE6\xB8\xA9\xE5\xBA\xA6"      /* 温度 */
@@ -229,53 +223,32 @@ static void refresh_indoor(env_ctx_t *ctx)
     uint8_t status = 0;
     bool valid = false;
 
-    /* 2F rain value (mV) */
-    valid = device_model_get_rain_value(2, &value);
-    lv_snprintf(buf, sizeof(buf), "%u", (unsigned)value);
-    add_metric_card(ctx->indoor_wrap, ICON_DROP,
-        tr(STR_2F_RAIN_VAL_ZH, STR_2F_RAIN_VAL_EN),
-        buf, "mV", valid);
-
-    /* 2F rain status (下雨/干燥) */
-    valid = device_model_get_rain_status(2, &status);
-    add_metric_card(ctx->indoor_wrap, ICON_UMBRELLA,
-        tr(STR_2F_RAIN_STA_ZH, STR_2F_RAIN_STA_EN),
-        status ? tr(STR_WET_ZH, STR_WET_EN) : tr(STR_DRY_ZH, STR_DRY_EN),
-        "", valid);
-
     /* 3F rain value (mV) */
     valid = device_model_get_rain_value(3, &value);
     lv_snprintf(buf, sizeof(buf), "%u", (unsigned)value);
     add_metric_card(ctx->indoor_wrap, ICON_DROP,
-        tr(STR_3F_RAIN_VAL_ZH, STR_3F_RAIN_VAL_EN),
+        tr(STR_RAIN_SENSOR_ZH, STR_RAIN_SENSOR_EN),
         buf, "mV", valid);
 
     /* 3F rain status (下雨/干燥) */
     valid = device_model_get_rain_status(3, &status);
     add_metric_card(ctx->indoor_wrap, ICON_UMBRELLA,
-        tr(STR_3F_RAIN_STA_ZH, STR_3F_RAIN_STA_EN),
+        tr(STR_RAIN_STATUS_ZH, STR_RAIN_STATUS_EN),
         status ? tr(STR_WET_ZH, STR_WET_EN) : tr(STR_DRY_ZH, STR_DRY_EN),
         "", valid);
 
-    /* 3F smoke (mV) */
-    valid = device_model_get_smoke_value(3, &value);
+    /* 3F flame sensor voltage (mV) */
+    valid = device_model_get_flame_sensor_mv(3, &value);
     lv_snprintf(buf, sizeof(buf), "%u", (unsigned)value);
-    add_metric_card(ctx->indoor_wrap, ICON_FOG,
-        tr(STR_3F_SMOKE_ZH, STR_3F_SMOKE_EN),
+    add_metric_card(ctx->indoor_wrap, ICON_FIRE,
+        tr(STR_FLAME_SENSOR_ZH, STR_FLAME_SENSOR_EN),
         buf, "mV", valid);
 
-    /* 3F fire (告警/正常) */
+    /* 3F fire status (告警/正常) */
     valid = device_model_get_fire_status(3, &status);
-    add_metric_card(ctx->indoor_wrap, ICON_FIRE,
-        tr(STR_3F_FIRE_ZH, STR_3F_FIRE_EN),
-        status ? tr(STR_ALARM_ZH, STR_ALARM_EN) : tr(STR_NORMAL_ZH, STR_NORMAL_EN),
-        "", valid);
-
-    /* 3F help (求助/正常) */
-    valid = device_model_get_help_status(3, &status);
     add_metric_card(ctx->indoor_wrap, ICON_SHIELD,
-        tr(STR_3F_HELP_ZH, STR_3F_HELP_EN),
-        status ? tr(STR_HELP_ON_ZH, STR_HELP_ON_EN) : tr(STR_NORMAL_ZH, STR_NORMAL_EN),
+        tr(STR_FIRE_STATUS_ZH, STR_FIRE_STATUS_EN),
+        status ? tr(STR_ALARM_ZH, STR_ALARM_EN) : tr(STR_NORMAL_ZH, STR_NORMAL_EN),
         "", valid);
 }
 

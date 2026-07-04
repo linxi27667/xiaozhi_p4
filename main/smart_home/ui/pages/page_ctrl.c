@@ -34,8 +34,13 @@ typedef struct {
 static const char *device_name_en(const rc_device_t *d)
 {
     if (!d) return "";
+    if (strcmp(d->id, "floor_all_main_power") == 0) return "Main Breaker";
+    if (strcmp(d->id, "floor1_main_power") == 0) return "1F Breaker";
+    if (strcmp(d->id, "floor2_main_power") == 0) return "2F Breaker";
+    if (strcmp(d->id, "floor3_main_power") == 0) return "3F Breaker";
     if (strcmp(d->id, "floor1_gate") == 0) return "Gate";
     if (strcmp(d->id, "floor1_hall_light") == 0) return "Hall Light";
+    if (strcmp(d->id, "floor2_master_light") == 0) return "Bedroom Light";
     if (strcmp(d->id, "floor2_fan") == 0) return "Fan";
     if (strcmp(d->id, "floor2_living_light") == 0) return "Living Light";
     if (strcmp(d->id, "floor2_toilet_light") == 0) return "Toilet Light";
@@ -54,11 +59,34 @@ static const char *device_name_local(const rc_device_t *d)
     return device_name_en(d);
 }
 
+static bool rain_hanger_lock_active(void)
+{
+    uint8_t rain_status = 0;
+    return device_model_get_rain_status(3, &rain_status) && rain_status != 0;
+}
+
+static bool is_hanger_device(const rc_device_t *d)
+{
+    return d && (strcmp(d->id, "floor2_hanger") == 0 ||
+                 strcmp(d->id, "floor3_hanger") == 0);
+}
+
 /* ---- Device status helpers ---- */
 
 static const char *device_status_text(const rc_device_t *d)
 {
     if (!d || !d->connected) return tr("\xE6\x9C\xAA\xE6\x8E\xA5\xE5\x85\xA5", "Offline");
+    if (is_hanger_device(d) && rain_hanger_lock_active()) {
+        return tr("\xE9\x9B\xA8\xE5\xA4\xA9\xE9\x94\x81\xE5\xAE\x9A", "Rain Locked");
+    }
+    if (d->type == RC_DEVICE_RGB_LIGHT) {
+        return d->power_on ? tr("\xE5\x9C\xA8\xE7\xBA\xBF", "Online")
+                           : tr("\xE7\x81\xAF\xE5\xB8\xA6\xE7\xA6\xBB\xE7\xBA\xBF", "Strip Offline");
+    }
+    if (d->type == RC_DEVICE_MAIN_POWER) {
+        return d->power_on ? tr("\xE5\xB7\xB2\xE5\xBC\x80\xE5\x90\xAF", "On")
+                           : tr("\xE5\xB7\xB2\xE5\x85\xB3\xE9\x97\xAD", "Off");
+    }
     if (d->type == RC_DEVICE_DOOR || d->type == RC_DEVICE_WINDOW) {
         /* UTF-8: 已打开=E5B7B2E68993E5BC80, 已关闭=E5B7B2E585B3E997AD */
         return d->power_on ? tr("\xE5\xB7\xB2\xE6\x89\x93\xE5\xBC\x80", "Open")
@@ -78,7 +106,19 @@ static const char *device_status_text(const rc_device_t *d)
 static lv_color_t device_status_color(const rc_device_t *d)
 {
     if (!d || !d->connected) return UI_COLOR_TEXT_SEC;
+    if (is_hanger_device(d) && rain_hanger_lock_active()) return UI_COLOR_BLUE;
+    if (d->type == RC_DEVICE_MAIN_POWER && !d->power_on) return UI_COLOR_RED;
     return d->power_on ? UI_COLOR_GREEN : UI_COLOR_TEXT_SEC;
+}
+
+static bool device_visible_on_floor(const rc_device_t *d, int floor)
+{
+    if (!d || !d->controllable) return false;
+    if (floor == 0) {
+        return !(d->type == RC_DEVICE_MAIN_POWER && d->floor != RC_FLOOR_ALL);
+    }
+    if (d->floor != (rc_floor_t)floor) return false;
+    return d->floor != RC_FLOOR_ALL;
 }
 
 /* ---- State hash for change detection ---- */
@@ -88,10 +128,11 @@ static uint32_t floor_state_hash(int floor)
     uint32_t h = 2166136261u;
     for (uint16_t i = 0; i < device_model_count(); i++) {
         const rc_device_t *d = device_model_at(i);
-        if (!d || !d->controllable) continue;
-        if (floor != 0 && d->floor != (rc_floor_t)floor) continue;
-        if (d->type == RC_DEVICE_RGB_LIGHT) continue;
+        if (!device_visible_on_floor(d, floor)) continue;
         h ^= ((uint32_t)d->power_on << 8) ^ ((uint32_t)d->connected << 7) ^ (uint32_t)i;
+        if (d->type == RC_DEVICE_RGB_LIGHT) {
+            h ^= ((uint32_t)d->brightness << 16);
+        }
         h *= 16777619u;
     }
     return h;
@@ -103,7 +144,7 @@ static void on_device_click(lv_event_t *e)
 {
     uint16_t idx = (uint16_t)(uintptr_t)lv_event_get_user_data(e);
     const rc_device_t *d = device_model_at(idx);
-    if (d && d->controllable && d->connected) {
+    if (d && d->controllable && (d->connected || d->type == RC_DEVICE_RGB_LIGHT)) {
         device_model_toggle_device(idx);
     }
 }
@@ -189,10 +230,7 @@ static void rebuild_devices(ctrl_ctx_t *ctx)
 
     for (uint16_t i = 0; i < device_model_count(); i++) {
         const rc_device_t *d = device_model_at(i);
-        if (!d || !d->controllable) continue;
-        if (floor != 0 && d->floor != (rc_floor_t)floor) continue;
-        /* RGB_LIGHT (master bedroom light) is exclusive to the lighting page */
-        if (d->type == RC_DEVICE_RGB_LIGHT) continue;
+        if (!device_visible_on_floor(d, floor)) continue;
 
         const char *icon = device_model_type_icon(d->type);
         const char *name = device_name_local(d);
@@ -200,7 +238,7 @@ static void rebuild_devices(ctrl_ctx_t *ctx)
         lv_color_t color = device_status_color(d);
 
         lv_obj_t *card = ui_kit_device_card(ctx->devices_col, icon, name, status, color,
-                                            d->connected, on_device_click,
+                                            d->connected || d->type == RC_DEVICE_RGB_LIGHT, on_device_click,
                                             (void *)(uintptr_t)i);
         lv_obj_set_width(card, lv_pct(31));
         lv_obj_set_style_min_height(card, 112, 0);

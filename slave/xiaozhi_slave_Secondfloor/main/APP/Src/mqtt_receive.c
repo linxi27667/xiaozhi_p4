@@ -37,6 +37,7 @@ static char s_mac_str[13] = {0};
 #define MQTT_BROKER_URI     "mqtt://8.134.167.240"  // 阿里云服务器 IP
 #define MQTT_BROKER_PORT    1883
 #define MQTT_CLIENT_ID      "xiaozhi_slave_2"
+#define SERVO_PROTOCOL_BASE_INDEX 6
 
 /* ================= 响应发送 ================= */
 static void Send_Response(uint8_t cmd, uint8_t gpio_index, uint8_t value) {
@@ -68,6 +69,24 @@ static void Send_RGB_Response(const iot_rgb_light_packet_t* cmd) {
     esp_mqtt_client_publish(s_mqtt_client, topic, (const char*)&resp, sizeof(resp), 0, 0);
 }
 
+static bool Servo_Index_From_Command(uint8_t command_index, uint8_t *local_index, uint8_t *protocol_index) {
+    if (command_index >= SERVO_PROTOCOL_BASE_INDEX &&
+        command_index < SERVO_PROTOCOL_BASE_INDEX + SERVO_COUNT) {
+        uint8_t local = command_index - SERVO_PROTOCOL_BASE_INDEX;
+        if (local_index) *local_index = local;
+        if (protocol_index) *protocol_index = command_index;
+        return true;
+    }
+
+    if (command_index < SERVO_COUNT) {
+        if (local_index) *local_index = command_index;
+        if (protocol_index) *protocol_index = command_index + SERVO_PROTOCOL_BASE_INDEX;
+        return true;
+    }
+
+    return false;
+}
+
 static void Apply_Local_Scene(uint8_t scene_id) {
     switch (scene_id) {
         case IOT_SCENE_SLEEP:
@@ -89,11 +108,11 @@ static void Apply_Local_Scene(uint8_t scene_id) {
             break;
         case IOT_SCENE_FIRE:
             g_device_flags.light[0] = ON;
-            App_Ambient_Light_Set_RGB(AMBIENT_BEDROOM_INDEX, 255, 0, 0, 80, IOT_LIGHT_EFFECT_WARNING);
+            App_Ambient_Light_Set_RGB(AMBIENT_BEDROOM_INDEX, 255, 0, 0, 100, IOT_LIGHT_EFFECT_WARNING);
             break;
         case IOT_SCENE_RAIN:
-            g_device_flags.servo[0] = SERVO_0;
-            App_Ambient_Light_Set_RGB(AMBIENT_BEDROOM_INDEX, 0, 120, 255, 35, IOT_LIGHT_EFFECT_BREATHE);
+            g_device_flags.servo[2] = SERVO_0;
+            App_Ambient_Light_Set_RGB(AMBIENT_BEDROOM_INDEX, 0, 120, 255, 65, IOT_LIGHT_EFFECT_WARNING);
             break;
         case IOT_SCENE_AWAY:
             for (int i = 0; i < LIGHT_COUNT; i++) g_device_flags.light[i] = OFF;
@@ -103,7 +122,13 @@ static void Apply_Local_Scene(uint8_t scene_id) {
             break;
         case IOT_SCENE_HOME:
             g_device_flags.light[0] = ON;
-            App_Ambient_Light_Set_RGB(AMBIENT_BEDROOM_INDEX, 255, 166, 82, 45, IOT_LIGHT_EFFECT_BREATHE);
+            g_device_flags.light[1] = ON;
+            g_device_flags.light[2] = ON;
+            App_Ambient_Light_Set_RGB(AMBIENT_BEDROOM_INDEX, 255, 166, 82, 45, IOT_LIGHT_EFFECT_STATIC);
+            break;
+        case IOT_SCENE_BRIGHT:
+            for (int i = 0; i < LIGHT_COUNT; i++) g_device_flags.light[i] = ON;
+            App_Ambient_Light_Set_RGB(AMBIENT_BEDROOM_INDEX, 255, 220, 170, 85, IOT_LIGHT_EFFECT_STATIC);
             break;
         default:
             break;
@@ -189,14 +214,27 @@ static void Process_Command(const iot_command_packet_t* cmd) {
             }
             break;
 
+        case IOT_CMD_SET_MAIN_POWER:
+            g_device_flags.main_power = (cmd->value == 1) ? ON : OFF;
+            ESP_LOGW(TAG, "Main power = %s", cmd->value ? "ON" : "OFF");
+            Send_Response(cmd->command, 0, cmd->value ? 1 : 0);
+            MQTT_Heartbeat_Publish_Now();
+            break;
+
         case IOT_CMD_SET_SERVO:
-            if (cmd->gpio_index >= 6 && cmd->gpio_index < 6 + SERVO_COUNT && cmd->value <= 180) {
-                uint8_t servo_local_index = cmd->gpio_index - 6;
+            if (cmd->value <= 180) {
+                uint8_t servo_local_index = 0;
+                uint8_t servo_protocol_index = 0;
+                if (!Servo_Index_From_Command(cmd->gpio_index, &servo_local_index, &servo_protocol_index)) {
+                    ESP_LOGW(TAG, "Invalid servo index: %d", cmd->gpio_index);
+                    break;
+                }
                 uint8_t step = cmd->value / 45;
                 if (step > 4) step = 4;
                 g_device_flags.servo[servo_local_index] = (servo_angle_enum_t)step;
-                ESP_LOGI(TAG, "Servo[%d] (GPIO%d) = %d deg", servo_local_index, cmd->gpio_index, cmd->value);
-                Send_Response(cmd->command, cmd->gpio_index, cmd->value);
+                uint8_t applied_angle = step * 45;
+                ESP_LOGI(TAG, "Servo[%d] (index=%d) = %d deg", servo_local_index, servo_protocol_index, applied_angle);
+                Send_Response(cmd->command, servo_protocol_index, applied_angle);
                 MQTT_Heartbeat_Publish_Now();
             }
             break;
@@ -264,6 +302,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
             ESP_LOGI(TAG, "MQTT connected");
             esp_mqtt_client_subscribe(s_mqtt_client, MQTT_TOPIC_CMD_BROADCAST, 1);
             esp_mqtt_client_subscribe(s_mqtt_client, MQTT_TOPIC_CMD_PREFIX DEVICE_ID_SECONDFLOOR, 1);
+            esp_mqtt_client_subscribe(s_mqtt_client, MQTT_TOPIC_POWER_BROADCAST, 1);
+            esp_mqtt_client_subscribe(s_mqtt_client, MQTT_TOPIC_POWER_PREFIX DEVICE_ID_SECONDFLOOR, 1);
             Send_Announce();
             break;
 

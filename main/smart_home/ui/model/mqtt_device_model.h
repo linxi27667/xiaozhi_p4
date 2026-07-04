@@ -17,6 +17,7 @@ extern "C" {
 #define WIFI_AP_MAX    16
 
 typedef enum {
+    RC_FLOOR_ALL = 0,
     RC_FLOOR_1 = 1,
     RC_FLOOR_2 = 2,
     RC_FLOOR_3 = 3,
@@ -28,6 +29,7 @@ typedef enum {
     RC_DEVICE_FAN,
     RC_DEVICE_DOOR,
     RC_DEVICE_WINDOW,
+    RC_DEVICE_MAIN_POWER,
 } rc_device_type_t;
 
 typedef enum {
@@ -62,7 +64,8 @@ typedef struct {
     uint8_t blue;
     uint8_t brightness;
     uint8_t effect;
-    uint8_t servo_open_angle;   /* 舵机打开角度(默认180,3F天窗机械限位135) */
+    uint8_t servo_open_angle;   /* 舵机打开角度 */
+    uint8_t servo_close_angle;  /* 舵机关闭角度 */
 } rc_device_t;
 
 typedef struct {
@@ -174,6 +177,7 @@ void device_model_apply_rgb_ack(uint8_t floor_id, uint8_t index, uint8_t red, ui
 void device_model_set_scene(uint8_t scene_id);
 const char *device_model_scene_name(uint8_t scene_id);
 bool device_model_get_smoke_value(uint8_t floor_id, uint16_t *value);
+bool device_model_get_flame_sensor_mv(uint8_t floor_id, uint16_t *value);
 bool device_model_get_rain_value(uint8_t floor_id, uint16_t *value);
 bool device_model_get_flame_value(uint8_t floor_id, uint16_t *value);
 bool device_model_get_fire_status(uint8_t floor_id, uint8_t *status);
