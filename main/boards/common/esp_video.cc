@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <esp_heap_caps.h>
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 
@@ -946,11 +947,29 @@ std::string EspVideo::Explain(const std::string& question) {
         throw std::runtime_error("Failed to connect to explain URL");
     }
 
-    const auto write_http = [&http](const char* data, size_t len) {
-        int written = http->Write(data, len);
-        if (written < 0 || (len > 0 && static_cast<size_t>(written) < len)) {
-            throw std::runtime_error("Failed to upload photo data");
-        }
+    const auto write_http = [&http](const char* data, size_t len, bool paced = false) {
+#ifdef CONFIG_ESP_HOSTED_ENABLED
+        constexpr size_t kUploadChunkSize = 1024;
+#else
+        constexpr size_t kUploadChunkSize = 4096;
+#endif
+        size_t offset = 0;
+
+        do {
+            size_t chunk_len = paced ? std::min(kUploadChunkSize, len - offset) : len;
+            int written = http->Write(data + offset, chunk_len);
+            if (written < 0 || (chunk_len > 0 && static_cast<size_t>(written) < chunk_len)) {
+                throw std::runtime_error("Failed to upload photo data");
+            }
+            offset += chunk_len;
+#ifdef CONFIG_ESP_HOSTED_ENABLED
+            if (paced && offset < len) {
+                // ESP-Hosted caches 1536-byte DMA blocks. Pacing lets the SDIO TX path
+                // return and reuse a small set instead of exhausting internal memory.
+                vTaskDelay(pdMS_TO_TICKS(10));
+            }
+#endif
+        } while (offset < len);
     };
 
     {
@@ -972,7 +991,11 @@ std::string EspVideo::Explain(const std::string& question) {
         write_http(file_header.c_str(), file_header.size());
     }
 
-    write_http(reinterpret_cast<const char*>(jpeg_data), jpeg_len);
+    ESP_LOGI(TAG, "Photo upload start: jpeg=%u internal_free=%u largest=%u",
+             (unsigned)jpeg_len,
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+    write_http(reinterpret_cast<const char*>(jpeg_data), jpeg_len, true);
 
     {
         // 第四块：multipart尾部
@@ -990,6 +1013,10 @@ std::string EspVideo::Explain(const std::string& question) {
 
     std::string result = http->ReadAll();
     http->Close();
+
+    ESP_LOGI(TAG, "Photo upload done: internal_free=%u largest=%u",
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
 
     // Get remain task stack size
     size_t remain_stack_size = uxTaskGetStackHighWaterMark(nullptr);
