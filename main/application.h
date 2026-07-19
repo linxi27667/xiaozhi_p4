@@ -180,19 +180,4 @@ private:
     void OnStateChanged(DeviceState old_state, DeviceState new_state);
 };
 
-
-class TaskPriorityReset {
-public:
-    TaskPriorityReset(BaseType_t priority) {
-        original_priority_ = uxTaskPriorityGet(NULL);
-        vTaskPrioritySet(NULL, priority);
-    }
-    ~TaskPriorityReset() {
-        vTaskPrioritySet(NULL, original_priority_);
-    }
-
-private:
-    BaseType_t original_priority_;
-};
-
 #endif // _APPLICATION_H_

@@ -397,10 +397,6 @@ void EspVideo::SetExplainUrl(const std::string& url, const std::string& token) {
 bool EspVideo::Capture() {
     std::lock_guard<std::mutex> capture_lock(capture_mutex_);
 
-    if (encoder_thread_.joinable()) {
-        encoder_thread_.join();
-    }
-
     if (!streaming_on_ || video_fd_ < 0) {
         return false;
     }
@@ -893,9 +889,8 @@ bool EspVideo::SetVFlip(bool enabled) {
  * 问题对图像进行AI分析并返回结果。
  *
  * 实现特点：
- * - 使用独立线程编码JPEG，与主线程分离
- * - 采用分块传输编码(chunked transfer encoding)优化内存使用
- * - 通过队列机制实现编码线程和发送线程的数据同步
+ * - 将当前帧一次性编码到PSRAM中的JPEG缓冲区
+ * - 使用分块传输编码(chunked transfer encoding)上传
  * - 支持设备ID、客户端ID和认证令牌的HTTP头部配置
  *
  * @param question 要向AI提出的关于图像的问题，将作为表单字段发送
@@ -905,7 +900,6 @@ bool EspVideo::SetVFlip(bool enabled) {
  *                  {"success": false, "message": "错误信息"}
  *
  * @note 调用此函数前必须先调用SetExplainUrl()设置服务器URL
- * @note 函数会等待之前的编码线程完成后再开始新的处理
  * @warning 如果摄像头缓冲区为空或网络连接失败，将返回错误信息
  */
 std::string EspVideo::Explain(const std::string& question) {
@@ -913,44 +907,25 @@ std::string EspVideo::Explain(const std::string& question) {
         throw std::runtime_error("Image explain URL or token is not set");
     }
 
-    // 创建局部的 JPEG 队列, 40 entries is about to store 512 * 40 = 20480 bytes of JPEG data
-    QueueHandle_t jpeg_queue = xQueueCreate(40, sizeof(JpegChunk));
-    if (jpeg_queue == nullptr) {
-        ESP_LOGE(TAG, "Failed to create JPEG queue");
-        throw std::runtime_error("Failed to create JPEG queue");
-    }
+    uint8_t* jpeg_data = nullptr;
+    size_t jpeg_len = 0;
+    size_t source_len = 0;
+    {
+        std::lock_guard<std::mutex> capture_lock(capture_mutex_);
+        if (frame_.data == nullptr || frame_.len == 0) {
+            throw std::runtime_error("Camera frame is empty");
+        }
 
-    // We spawn a thread to encode the image to JPEG using optimized encoder (cost about 500ms and 8KB SRAM)
-    encoder_thread_ = std::thread([this, jpeg_queue]() {
         uint16_t w = frame_.width ? frame_.width : 320;
         uint16_t h = frame_.height ? frame_.height : 240;
         v4l2_pix_fmt_t enc_fmt = frame_.format;
-        bool ok = image_to_jpeg_cb(
-            frame_.data, frame_.len, w, h, enc_fmt, 80,
-            [](void* arg, size_t index, const void* data, size_t len) -> size_t {
-                auto jpeg_queue = static_cast<QueueHandle_t>(arg);
-                JpegChunk chunk = {.data = nullptr, .len = len};
-                if (index == 0 && data != nullptr && len > 0) {
-                    chunk.data = (uint8_t*)heap_caps_aligned_alloc(16, len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-                    if (chunk.data == nullptr) {
-                        ESP_LOGE(TAG, "Failed to allocate %zu bytes for JPEG chunk", len);
-                        chunk.len = 0;
-                    } else {
-                        memcpy(chunk.data, data, len);
-                    }
-                } else {
-                    chunk.len = 0;  // Sentinel or error
-                }
-                xQueueSend(jpeg_queue, &chunk, portMAX_DELAY);
-                return len;
-            },
-            jpeg_queue);
-
-        if (!ok) {
-            JpegChunk chunk = {.data = nullptr, .len = 0};
-            xQueueSend(jpeg_queue, &chunk, portMAX_DELAY);
+        source_len = frame_.len;
+        if (!image_to_jpeg(frame_.data, frame_.len, w, h, enc_fmt, 80, &jpeg_data, &jpeg_len) ||
+            jpeg_data == nullptr || jpeg_len == 0) {
+            throw std::runtime_error("Failed to encode image to JPEG");
         }
-    });
+    }
+    std::unique_ptr<uint8_t, decltype(&heap_caps_free)> jpeg_guard(jpeg_data, heap_caps_free);
 
     auto network = Board::GetInstance().GetNetwork();
     auto http = network->CreateHttp(3);
@@ -963,23 +938,20 @@ std::string EspVideo::Explain(const std::string& question) {
     if (!explain_token_.empty()) {
         http->SetHeader("Authorization", "Bearer " + explain_token_);
     }
+    http->SetTimeout(15000);
     http->SetHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
     http->SetHeader("Transfer-Encoding", "chunked");
     if (!http->Open("POST", explain_url_)) {
         ESP_LOGE(TAG, "Failed to connect to explain URL");
-        // Clear the queue
-        encoder_thread_.join();
-        JpegChunk chunk;
-        while (xQueueReceive(jpeg_queue, &chunk, portMAX_DELAY) == pdPASS) {
-            if (chunk.data != nullptr) {
-                heap_caps_free(chunk.data);
-            } else {
-                break;
-            }
-        }
-        vQueueDelete(jpeg_queue);
         throw std::runtime_error("Failed to connect to explain URL");
     }
+
+    const auto write_http = [&http](const char* data, size_t len) {
+        int written = http->Write(data, len);
+        if (written < 0 || (len > 0 && static_cast<size_t>(written) < len)) {
+            throw std::runtime_error("Failed to upload photo data");
+        }
+    };
 
     {
         // 第一块：question字段
@@ -988,7 +960,7 @@ std::string EspVideo::Explain(const std::string& question) {
         question_field += "Content-Disposition: form-data; name=\"question\"\r\n";
         question_field += "\r\n";
         question_field += question + "\r\n";
-        http->Write(question_field.c_str(), question_field.size());
+        write_http(question_field.c_str(), question_field.size());
     }
     {
         // 第二块：文件字段头部
@@ -997,47 +969,22 @@ std::string EspVideo::Explain(const std::string& question) {
         file_header += "Content-Disposition: form-data; name=\"file\"; filename=\"camera.jpg\"\r\n";
         file_header += "Content-Type: image/jpeg\r\n";
         file_header += "\r\n";
-        http->Write(file_header.c_str(), file_header.size());
+        write_http(file_header.c_str(), file_header.size());
     }
 
-    // 第三块：JPEG数据
-    size_t total_sent = 0;
-    bool saw_terminator = false;
-    while (true) {
-        JpegChunk chunk;
-        if (xQueueReceive(jpeg_queue, &chunk, portMAX_DELAY) != pdPASS) {
-            ESP_LOGE(TAG, "Failed to receive JPEG chunk");
-            break;
-        }
-        if (chunk.data == nullptr) {
-            saw_terminator = true;
-            break;  // The last chunk
-        }
-        http->Write((const char*)chunk.data, chunk.len);
-        total_sent += chunk.len;
-        heap_caps_free(chunk.data);
-    }
-    // Wait for the encoder thread to finish
-    encoder_thread_.join();
-    // 清理队列
-    vQueueDelete(jpeg_queue);
-
-    if (!saw_terminator || total_sent == 0) {
-        ESP_LOGE(TAG, "JPEG encoder failed or produced empty output");
-        throw std::runtime_error("Failed to encode image to JPEG");
-    }
+    write_http(reinterpret_cast<const char*>(jpeg_data), jpeg_len);
 
     {
         // 第四块：multipart尾部
         std::string multipart_footer;
         multipart_footer += "\r\n--" + boundary + "--\r\n";
-        http->Write(multipart_footer.c_str(), multipart_footer.size());
+        write_http(multipart_footer.c_str(), multipart_footer.size());
     }
-    // 结束块
-    http->Write("", 0);
+    write_http("", 0);
 
-    if (http->GetStatusCode() != 200) {
-        ESP_LOGE(TAG, "Failed to upload photo, status code: %d", http->GetStatusCode());
+    int status_code = http->GetStatusCode();
+    if (status_code != 200) {
+        ESP_LOGE(TAG, "Failed to upload photo, status code: %d", status_code);
         throw std::runtime_error("Failed to upload photo");
     }
 
@@ -1047,7 +994,7 @@ std::string EspVideo::Explain(const std::string& question) {
     // Get remain task stack size
     size_t remain_stack_size = uxTaskGetStackHighWaterMark(nullptr);
     ESP_LOGI(TAG, "Explain image size=%d bytes, compressed size=%d, remain stack size=%d, question=%s\n%s",
-             (int)frame_.len, (int)total_sent, (int)remain_stack_size, question.c_str(), result.c_str());
+             (int)source_len, (int)jpeg_len, (int)remain_stack_size, question.c_str(), result.c_str());
     return result;
 }
 
@@ -1055,11 +1002,6 @@ bool EspVideo::CaptureFrame(CapturedFrame& frame) {
     std::lock_guard<std::mutex> capture_lock(capture_mutex_);
 
     frame = {};
-
-    // 等待编码线程完成(避免冲突)
-    if (encoder_thread_.joinable()) {
-        encoder_thread_.join();
-    }
 
     if (!streaming_on_ || video_fd_ < 0) {
         ESP_LOGE(TAG, "CaptureFrame: stream not on or fd invalid");

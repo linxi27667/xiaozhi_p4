@@ -8,7 +8,10 @@
 #include <esp_app_desc.h>
 #include <algorithm>
 #include <cstring>
-#include <esp_pthread.h>
+#include <memory>
+#include <new>
+#include <esp_heap_caps.h>
+#include <freertos/idf_additions.h>
 
 #include "application.h"
 #include "display.h"
@@ -109,15 +112,12 @@ void McpServer::AddCommonTools() {
                 Property("question", kPropertyTypeString)
             }),
             [camera](const PropertyList& properties) -> ReturnValue {
-                // Lower the priority to do the camera capture
-                TaskPriorityReset priority_reset(1);
-
                 if (!camera->Capture()) {
                     throw std::runtime_error("Failed to capture photo");
                 }
                 auto question = properties["question"].value<std::string>();
                 return camera->Explain(question);
-            });
+            }, true);
     }
 #endif
 
@@ -311,8 +311,87 @@ void McpServer::AddTool(McpTool* tool) {
     tools_.push_back(tool);
 }
 
-void McpServer::AddTool(const std::string& name, const std::string& description, const PropertyList& properties, std::function<ReturnValue(const PropertyList&)> callback) {
-    AddTool(new McpTool(name, description, properties, callback));
+void McpServer::AddTool(const std::string& name, const std::string& description, const PropertyList& properties,
+                        std::function<ReturnValue(const PropertyList&)> callback, bool run_in_background) {
+    AddTool(new McpTool(name, description, properties, callback, run_in_background));
+}
+
+bool McpServer::EnsureBackgroundTask() {
+    if (background_tool_task_ != nullptr) {
+        return true;
+    }
+
+    background_tool_queue_ = xQueueCreate(2, sizeof(BackgroundToolCall*));
+    if (background_tool_queue_ == nullptr) {
+        ESP_LOGE(TAG, "Failed to create background tool queue");
+        return false;
+    }
+
+#ifdef CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY
+    BaseType_t task_result = xTaskCreateWithCaps(
+        BackgroundTask, "mcp_camera", 12 * 1024, this, 1, &background_tool_task_,
+        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+#else
+    BaseType_t task_result = xTaskCreate(
+        BackgroundTask, "mcp_camera", 12 * 1024, this, 1, &background_tool_task_);
+#endif
+
+    if (task_result != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create background camera task");
+        vQueueDelete(background_tool_queue_);
+        background_tool_queue_ = nullptr;
+        background_tool_task_ = nullptr;
+        return false;
+    }
+    return true;
+}
+
+void McpServer::BackgroundTask(void* arg) {
+    auto* server = static_cast<McpServer*>(arg);
+
+    while (true) {
+        BackgroundToolCall* raw_call = nullptr;
+        if (xQueueReceive(server->background_tool_queue_, &raw_call, portMAX_DELAY) != pdTRUE ||
+            raw_call == nullptr) {
+            continue;
+        }
+
+        std::unique_ptr<BackgroundToolCall> call(raw_call);
+        try {
+            auto result = call->tool->Call(call->arguments);
+            int id = call->id;
+            Application::GetInstance().Schedule(
+                [server, id, result = std::move(result)]() {
+                    server->ReplyResult(id, result);
+                });
+        } catch (const std::exception& e) {
+            ESP_LOGE(TAG, "background tools/call: %s", e.what());
+            try {
+                int id = call->id;
+                std::string message = e.what();
+                Application::GetInstance().Schedule(
+                    [server, id, message = std::move(message)]() {
+                        server->ReplyError(id, message);
+                    });
+            } catch (...) {
+                ESP_LOGE(TAG, "Failed to schedule background tool error reply");
+            }
+        } catch (...) {
+            ESP_LOGE(TAG, "background tools/call: unknown error");
+            try {
+                int id = call->id;
+                Application::GetInstance().Schedule([server, id]() {
+                    server->ReplyError(id, "Camera tool failed");
+                });
+            } catch (...) {
+                ESP_LOGE(TAG, "Failed to schedule background tool error reply");
+            }
+        }
+
+        ESP_LOGI(TAG, "Background tool finished: %s, stack high water=%u",
+                 call->tool->name().c_str(),
+                 (unsigned)uxTaskGetStackHighWaterMark(nullptr));
+    }
 }
 
 void McpServer::AddUserOnlyTool(const std::string& name, const std::string& description, const PropertyList& properties, std::function<ReturnValue(const PropertyList&)> callback) {
@@ -552,14 +631,37 @@ void McpServer::DoToolCall(int id, const std::string& tool_name, const cJSON* to
         return;
     }
 
-    // Use main thread to call the tool
+    auto* tool = *tool_iter;
     auto& app = Application::GetInstance();
-    app.Schedule([this, id, tool_iter, arguments = std::move(arguments)]() {
-        try {
-            ReplyResult(id, (*tool_iter)->Call(arguments));
-        } catch (const std::exception& e) {
-            ESP_LOGE(TAG, "tools/call: %s", e.what());
-            ReplyError(id, e.what());
-        }
-    });
+    if (!tool->run_in_background()) {
+        app.Schedule([this, id, tool, arguments = std::move(arguments)]() {
+            try {
+                ReplyResult(id, tool->Call(arguments));
+            } catch (const std::exception& e) {
+                ESP_LOGE(TAG, "tools/call: %s", e.what());
+                ReplyError(id, e.what());
+            }
+        });
+        return;
+    }
+
+    if (!EnsureBackgroundTask()) {
+        ReplyError(id, "Not enough memory to run camera tool");
+        return;
+    }
+
+    auto* call = new (std::nothrow) BackgroundToolCall{
+        id, tool, std::move(arguments)
+    };
+    if (call == nullptr) {
+        ESP_LOGE(TAG, "Failed to allocate background tool context");
+        ReplyError(id, "Not enough memory to run camera tool");
+        return;
+    }
+
+    if (xQueueSend(background_tool_queue_, &call, 0) != pdTRUE) {
+        delete call;
+        ESP_LOGW(TAG, "Background camera queue is full");
+        ReplyError(id, "Camera is busy");
+    }
 }

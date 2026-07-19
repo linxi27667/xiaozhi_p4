@@ -8,10 +8,12 @@
 #include <variant>
 #include <optional>
 #include <stdexcept>
-#include <thread>
 #include <mbedtls/base64.h>
 
 #include <cJSON.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include <freertos/task.h>
 
 class ImageContent {
 private:
@@ -212,22 +214,26 @@ private:
     PropertyList properties_;
     std::function<ReturnValue(const PropertyList&)> callback_;
     bool user_only_ = false;
+    bool run_in_background_ = false;
 
 public:
     McpTool(const std::string& name, 
             const std::string& description, 
             const PropertyList& properties, 
-            std::function<ReturnValue(const PropertyList&)> callback)
+            std::function<ReturnValue(const PropertyList&)> callback,
+            bool run_in_background = false)
         : name_(name), 
         description_(description), 
         properties_(properties), 
-        callback_(callback) {}
+        callback_(callback),
+        run_in_background_(run_in_background) {}
 
     void set_user_only(bool user_only) { user_only_ = user_only; }
     inline const std::string& name() const { return name_; }
     inline const std::string& description() const { return description_; }
     inline const PropertyList& properties() const { return properties_; }
     inline bool user_only() const { return user_only_; }
+    inline bool run_in_background() const { return run_in_background_; }
 
     std::string to_json() const {
         std::vector<std::string> required = properties_.GetRequired();
@@ -321,15 +327,24 @@ public:
     void AddCommonTools();
     void AddUserOnlyTools();
     void AddTool(McpTool* tool);
-    void AddTool(const std::string& name, const std::string& description, const PropertyList& properties, std::function<ReturnValue(const PropertyList&)> callback);
+    void AddTool(const std::string& name, const std::string& description, const PropertyList& properties,
+                 std::function<ReturnValue(const PropertyList&)> callback, bool run_in_background = false);
     void AddUserOnlyTool(const std::string& name, const std::string& description, const PropertyList& properties, std::function<ReturnValue(const PropertyList&)> callback);
     void ParseMessage(const cJSON* json);
     void ParseMessage(const std::string& message);
 
 private:
+    struct BackgroundToolCall {
+        int id;
+        McpTool* tool;
+        PropertyList arguments;
+    };
+
     McpServer();
     ~McpServer();
 
+    bool EnsureBackgroundTask();
+    static void BackgroundTask(void* arg);
     void ParseCapabilities(const cJSON* capabilities);
 
     void ReplyResult(int id, const std::string& result);
@@ -339,6 +354,8 @@ private:
     void DoToolCall(int id, const std::string& tool_name, const cJSON* tool_arguments);
 
     std::vector<McpTool*> tools_;
+    QueueHandle_t background_tool_queue_ = nullptr;
+    TaskHandle_t background_tool_task_ = nullptr;
 };
 
 #endif // MCP_SERVER_H

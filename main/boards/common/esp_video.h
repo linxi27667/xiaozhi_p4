@@ -3,7 +3,6 @@
 
 #include <lvgl.h>
 #include <atomic>
-#include <thread>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -42,7 +41,6 @@ private:
     std::vector<MmapBuffer> mmap_buffers_;
     std::string explain_url_;
     std::string explain_token_;
-    std::thread encoder_thread_;
 
 public:
     EspVideo(const esp_video_init_config_t& config);
