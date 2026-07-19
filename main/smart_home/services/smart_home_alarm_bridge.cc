@@ -91,6 +91,8 @@ extern "C" void smart_home_alarm_on_rain_status(uint8_t floor_id, bool active)
         post_rule_event(SH_EVENT_RAIN_ALARM, floor_id, 1, "Rain detected");
         mqtt_send_command(2, IOT_CMD_SET_SERVO, 8, 0);
         mqtt_send_command(3, IOT_CMD_SET_SERVO, 8, 0);
+        mqtt_send_command(3, IOT_CMD_SET_SERVO, 6, 180);
+        mqtt_send_command(3, IOT_CMD_SET_SERVO, 7, 0);
     } else {
         mqtt_send_command(2, IOT_CMD_SET_SERVO, 8, 180);
         mqtt_send_command(3, IOT_CMD_SET_SERVO, 8, 180);

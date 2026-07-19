@@ -221,11 +221,9 @@ static void create_embedded_content_area(lv_obj_t *scr)
 {
     lv_obj_t *content = lv_obj_create(scr);
     lv_obj_remove_style_all(content);
-    int32_t width = lv_obj_get_width(scr);
-    int32_t height = lv_obj_get_height(scr);
-    if (width <= 1) width = LV_HOR_RES;
-    if (height <= 1) height = LV_VER_RES;
-    lv_obj_set_size(content, width, height);
+    /* 用百分比跟随 parent 实际尺寸,避免 parent HIDDEN 时
+       lv_obj_get_width 返回 0 而 fallback 到错误的 LV_HOR_RES。 */
+    lv_obj_set_size(content, lv_pct(100), lv_pct(100));
     lv_obj_set_style_bg_color(content, UI_COLOR_BG, 0);
     lv_obj_set_style_bg_opa(content, LV_OPA_COVER, 0);
     lv_obj_set_style_pad_all(content, 0, 0);
@@ -251,7 +249,13 @@ void UI_Manager_Init(lv_obj_t *parent)
     lv_obj_t *scr = parent ? parent : lv_screen_active();
     bool embedded = parent != NULL;
     lv_obj_clean(scr);
-    lv_obj_remove_style_all(scr);
+    if (!embedded) {
+        /* 独立模式:完全重置 scr 样式 */
+        lv_obj_remove_style_all(scr);
+    }
+    /* embedded 模式:scr(smart_home_page_)的 size/pos 由外层 lcd_display.cc
+       管理,不清除其样式,只覆盖必要属性。否则 remove_style_all 会清掉
+       外层设的 896x600 尺寸,导致 content_parent 拿到错误尺寸。 */
     lv_obj_set_style_bg_color(scr, UI_COLOR_BG, 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
     lv_obj_set_style_pad_all(scr, 0, 0);
@@ -268,8 +272,15 @@ void UI_Manager_Init(lv_obj_t *parent)
     }
     ui_event_subscribe(UI_EVENT_LANG_CHANGED, on_language_changed, NULL);
 
-    s_app_ctx.switch_pending = 1;
-    s_app_ctx.target_page = s_app_ctx.current_page;
+    /* embedded 模式下父容器创建时通常是 HIDDEN,若立即预创建页面,
+       HIDDEN 状态下 flex 布局未计算,首次显示会出现页面元素跳出屏幕。
+       改为不预创建(switch_pending=0),等容器可见时由
+       UI_Manager_Switch_Page() 触发首次创建。非 embedded 模式
+       (独立 sidebar 布局)父容器立即可见,保持原自动创建首页行为。 */
+    if (!embedded) {
+        s_app_ctx.switch_pending = 1;
+        s_app_ctx.target_page = s_app_ctx.current_page;
+    }
     refresh_nav_state();
 
     /* Timer for deferred page switching */
@@ -277,9 +288,24 @@ void UI_Manager_Init(lv_obj_t *parent)
         s_poll_timer = lv_timer_create(poll_timer_cb, 50, NULL);
     }
 
+    /* embedded 模式:content_parent 在 scr HIDDEN 状态下创建,
+       lv_pct(100) 可能未被正确解算。强制 update_layout 链触发解算,
+       让 content_parent 拿到 scr 的真实尺寸(896x600)。 */
+    if (embedded && s_app_ctx.content_parent) {
+        lv_obj_update_layout(scr);
+        lv_obj_update_layout(s_app_ctx.content_parent);
+    }
+
     ESP_LOGI(TAG, "%s", embedded ?
         "UI initialized in embedded content mode, 7 pages" :
         "UI initialized in standalone sidebar layout, 7 pages");
+}
+
+void UI_Manager_Force_Layout(void)
+{
+    if (s_app_ctx.content_parent) {
+        lv_obj_update_layout(s_app_ctx.content_parent);
+    }
 }
 
 void UI_Manager_Switch_Page(ui_page_id_t page)

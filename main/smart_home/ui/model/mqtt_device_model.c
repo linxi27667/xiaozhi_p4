@@ -171,7 +171,7 @@ void device_model_init(void)
     s_model.mqtt_state = MQTT_STATE_DISCONNECTED;
     s_model.wifi_state = WIFI_STATE_IDLE;
     snprintf(s_model.mqtt_broker, sizeof(s_model.mqtt_broker), "mqtt://8.134.167.240");
-    snprintf(s_model.weather_location, sizeof(s_model.weather_location), "%s", "广州");
+    snprintf(s_model.weather_location, sizeof(s_model.weather_location), "%s", "厦门");
 
     /*                    floor   type            id                      name       ctrl  floor_id  cmd_type           gpio_idx */
     add_device(RC_FLOOR_ALL, RC_DEVICE_MAIN_POWER, "floor_all_main_power", "\xE6\x80\xBB\xE5\xBC\x80\xE5\x85\xB3", true, 0, IOT_CMD_SET_MAIN_POWER, 0); /* 总开关 */
@@ -192,7 +192,7 @@ void device_model_init(void)
 
     rc_device_t *gate = find_device("floor1_gate");
     if (gate) {
-        gate->servo_open_angle = 135;
+        gate->servo_open_angle = 180;
         gate->servo_close_angle = 0;
     }
 

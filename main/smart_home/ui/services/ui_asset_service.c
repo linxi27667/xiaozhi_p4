@@ -57,8 +57,8 @@ extern const uint8_t _binary_siyin_logo_png_start[] asm("_binary_siyin_logo_png_
 extern const uint8_t _binary_siyin_logo_png_end[] asm("_binary_siyin_logo_png_end");
 extern const uint8_t _binary_weather_cloud_png_start[] asm("_binary_weather_cloud_png_start");
 extern const uint8_t _binary_weather_cloud_png_end[] asm("_binary_weather_cloud_png_end");
-extern const uint8_t _binary_weather_guangzhou_png_start[] asm("_binary_weather_guangzhou_png_start");
-extern const uint8_t _binary_weather_guangzhou_png_end[] asm("_binary_weather_guangzhou_png_end");
+extern const uint8_t _binary_weather_xiamen_png_start[] asm("_binary_weather_xiamen_png_start");
+extern const uint8_t _binary_weather_xiamen_png_end[] asm("_binary_weather_xiamen_png_end");
 
 typedef struct {
     const char *name;
@@ -72,7 +72,7 @@ typedef struct {
 static const ui_asset_def_t s_required_assets[] = {
     {"siyin_logo.png", _binary_siyin_logo_png_start, _binary_siyin_logo_png_end, 9857, 330, 60},
     {"overview_home.png", _binary_overview_home_png_start, _binary_overview_home_png_end, 1838, 148, 82},
-    {"weather_guangzhou.png", _binary_weather_guangzhou_png_start, _binary_weather_guangzhou_png_end, 1381, 88, 70},
+    {"weather_xiamen.png", _binary_weather_xiamen_png_start, _binary_weather_xiamen_png_end, 1381, 88, 70},
     {"weather_cloud.png", _binary_weather_cloud_png_start, _binary_weather_cloud_png_end, 1511, 96, 72},
     {"floor_1.png", _binary_floor_1_png_start, _binary_floor_1_png_end, 981, 82, 56},
     {"floor_2.png", _binary_floor_2_png_start, _binary_floor_2_png_end, 999, 82, 56},

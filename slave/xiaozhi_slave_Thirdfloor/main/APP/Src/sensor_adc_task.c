@@ -7,6 +7,7 @@
 #include "sensor_config.h"
 #include "app_asr_uart.h"
 #include "mqtt_receive.h"
+#include "mqtt_heartbeat.h"
 #include "mqtt_iot_protocol.h"
 
 #include "esp_err.h"
@@ -228,11 +229,14 @@ static void Sensor_ADC_Task(void* arg) {
                     g_device_flags.fire_status = FIRE_STATUS_CONFIRMED;
                     ESP_LOGW(TAG, "[FIRE] Fire detected! %ld mV (%ld%%) > %d%%",
                              flame_mv, fire_percent, FIRE_THRESHOLD_PERCENT);
+                    /* 火灾状态切换立即上报心跳,主机可在 ~1.5s 内收到并触发
+                     * 开门+弹窗+场景联动,不必等 30s 心跳周期。 */
+                    MQTT_Heartbeat_Publish_Now();
                 }
                 if (!g_fire_alert_sent) {
-                    App_ASR_Send_Emergency_Alert();
+                    App_ASR_Send_Fire_Alert();
                     g_fire_alert_sent = 1;
-                    ESP_LOGW(TAG, "[FIRE] Tianwen51 alert sent once: 0x03");
+                    ESP_LOGW(TAG, "[FIRE] Tianwen51 alert sent once: 0x01");
                 }
             }
         } else {
@@ -242,6 +246,8 @@ static void Sensor_ADC_Task(void* arg) {
                 g_fire_alert_sent = 0;
                 ESP_LOGI(TAG, "[FIRE] Fire normal %ld mV (%ld%%) <= %d%%",
                          flame_mv, fire_percent, FIRE_THRESHOLD_PERCENT);
+                /* 火灾解除也立即上报,让主机总览页状态及时更新。 */
+                MQTT_Heartbeat_Publish_Now();
             }
         }
 

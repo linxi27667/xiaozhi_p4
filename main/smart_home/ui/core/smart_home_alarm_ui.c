@@ -78,8 +78,10 @@ static void on_alarm_ack(lv_event_t *e)
 
 static void show_fire_modal(void)
 {
+    /* 火警弹窗一旦显示,只有手动点击"紧急处理"按钮才关闭。
+     * 火灾读数波动恢复正常时不关闭弹窗,避免漏报。
+     * 只在火警激活且未确认且弹窗未显示时才创建弹窗。 */
     if (!s_fire_active || s_fire_acknowledged) {
-        close_modal();
         return;
     }
 
@@ -233,11 +235,11 @@ static void poll_fire_status(lv_timer_t *timer)
         }
     }
 
-    /* No fire detected — clear state and close modal if open */
-    if (s_fire_active) {
+    /* No fire detected — 火警弹窗一旦显示,必须手动点击"紧急处理"按钮才关闭,
+     * 避免传感器读数短暂波动导致弹窗自动消失而漏报。
+     * 只清空 s_fire_active 标志(若弹窗还没来得及显示),不关闭已显示的弹窗。 */
+    if (s_fire_active && !s_modal) {
         s_fire_active = false;
-        close_modal();
-        ESP_LOGI(TAG, "Fire cleared, modal closed");
     }
 }
 

@@ -64,40 +64,40 @@ static void show_home_popup(void)
 
     lv_obj_t *box = lv_obj_create(s_popup);
     lv_obj_remove_style_all(box);
-    lv_obj_set_size(box, 520, 246);
-    lv_obj_align(box, LV_ALIGN_TOP_MID, 0, 34);
+    lv_obj_set_size(box, 720, 340);
+    lv_obj_align(box, LV_ALIGN_CENTER, 0, 0);
     lv_obj_set_style_bg_color(box, UI_COLOR_CARD, 0);
     lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(box, 10, 0);
+    lv_obj_set_style_radius(box, 14, 0);
     lv_obj_set_style_border_width(box, 1, 0);
     lv_obj_set_style_border_color(box, UI_COLOR_BORDER, 0);
-    lv_obj_set_style_shadow_width(box, 10, 0);
+    lv_obj_set_style_shadow_width(box, 16, 0);
     lv_obj_set_style_shadow_opa(box, LV_OPA_20, 0);
     lv_obj_set_style_shadow_color(box, UI_COLOR_SHADOW, 0);
     lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t *img = ui_asset_image_create(box, "overview_home.png");
     if (img) {
-        lv_obj_set_pos(img, 28, 76);
+        lv_obj_set_pos(img, 48, 110);
     } else {
-        lv_obj_t *ic = ui_create_icon(box, ICON_HOME, ui_font_icon(46), UI_COLOR_ACCENT);
-        lv_obj_set_pos(ic, 48, 94);
+        lv_obj_t *ic = ui_create_icon(box, ICON_HOME, ui_font_icon(30), UI_COLOR_ACCENT);
+        lv_obj_set_pos(ic, 70, 130);
     }
 
-    label(box, tr("欢迎回家", "Welcome Home"), 30, UI_COLOR_TEXT_STRONG, 210, 42, 240);
+    label(box, tr("欢迎回家", "Welcome Home"), 30, UI_COLOR_TEXT_STRONG, 180, 90, 500);
     label(box,
         tr("已为你打开大厅灯，并将主卧灯调为暖色氛围。", "Hall light is on and master light is set to warm ambience."),
-        16, UI_COLOR_TEXT_SEC, 210, 96, 260);
+        20, UI_COLOR_TEXT_SEC, 180, 150, 500);
 
     lv_obj_t *btn = lv_btn_create(box);
     lv_obj_remove_style_all(btn);
-    lv_obj_set_pos(btn, 464, 18);
-    lv_obj_set_size(btn, 38, 38);
-    lv_obj_set_style_radius(btn, 8, 0);
+    lv_obj_set_pos(btn, 656, 16);
+    lv_obj_set_size(btn, 48, 48);
+    lv_obj_set_style_radius(btn, 10, 0);
     lv_obj_set_style_bg_color(btn, UI_COLOR_INPUT_BG, 0);
     lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
     lv_obj_add_event_cb(btn, on_close, LV_EVENT_CLICKED, NULL);
-    lv_obj_t *x = label(btn, "X", 16, UI_COLOR_TEXT_SEC, 0, 9, 38);
+    lv_obj_t *x = label(btn, "X", 20, UI_COLOR_TEXT_SEC, 0, 12, 48);
     lv_obj_set_style_text_align(x, LV_TEXT_ALIGN_CENTER, 0);
 }
 

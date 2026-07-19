@@ -44,7 +44,7 @@ void SmartHomeTasksNotifyNetworkReady(void) {
 static void smart_home_mqtt_task(void* arg) {
     (void)arg;
 
-    vTaskDelay(pdMS_TO_TICKS(5000));
+    vTaskDelay(pdMS_TO_TICKS(1000));
 
     while (true) {
         if (!mqtt_client_is_connected()) {

@@ -8,6 +8,7 @@
 #include "ui_i18n.h"
 #include "ui_icons.h"
 #include "ui_manager.h"
+#include "ui_device_settings.h"
 #include "esp_log.h"
 #include "lvgl.h"
 #include <string.h>
@@ -47,14 +48,14 @@ static const char *TAG = "PAGE_SET";
 #define STR_LANG_EN_NAME    "English"
 
 /* Weather location */
-#define STR_SHANGHAI_ZH     "\xE5\xB9\xBF\xE5\xB7\x9E"                          /* 广州 */
-#define STR_SHANGHAI_EN     "Guangzhou"
+#define STR_XIAMEN_ZH       "\xE5\x8E\xA6\xE9\x97\xA8"                          /* 厦门 */
+#define STR_XIAMEN_EN       "Xiamen"
 
 #define MQTT_BROKER_STR     "8.134.167.240:1883"
 #define MQTT_CLIENT_ID      "xiaozhi_p4_host"
 #define FIRMWARE_VERSION    "v1.0.0"
 
-/* Persist slider values across page rebuilds (display only, no real effect) */
+/* Cached hardware values for the current page instance. */
 static int s_brightness = 80;
 static int s_volume = 70;
 
@@ -96,6 +97,14 @@ static void on_brightness_changed(lv_event_t *e)
     char buf[12];
     lv_snprintf(buf, sizeof(buf), "%d%%", s_brightness);
     lv_label_set_text(ctx->brightness_val, buf);
+    ui_device_settings_set_brightness(s_brightness, false);
+}
+
+static void on_brightness_released(lv_event_t *e)
+{
+    lv_obj_t *slider = lv_event_get_target(e);
+    s_brightness = (int)lv_slider_get_value(slider);
+    ui_device_settings_set_brightness(s_brightness, true);
 }
 
 static void on_volume_changed(lv_event_t *e)
@@ -109,6 +118,13 @@ static void on_volume_changed(lv_event_t *e)
     lv_label_set_text(ctx->volume_val, buf);
 }
 
+static void on_volume_released(lv_event_t *e)
+{
+    lv_obj_t *slider = lv_event_get_target(e);
+    s_volume = (int)lv_slider_get_value(slider);
+    ui_device_settings_set_volume(s_volume);
+}
+
 /* ---- Delete callback ---- */
 static void on_delete(lv_event_t *e)
 {
@@ -119,24 +135,26 @@ static void on_delete(lv_event_t *e)
 }
 
 /* ---- Create a styled slider for setting rows ---- */
-static lv_obj_t *make_slider(lv_obj_t *parent, int value,
-    lv_event_cb_t cb, void *user_data)
+static lv_obj_t *make_slider(lv_obj_t *parent, int min_value, int value,
+    lv_event_cb_t changed_cb, lv_event_cb_t released_cb, void *user_data)
 {
     lv_obj_t *slider = lv_slider_create(parent);
     lv_obj_set_width(slider, 140);
-    lv_slider_set_range(slider, 0, 100);
+    lv_slider_set_range(slider, min_value, 100);
     lv_slider_set_value(slider, value, LV_ANIM_OFF);
     lv_obj_set_style_bg_color(slider, UI_COLOR_INPUT_BG, LV_PART_MAIN);
     lv_obj_set_style_bg_color(slider, UI_COLOR_ACCENT, LV_PART_INDICATOR);
     lv_obj_set_style_bg_color(slider, UI_COLOR_ACCENT, LV_PART_KNOB);
     lv_obj_clear_flag(slider, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-    if (cb) lv_obj_add_event_cb(slider, cb, LV_EVENT_VALUE_CHANGED, user_data);
+    if (changed_cb) lv_obj_add_event_cb(slider, changed_cb, LV_EVENT_VALUE_CHANGED, user_data);
+    if (released_cb) lv_obj_add_event_cb(slider, released_cb, LV_EVENT_RELEASED, user_data);
     return slider;
 }
 
 /* ---- Create a slider + value label container as right_widget ---- */
-static lv_obj_t *make_slider_group(lv_obj_t *parent, int value,
-    lv_obj_t **val_label_out, lv_event_cb_t cb, void *user_data)
+static lv_obj_t *make_slider_group(lv_obj_t *parent, int min_value, int value,
+    lv_obj_t **val_label_out, lv_event_cb_t changed_cb,
+    lv_event_cb_t released_cb, void *user_data)
 {
     lv_obj_t *cont = lv_obj_create(parent);
     lv_obj_remove_style_all(cont);
@@ -150,7 +168,7 @@ static lv_obj_t *make_slider_group(lv_obj_t *parent, int value,
         LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
 
-    make_slider(cont, value, cb, user_data);
+    make_slider(cont, min_value, value, changed_cb, released_cb, user_data);
 
     char buf[12];
     lv_snprintf(buf, sizeof(buf), "%d%%", value);
@@ -164,6 +182,9 @@ static lv_obj_t *make_slider_group(lv_obj_t *parent, int value,
 /* ---- Page create ---- */
 lv_obj_t *page_set_create(lv_obj_t *parent)
 {
+    s_brightness = ui_device_settings_get_brightness();
+    s_volume = ui_device_settings_get_volume();
+
     set_ctx_t *ctx = lv_malloc(sizeof(set_ctx_t));
     memset(ctx, 0, sizeof(*ctx));
 
@@ -195,15 +216,15 @@ lv_obj_t *page_set_create(lv_obj_t *parent)
     lv_obj_add_event_cb(lang_row, on_language_row, LV_EVENT_CLICKED, NULL);
     ui_apply_press_feedback(lang_row, UI_COLOR_ACCENT);
 
-    /* Brightness row: slider + value label (display only) */
-    lv_obj_t *bright_right = make_slider_group(ctx->page, s_brightness,
-        &ctx->brightness_val, on_brightness_changed, ctx);
+    /* Brightness previews while dragging and persists once released. */
+    lv_obj_t *bright_right = make_slider_group(ctx->page, 10, s_brightness,
+        &ctx->brightness_val, on_brightness_changed, on_brightness_released, ctx);
     ui_kit_setting_row(ctx->page, ICON_LIGHTBULB,
         tr(STR_BRIGHTNESS_ZH, STR_BRIGHTNESS_EN), bright_right);
 
-    /* Volume row: slider + value label (display only) */
-    lv_obj_t *vol_right = make_slider_group(ctx->page, s_volume,
-        &ctx->volume_val, on_volume_changed, ctx);
+    /* Volume is applied and persisted once released. */
+    lv_obj_t *vol_right = make_slider_group(ctx->page, 0, s_volume,
+        &ctx->volume_val, on_volume_changed, on_volume_released, ctx);
     ui_kit_setting_row(ctx->page, ICON_VOLUME,
         tr(STR_VOLUME_ZH, STR_VOLUME_EN), vol_right);
 
@@ -224,7 +245,7 @@ lv_obj_t *page_set_create(lv_obj_t *parent)
 
     /* Weather location */
     lv_obj_t *loc_val = ui_create_label(ctx->page,
-        tr(STR_SHANGHAI_ZH, STR_SHANGHAI_EN),
+        tr(STR_XIAMEN_ZH, STR_XIAMEN_EN),
         ui_font_cn(13), UI_COLOR_TEXT_SEC);
     ui_kit_setting_row(ctx->page, ICON_DROP,
         tr(STR_WEATHER_LOC_ZH, STR_WEATHER_LOC_EN), loc_val);

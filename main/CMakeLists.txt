@@ -54,6 +54,7 @@ list(APPEND SOURCES
     "smart_home/services/smart_home_event_center.c"
     "smart_home/services/xiaozhi_mqtt.cc"
     "smart_home/services/smart_home_alarm_bridge.cc"
+    "smart_home/services/ui_device_settings.cc"
     "smart_home/services/wifi_manager.cc"
     "smart_home/services/weather_service.cc"
     "smart_home/services/face_recognition.cc"

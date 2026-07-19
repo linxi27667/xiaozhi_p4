@@ -34,6 +34,9 @@ static int64_t s_last_stats_publish_ms = 0;
 static constexpr int64_t kStatsPublishIntervalMs = 5000;  /* 5秒最多刷新一次 */
 static bool s_controller_online[4] = {false};
 static int64_t s_last_network_wait_log_ms = 0;
+static bool s_pending_scene_valid = false;
+static uint8_t s_pending_scene_id = IOT_SCENE_NONE;
+static bool s_flushing_pending_scene = false;
 
 /* MAC->楼层映射表: 从机 announce/heartbeat 时注册, 用于 response topic 反查楼层 */
 static char s_floor_mac[4][13] = {{0}};
@@ -332,6 +335,16 @@ extern "C" void mqtt_client_poll(void) {
         return;
     }
 
+    if (s_pending_scene_valid) {
+        uint8_t scene_id = s_pending_scene_id;
+        s_pending_scene_valid = false;
+        s_pending_scene_id = IOT_SCENE_NONE;
+        ESP_LOGI(TAG, "Flush queued scene after MQTT connected: scene=%u", scene_id);
+        s_flushing_pending_scene = true;
+        mqtt_send_scene(scene_id);
+        s_flushing_pending_scene = false;
+    }
+
     int64_t now = esp_timer_get_time() / 1000000;
     /* poll 中也节流 mqtt_stats 更新,与 OnMessage 共享节流变量,避免重复刷新 */
     int64_t now_ms = esp_timer_get_time() / 1000;
@@ -353,10 +366,10 @@ extern "C" void mqtt_client_poll(void) {
     }
 }
 
-extern "C" void mqtt_send_command(uint8_t floor_id, uint8_t cmd_type, uint8_t gpio_index, uint8_t value) {
+extern "C" bool mqtt_send_command(uint8_t floor_id, uint8_t cmd_type, uint8_t gpio_index, uint8_t value) {
     if (!mqtt_client_is_connected()) {
         ESP_LOGW(TAG, "Cannot send command: MQTT not connected");
-        return;
+        return false;
     }
 
     if (cmd_type == IOT_CMD_SET_SERVO) {
@@ -379,8 +392,13 @@ extern "C" void mqtt_send_command(uint8_t floor_id, uint8_t cmd_type, uint8_t gp
     snprintf(topic, sizeof(topic), "%s%u", MQTT_TOPIC_CMD_PREFIX, floor_id);
 
     std::string payload(reinterpret_cast<const char*>(&pkt), sizeof(pkt));
-    s_mqtt->Publish(topic, payload, 0);
+    if (!s_mqtt->Publish(topic, payload, 0)) {
+        ESP_LOGE(TAG, "Failed to publish command: topic=%s cmd=0x%02X gpio=%u val=%u",
+                 topic, cmd_type, gpio_index, value);
+        return false;
+    }
     ESP_LOGI(TAG, "CMD -> %s: cmd=0x%02X gpio=%u val=%u", topic, cmd_type, gpio_index, value);
+    return true;
 }
 
 extern "C" void mqtt_send_main_power(uint8_t floor_id, bool on) {
@@ -484,10 +502,19 @@ extern "C" void mqtt_send_rgb_light(uint8_t floor_id, uint8_t index, uint8_t red
 }
 
 extern "C" void mqtt_send_scene(uint8_t scene_id) {
+    if (!s_flushing_pending_scene) {
+        device_model_set_scene(scene_id);
+    }
+
     if (!mqtt_client_is_connected()) {
-        ESP_LOGW(TAG, "Cannot send scene: MQTT not connected");
+        s_pending_scene_valid = true;
+        s_pending_scene_id = scene_id;
+        ESP_LOGW(TAG, "MQTT not connected, scene=%u applied locally and queued", scene_id);
         return;
     }
+
+    s_pending_scene_valid = false;
+    s_pending_scene_id = IOT_SCENE_NONE;
 
     iot_scene_packet_t pkt = {};
     pkt.command = IOT_CMD_SET_SCENE;
@@ -497,7 +524,6 @@ extern "C" void mqtt_send_scene(uint8_t scene_id) {
 
     std::string payload(reinterpret_cast<const char*>(&pkt), sizeof(pkt));
     s_mqtt->Publish(MQTT_TOPIC_CMD_BROADCAST, payload, 0);
-    device_model_set_scene(scene_id);
 
     switch (scene_id) {
         case IOT_SCENE_SLEEP:
@@ -529,7 +555,7 @@ extern "C" void mqtt_send_scene(uint8_t scene_id) {
             mqtt_send_command(3, IOT_CMD_SET_SERVO, 6, 90);
             mqtt_send_command(3, IOT_CMD_SET_SERVO, 7, 90);
             mqtt_send_broadcast(IOT_CMD_BROADCAST_LIGHTS_ON);
-            mqtt_send_command(1, IOT_CMD_SET_SERVO, 6, 135);
+            mqtt_send_command(1, IOT_CMD_SET_SERVO, 6, 180);  // 一楼大门全开 180° 便于疏散
             mqtt_send_command(1, IOT_CMD_SET_LIGHT, 0, 1);
             mqtt_send_rgb_light(2, 0, 255, 0, 0, 100, IOT_LIGHT_EFFECT_WARNING, 5);
             mqtt_send_command(2, IOT_CMD_SET_LIGHT, 1, 1);
@@ -552,7 +578,7 @@ extern "C" void mqtt_send_scene(uint8_t scene_id) {
         case IOT_SCENE_HOME:
             mqtt_send_all_main_power(true);
             mqtt_send_broadcast(IOT_CMD_BROADCAST_LIGHTS_ON);
-            mqtt_send_command(1, IOT_CMD_SET_SERVO, 6, 135);
+            mqtt_send_command(1, IOT_CMD_SET_SERVO, 6, 180);
             mqtt_send_command(1, IOT_CMD_SET_LIGHT, 0, 1);
             mqtt_send_command(2, IOT_CMD_SET_LIGHT, 1, 1);
             mqtt_send_command(2, IOT_CMD_SET_LIGHT, 2, 1);

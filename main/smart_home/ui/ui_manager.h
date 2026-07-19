@@ -23,6 +23,11 @@ void UI_Manager_Rebuild_Current(void);
 void UI_Manager_Poll(void);
 ui_page_id_t UI_Manager_Get_Current_Page(void);
 
+/* 强制刷新 content_parent 的 layout。
+ * 用于 HIDDEN→可见转换时确保 lv_pct(100) 正确解算到父对象真实尺寸,
+ * 避免 page 创建后按旧 width 渲染导致内容溢出屏幕。 */
+void UI_Manager_Force_Layout(void);
+
 #ifdef __cplusplus
 }
 #endif

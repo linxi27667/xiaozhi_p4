@@ -143,38 +143,36 @@ static void publish_ui_event_now(ui_event_type_t event)
     ui_events_dispatch_pending();
 }
 
-// 人脸识别任务:在登录 UI 处于人脸模式时,持续采集帧并进行识别
+// 演示模式人脸登录任务:连续检测到满足条件的人脸后解锁
 static void face_recognition_task(void *arg)
 {
     (void)arg;
-    ESP_LOGI(TAG, "Face recognition task started");
+    ESP_LOGI(TAG, "Face detection login task started");
 
-    // 初始化人脸识别引擎
     auto &face_recog = smart_home::FaceRecognition::GetInstance();
-    bool face_init_ok = face_recog.Initialize();
+    bool face_init_ok = face_recog.InitializeDetector();
     if (!face_init_ok) {
-        ESP_LOGW(TAG, "Face recognition init failed, face login unavailable");
+        ESP_LOGW(TAG, "Face detector init failed, face login unavailable");
     }
 
     const TickType_t frame_interval = pdMS_TO_TICKS(400);
     const TickType_t detect_interval = pdMS_TO_TICKS(900);
-    const TickType_t recognize_interval = pdMS_TO_TICKS(1200);
+    const float min_face_score = 0.65f;
+    const int min_face_size = 60;
+    const int required_face_detections = 2;
     int no_face_count = 0;
+    int consecutive_face_detections = 0;
     const int max_no_face = 4;  // 约4秒无人脸则提示
     bool preview_started = false;
     bool camera_wait_status_shown = false;
     bool face_login_done = false;
     TickType_t last_detect_tick = 0;
-    TickType_t last_recognize_tick = 0;
-    int registered_face_count = face_init_ok ? face_recog.GetFaceCount() : 0;
-    if (face_init_ok) {
-        ESP_LOGI(TAG, "Face DB contains %d enrolled face(s)", registered_face_count);
-    }
 
     while (true) {
         // 只在登录 UI 可见且处于人脸模式时工作
         if (!login_ui_is_face_mode()) {
             face_login_done = false;
+            consecutive_face_detections = 0;
             vTaskDelay(pdMS_TO_TICKS(500));
             continue;
         }
@@ -268,51 +266,13 @@ static void face_recognition_task(void *arg)
         last_detect_tick = now;
 
         std::vector<smart_home::FaceDetectResult> detect_results;
-        smart_home::FaceRecognizeResult recog_result;
-        bool recog_ok = false;
-
-        if (registered_face_count <= 0) {
-            std::string user_id;
-            if (!face_recog.DetectAndRegister(face_frame, FACE_PREVIEW_W, FACE_PREVIEW_H,
-                                              detect_results, "default", user_id)) {
-                no_face_count++;
-                if (no_face_count >= max_no_face) {
-                    Application::GetInstance().Schedule([]() {
-                        DisplayLockGuard lock(Board::GetInstance().GetDisplay());
-                        if (login_ui_is_face_mode()) {
-                            login_ui_set_status("请面向屏幕");
-                            login_ui_clear_face_detect();
-                        }
-                    });
-                    no_face_count = 0;
-                }
-                free(face_frame);
-                vTaskDelay(frame_interval);
-                continue;
-            }
-
-            registered_face_count = face_recog.GetFaceCount();
-            ESP_LOGI(TAG, "Default face enrolled: id=%s, total=%d",
-                     user_id.c_str(), registered_face_count);
-            face_login_done = true;
-        } else {
-            now = xTaskGetTickCount();
-            if ((now - last_recognize_tick) < recognize_interval) {
-                if (!face_recog.DetectFaces(face_frame, FACE_PREVIEW_W, FACE_PREVIEW_H, detect_results)) {
-                    no_face_count++;
-                }
-            } else {
-                last_recognize_tick = now;
-                recog_ok = face_recog.DetectAndRecognize(face_frame, FACE_PREVIEW_W, FACE_PREVIEW_H,
-                                                         detect_results, recog_result);
-                if (detect_results.empty()) {
-                    no_face_count++;
-                }
-            }
+        if (!face_recog.DetectFaces(face_frame, FACE_PREVIEW_W, FACE_PREVIEW_H, detect_results)) {
+            no_face_count++;
         }
 
         if (detect_results.empty()) {
             // 未检测到人脸
+            consecutive_face_detections = 0;
             if (no_face_count >= max_no_face) {
                 Application::GetInstance().Schedule([]() {
                     DisplayLockGuard lock(Board::GetInstance().GetDisplay());
@@ -331,7 +291,30 @@ static void face_recognition_task(void *arg)
 
         // 检测到人脸
         no_face_count = 0;
-        auto &detect = detect_results[0];
+        auto detect = detect_results[0];
+        for (const auto &candidate : detect_results) {
+            if (candidate.score > detect.score) {
+                detect = candidate;
+            }
+        }
+
+        const int face_center_x = detect.x + detect.width / 2;
+        const int face_center_y = detect.y + detect.height / 2;
+        const bool face_centered =
+            face_center_x >= FACE_PREVIEW_W / 10 && face_center_x <= FACE_PREVIEW_W * 9 / 10 &&
+            face_center_y >= FACE_PREVIEW_H / 10 && face_center_y <= FACE_PREVIEW_H * 9 / 10;
+        const bool face_quality_ok = detect.score >= min_face_score &&
+                                     detect.width >= min_face_size &&
+                                     detect.height >= min_face_size &&
+                                     face_centered;
+
+        if (face_quality_ok) {
+            consecutive_face_detections++;
+        } else {
+            consecutive_face_detections = 0;
+            ESP_LOGD(TAG, "Face rejected: score=%.2f size=%dx%d center=(%d,%d)",
+                     detect.score, detect.width, detect.height, face_center_x, face_center_y);
+        }
 
         // 更新检测框(在 LVGL 任务中执行)
         Application::GetInstance().Schedule([detect]() {
@@ -344,12 +327,9 @@ static void face_recognition_task(void *arg)
             }
         });
 
-        if (face_login_done || recog_ok) {
-            // 识别成功
-            if (recog_ok) {
-                ESP_LOGI(TAG, "Face recognized: id=%u (%.2f)",
-                         (unsigned)recog_result.id, recog_result.similarity);
-            }
+        if (consecutive_face_detections >= required_face_detections) {
+            ESP_LOGI(TAG, "Face presence confirmed: score=%.2f size=%dx%d",
+                     detect.score, detect.width, detect.height);
             face_login_done = true;
             Application::GetInstance().Schedule([]() {
                 DisplayLockGuard lock(Board::GetInstance().GetDisplay());
@@ -359,13 +339,6 @@ static void face_recognition_task(void *arg)
             // 等待登录 UI 隐藏
             vTaskDelay(pdMS_TO_TICKS(300));
             continue;
-        } else if (!recog_result.error_msg.empty() && recog_result.error_msg != "No face detected") {
-            // 识别失败
-            ESP_LOGD(TAG, "Face not recognized: %s", recog_result.error_msg.c_str());
-            Application::GetInstance().Schedule([]() {
-                DisplayLockGuard lock(Board::GetInstance().GetDisplay());
-                publish_ui_event_now(UI_EVENT_FACE_NOT_RECOGNIZED);
-            });
         }
 
         free(face_frame);
@@ -1040,27 +1013,23 @@ void Application::OnLoginSuccess() {
         return;
     }
 
+    SetDeviceState(kDeviceStateIdle);
+
+    /*
+     * Face login is a local security/scene trigger.  Do not wait for cloud
+     * activation here; mqtt_send_scene() updates the local UI immediately and
+     * queues the physical device sync until the smart-home MQTT link is ready.
+     */
+    mqtt_send_scene(IOT_SCENE_HOME);
+
     if (!network_ready_) {
-        ESP_LOGW(TAG, "Login succeeded before network is ready");
-        if (state == kDeviceStateLocked) {
-            SetDeviceState(kDeviceStateWifiConfiguring);
-        }
+        ESP_LOGW(TAG, "Login succeeded before network is ready; home scene queued");
         return;
     }
 
     if (!activation_done_ || !protocol_) {
-        ESP_LOGI(TAG, "Login succeeded while protocol is still activating");
-        if (state == kDeviceStateLocked) {
-            SetDeviceState(kDeviceStateActivating);
-        }
+        ESP_LOGI(TAG, "Login succeeded while protocol is still activating; smart home is already unlocked");
         return;
-    }
-
-    SetDeviceState(kDeviceStateIdle);
-    if (mqtt_client_is_connected()) {
-        mqtt_send_scene(IOT_SCENE_HOME);
-    } else {
-        device_model_set_scene(IOT_SCENE_HOME);
     }
 }
 

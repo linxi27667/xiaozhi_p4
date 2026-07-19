@@ -69,18 +69,12 @@ FaceRecognition::~FaceRecognition()
     }
 }
 
-bool FaceRecognition::Initialize()
+bool FaceRecognition::InitializeDetector()
 {
-    if (initialized_) {
+    if (detector_) {
         return true;
     }
 
-    if (!face_db_storage_ready()) {
-        return false;
-    }
-
-    // 2. 创建检测器(使用默认 MSRMNP_S8_V1 模型)
-    //    lazy_load=false 表示立即加载模型到内存
     try {
         auto *detector = new HumanFaceDetect(HumanFaceDetect::MSRMNP_S8_V1, false);
         detector_ = detector;
@@ -89,8 +83,20 @@ bool FaceRecognition::Initialize()
         return false;
     }
 
-    // 3. 创建识别器(包含特征提取模型和数据库)
-    //    数据库路径指向 FAT 分区
+    ESP_LOGI(TAG, "Face detector initialized");
+    return true;
+}
+
+bool FaceRecognition::Initialize()
+{
+    if (initialized_) {
+        return true;
+    }
+
+    if (!face_db_storage_ready() || !InitializeDetector()) {
+        return false;
+    }
+
     try {
         auto *recognizer = new HumanFaceRecognizer(FACE_DB_PATH,
                                                     HumanFaceFeat::MFN_S8_V1,
@@ -98,8 +104,6 @@ bool FaceRecognition::Initialize()
         recognizer_ = recognizer;
     } catch (const std::exception &e) {
         ESP_LOGE(TAG, "Failed to create HumanFaceRecognizer: %s", e.what());
-        delete static_cast<HumanFaceDetect *>(detector_);
-        detector_ = nullptr;
         return false;
     }
 
@@ -145,7 +149,7 @@ static void fill_detect_results(const std::list<dl::detect::result_t> &detect_re
 bool FaceRecognition::DetectFaces(const uint8_t *data, int width, int height,
                                    std::vector<FaceDetectResult> &results)
 {
-    if (!initialized_ || !detector_) {
+    if (!detector_) {
         return false;
     }
 

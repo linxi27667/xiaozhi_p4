@@ -105,7 +105,7 @@
      - 雨天场景:用 `scene_rain.png`,蓝色 `0x3B82F6`,回退 `ICON_WATER`(=FONT_AWESOME_CLOUD_RAIN)
 
 **未接线的 3 个 PNG**(保留在 s_required_assets 中,暂不使用):
-- `weather_cloud.png`:天气卡片已用 `weather_guangzhou.png`,无需替换
+- `weather_cloud.png`:天气卡片已用 `weather_xiamen.png`,无需替换
 - `logo_robot.png`:无对应 UI 位置,保留备用
 - `color_wheel_220.png`:已在 page_light.c 使用,无需改动
 
@@ -149,7 +149,7 @@ TF 卡根目录/
 └── xiaozhi_ui/
     ├── siyin_logo.png
     ├── overview_home.png
-    ├── weather_guangzhou.png
+    ├── weather_xiamen.png
     ├── floor_1.png
     ├── floor_2.png
     ├── floor_3.png
@@ -206,7 +206,7 @@ ui_asset_image_create(parent, "scene_home.png");
 
 ## 关键配置
 
-这些配置必须开启，否则长文件名如 `weather_guangzhou.png` 可能读不到：
+这些配置必须开启，否则长文件名如 `weather_xiamen.png` 可能读不到：
 
 ```text
 CONFIG_FATFS_LFN_NONE=n
@@ -298,7 +298,7 @@ Found assets at wrong path: /sdcard/xiaozhi_ui/xiaozhi_ui
 目录多套了一层，应该把里面那层 `xiaozhi_ui` 移到 TF 卡根目录。
 
 ```text
-required asset MISSING: weather_guangzhou.png
+required asset MISSING: weather_xiamen.png
 ```
 
 文件缺失、文件名大小写不一致，或长文件名配置没生效。

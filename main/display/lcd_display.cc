@@ -549,6 +549,9 @@ void LcdDisplay::SwitchShellPage(ShellPage page) {
         lv_obj_set_size(smart_home_page_, LV_HOR_RES - kShellSidebarWidth, LV_VER_RES);
         lv_obj_update_layout(smart_home_page_);
         EnsureSmartHomeUi();
+        /* 强制刷新 content_parent 的 layout,确保 lv_pct(100) 在 HIDDEN→可见转换中
+           正确解算到 896x600。否则 50ms 后创建的 page 会按旧 width 渲染导致溢出。 */
+        UI_Manager_Force_Layout();
         switch (page) {
             case ShellPage::Overview:
                 UI_Manager_Switch_Page(UI_PAGE_DATA);
@@ -768,6 +771,14 @@ void LcdDisplay::CreateSmartHomeShell() {
     lv_obj_move_foreground(side_bar_);
     ui_event_subscribe(UI_EVENT_LANG_CHANGED, OnShellLanguageChanged, this);
     ui_event_subscribe(UI_EVENT_PAGE_SWITCHED, OnShellPageSwitched, this);
+
+    // 预先初始化智能家居 UI(即使容器仍 HIDDEN)。
+    // 原因:UI_Manager_Init() 负责创建 50ms 事件轮询定时器,并注册
+    // ui_welcome_popup 的 SCENE_CHANGED 订阅。若延迟到用户首次切换页面才初始化,
+    // 人脸识别成功后发布的 SCENE_CHANGED 事件无人分发/订阅,"欢迎回家"弹窗
+    // 直到用户点击总览页才会出现。
+    EnsureSmartHomeUi();
+
     RefreshShellNav(ShellPage::Chat);
 }
 

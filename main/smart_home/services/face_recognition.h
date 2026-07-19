@@ -30,12 +30,16 @@ class FaceRecognition {
 public:
     static FaceRecognition &GetInstance();
 
+    // 仅初始化人脸检测器，不依赖人脸数据库或特征识别模型
+    bool InitializeDetector();
+
     // 初始化引擎(加载模型,打开数据库)
     // 需要先挂载 FAT 文件系统分区
     bool Initialize();
 
     // 是否已初始化
     bool IsInitialized() const { return initialized_; }
+    bool IsDetectorInitialized() const { return detector_ != nullptr; }
 
     // 人脸检测:返回检测到的人脸列表
     // data: RGB565 或 RGB888 图像数据

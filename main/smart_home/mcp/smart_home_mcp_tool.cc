@@ -6,10 +6,13 @@
 #include "../services/xiaozhi_mqtt.h"
 
 #include <cJSON.h>
+#include <esp_log.h>
 
 #include <cstring>
 #include <stdexcept>
 #include <string>
+
+static const char* TAG = "SH_MCP";
 
 static cJSON* build_status_json() {
     const mqtt_device_model_t* model = device_model_get();
@@ -160,7 +163,9 @@ static cJSON* send_servo_device(const std::string& device_id, uint8_t angle) {
         sent_angle = 0;
     }
 
-    mqtt_send_command(d->floor_id, IOT_CMD_SET_SERVO, d->gpio_index, sent_angle);
+    if (!mqtt_send_command(d->floor_id, IOT_CMD_SET_SERVO, d->gpio_index, sent_angle)) {
+        throw std::runtime_error("MQTT publish failed for servo: " + device_id);
+    }
     return build_servo_command_result(d, angle, sent_angle);
 }
 
@@ -215,7 +220,7 @@ extern "C" void SmartHomeMcp_RegisterTools(void) {
             return true;
         });
 
-    server.AddTool("self.iot.set_gpio",
+    server.AddUserOnlyTool("self.iot.set_gpio",
         "Set a GPIO-like smart-home output. type can be light, relay, servo, gpio, or main_power. For Chinese/natural servo commands prefer self.iot.set_servo_power. Servo index accepts local 0-2 or protocol 6-8: da men/front gate=1F index 6, 2F hanger=8, 3F right skylight=6, 3F left skylight=7, 3F hanger=8.",
         PropertyList({
             Property("floor", kPropertyTypeInteger, 1, 3),
@@ -235,7 +240,7 @@ extern "C" void SmartHomeMcp_RegisterTools(void) {
             return true;
         });
 
-    server.AddTool("self.iot.list_servos",
+    server.AddUserOnlyTool("self.iot.list_servos",
         "List smart-home servo devices and their stable device_id values, protocol indexes, open angles, close angles, and current state.",
         PropertyList(),
         [](const PropertyList& properties) -> ReturnValue {
@@ -243,7 +248,7 @@ extern "C" void SmartHomeMcp_RegisterTools(void) {
             return build_servo_list_json();
         });
 
-    server.AddTool("self.iot.set_servo",
+    server.AddUserOnlyTool("self.iot.set_servo",
         "Set a smart-home servo by stable device_id instead of guessing indexes. Device mapping: da men/front gate/floor1_gate, er lou liangyigan/floor2_hanger, san lou you tianchuang/floor3_right_skylight, san lou zuo tianchuang/floor3_left_skylight, san lou liangyigan/floor3_hanger. Rain status locks floor2_hanger and floor3_hanger closed.",
         PropertyList({
             Property("device_id", kPropertyTypeString),
@@ -256,7 +261,7 @@ extern "C" void SmartHomeMcp_RegisterTools(void) {
         });
 
     server.AddTool("self.iot.set_servo_power",
-        "Open or close a smart-home servo by stable device_id using the same angles as the LVGL buttons. Use this for Chinese/natural commands: da men/front gate/floor1_gate, er lou liangyigan/floor2_hanger, san lou you tianchuang/floor3_right_skylight, san lou zuo tianchuang/floor3_left_skylight, san lou liangyigan/floor3_hanger. Rain status locks floor2_hanger and floor3_hanger closed.",
+        "The only AI-visible servo control tool. Call it directly; do not call discover, get_status, list_servos, set_gpio, or angle tools first. Mapping: open gate/开门/打开大门 => floor1_gate open=true; close gate/关门 => floor1_gate open=false; 2F hanger/二楼晾衣架 => floor2_hanger; 3F right skylight/三楼右天窗 => floor3_right_skylight; 3F left skylight/三楼左天窗 => floor3_left_skylight; 3F hanger/三楼晾衣架 => floor3_hanger. Use open=true to open or extend and open=false to close or retract. Rain locks both hangers closed.",
         PropertyList({
             Property("device_id", kPropertyTypeString),
             Property("open", kPropertyTypeBoolean),
@@ -270,8 +275,11 @@ extern "C" void SmartHomeMcp_RegisterTools(void) {
             if (d->cmd_type != IOT_CMD_SET_SERVO) {
                 throw std::runtime_error("Device is not a servo: " + device_id);
             }
-            uint8_t angle = properties["open"].value<bool>() ?
+            bool open = properties["open"].value<bool>();
+            uint8_t angle = open ?
                 d->servo_open_angle : d->servo_close_angle;
+            ESP_LOGI(TAG, "Servo command: device_id=%s open=%s floor=%u index=%u angle=%u",
+                     d->id, open ? "true" : "false", d->floor_id, d->gpio_index, angle);
             return send_servo_device(device_id, angle);
         });
 
@@ -362,7 +370,7 @@ extern "C" void SmartHomeMcp_RegisterTools(void) {
             return true;
         });
 
-    server.AddTool("self.iot.set_servo_by_index",
+    server.AddUserOnlyTool("self.iot.set_servo_by_index",
         "Set a smart-home servo angle by floor/index for protocol debugging. Prefer self.iot.set_servo_power for Chinese/natural language control. Index accepts local servo 0-2 or protocol index 6-8: da men/front gate=1F index 6, 2F hanger=8, 3F right skylight=6, 3F left skylight=7, 3F hanger=8.",
         PropertyList({
             Property("floor", kPropertyTypeInteger, 1, 3),
@@ -413,4 +421,6 @@ extern "C" void SmartHomeMcp_RegisterTools(void) {
             mqtt_send_broadcast(IOT_CMD_BROADCAST_LIGHTS_ON);
             return true;
         });
+
+    ESP_LOGI(TAG, "AI-visible servo writer: self.iot.set_servo_power");
 }
