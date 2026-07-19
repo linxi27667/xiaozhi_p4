@@ -266,6 +266,15 @@ EspVideo::EspVideo(const esp_video_init_config_t& config) {
         return;
     }
 
+    sensor_stride_ = setformat.fmt.pix.bytesperline;
+    if (sensor_stride_ == 0 && sensor_format_ == V4L2_PIX_FMT_RGB565) {
+        sensor_stride_ = (size_t)setformat.fmt.pix.width * 2;
+    }
+    ESP_LOGI(TAG, "Camera format: %ldx%ld fourcc=0x%08lx stride=%u size=%lu",
+             setformat.fmt.pix.width, setformat.fmt.pix.height,
+             setformat.fmt.pix.pixelformat, (unsigned)sensor_stride_,
+             (unsigned long)setformat.fmt.pix.sizeimage);
+
 #ifdef CONFIG_XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE
     frame_.width = setformat.fmt.pix.height;
     frame_.height = setformat.fmt.pix.width;
@@ -386,6 +395,8 @@ void EspVideo::SetExplainUrl(const std::string& url, const std::string& token) {
 }
 
 bool EspVideo::Capture() {
+    std::lock_guard<std::mutex> capture_lock(capture_mutex_);
+
     if (encoder_thread_.joinable()) {
         encoder_thread_.join();
     }
@@ -442,7 +453,7 @@ bool EspVideo::Capture() {
                 {
                     auto src16 = (uint16_t*)mmap_buffers_[buf.index].start;
                     auto dst16 = (uint16_t*)frame_.data;
-                    size_t count = (size_t)mmap_buffers_[buf.index].length / 2;
+                    size_t count = MIN(mmap_buffers_[buf.index].length, frame_.len) / 2;
                     for (size_t i = 0; i < count; i++) {
                         dst16[i] = __builtin_bswap16(src16[i]);
                     }
@@ -1041,11 +1052,9 @@ std::string EspVideo::Explain(const std::string& question) {
 }
 
 bool EspVideo::CaptureFrame(CapturedFrame& frame) {
-    frame.data = nullptr;
-    frame.len = 0;
-    frame.format = 0;
-    frame.width = 0;
-    frame.height = 0;
+    std::lock_guard<std::mutex> capture_lock(capture_mutex_);
+
+    frame = {};
 
     // 等待编码线程完成(避免冲突)
     if (encoder_thread_.joinable()) {
@@ -1057,47 +1066,110 @@ bool EspVideo::CaptureFrame(CapturedFrame& frame) {
         return false;
     }
 
-    // 单次 DQBUF(不丢弃前 2 帧)
-    struct v4l2_buffer buf = {};
-    buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    buf.memory = V4L2_MEMORY_MMAP;
-    if (ioctl(video_fd_, VIDIOC_DQBUF, &buf) != 0) {
-        ESP_LOGE(TAG, "CaptureFrame: VIDIOC_DQBUF failed");
-        return false;
-    }
-
-    // 拷贝到 PSRAM
-    frame.len = buf.bytesused;
-    frame.format = sensor_format_;
-    frame.width = frame_.width;
-    frame.height = frame_.height;
-    frame.data = (uint8_t*)heap_caps_malloc(frame.len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!frame.data) {
-        ESP_LOGE(TAG, "CaptureFrame: alloc failed, need %lu bytes", (unsigned long)frame.len);
-        ioctl(video_fd_, VIDIOC_QBUF, &buf);
-        return false;
-    }
-
-#ifdef CONFIG_XIAOZHI_ENABLE_CAMERA_ENDIANNESS_SWAP
-    {
-        auto src16 = (uint16_t*)mmap_buffers_[buf.index].start;
-        auto dst16 = (uint16_t*)frame.data;
-        size_t count = (size_t)mmap_buffers_[buf.index].length / 2;
-        for (size_t i = 0; i < count; i++) {
-            dst16[i] = __builtin_bswap16(src16[i]);
-        }
-    }
+#ifdef CONFIG_XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE
+    const int capture_width = sensor_width_;
+    const int capture_height = sensor_height_;
 #else
-    memcpy(frame.data, mmap_buffers_[buf.index].start,
-           MIN(mmap_buffers_[buf.index].length, frame.len));
-#endif  // CONFIG_XIAOZHI_ENABLE_CAMERA_ENDIANNESS_SWAP
+    const int capture_width = frame_.width;
+    const int capture_height = frame_.height;
+#endif
 
-    // 重新入队
-    if (ioctl(video_fd_, VIDIOC_QBUF, &buf) != 0) {
-        ESP_LOGW(TAG, "CaptureFrame: VIDIOC_QBUF failed");
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        struct v4l2_buffer buf = {};
+        buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        buf.memory = V4L2_MEMORY_MMAP;
+        if (ioctl(video_fd_, VIDIOC_DQBUF, &buf) != 0) {
+            ESP_LOGE(TAG, "CaptureFrame: VIDIOC_DQBUF failed");
+            return false;
+        }
+
+        const auto requeue_buffer = [this, &buf]() {
+            if (ioctl(video_fd_, VIDIOC_QBUF, &buf) != 0) {
+                ESP_LOGE(TAG, "CaptureFrame: VIDIOC_QBUF failed");
+                return false;
+            }
+            return true;
+        };
+
+        if (buf.index >= mmap_buffers_.size()) {
+            ESP_LOGE(TAG, "CaptureFrame: invalid buffer index %lu", (unsigned long)buf.index);
+            (void)requeue_buffer();
+            return false;
+        }
+
+        const auto &mmap_buf = mmap_buffers_[buf.index];
+        const size_t available_len = buf.bytesused > 0 ? buf.bytesused : mmap_buf.length;
+        size_t output_len = available_len;
+        size_t source_stride = sensor_stride_;
+
+        if (sensor_format_ == V4L2_PIX_FMT_RGB565) {
+            const size_t row_len = (size_t)capture_width * 2;
+            if (source_stride < row_len) {
+                source_stride = row_len;
+            }
+            const size_t required_len = source_stride * capture_height;
+            output_len = row_len * capture_height;
+            if (available_len < required_len || mmap_buf.length < required_len) {
+                ESP_LOGW(TAG,
+                         "CaptureFrame: discard incomplete RGB565 frame attempt=%d bytes=%u required=%u mmap=%u",
+                         attempt + 1, (unsigned)available_len, (unsigned)required_len,
+                         (unsigned)mmap_buf.length);
+                if (!requeue_buffer()) {
+                    return false;
+                }
+                continue;
+            }
+        } else if (available_len == 0 || available_len > mmap_buf.length) {
+            ESP_LOGW(TAG, "CaptureFrame: discard invalid frame attempt=%d bytes=%u mmap=%u",
+                     attempt + 1, (unsigned)available_len, (unsigned)mmap_buf.length);
+            if (!requeue_buffer()) {
+                return false;
+            }
+            continue;
+        }
+
+        frame.data = (uint8_t*)heap_caps_malloc(output_len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!frame.data) {
+            ESP_LOGE(TAG, "CaptureFrame: alloc failed, need %u bytes", (unsigned)output_len);
+            (void)requeue_buffer();
+            return false;
+        }
+
+        if (sensor_format_ == V4L2_PIX_FMT_RGB565) {
+            const size_t row_len = (size_t)capture_width * 2;
+            for (int y = 0; y < capture_height; ++y) {
+                const uint8_t *src_row = static_cast<const uint8_t *>(mmap_buf.start) + y * source_stride;
+                uint8_t *dst_row = frame.data + y * row_len;
+#ifdef CONFIG_XIAOZHI_ENABLE_CAMERA_ENDIANNESS_SWAP
+                const auto *src16 = reinterpret_cast<const uint16_t *>(src_row);
+                auto *dst16 = reinterpret_cast<uint16_t *>(dst_row);
+                for (int x = 0; x < capture_width; ++x) {
+                    dst16[x] = __builtin_bswap16(src16[x]);
+                }
+#else
+                memcpy(dst_row, src_row, row_len);
+#endif
+            }
+        } else {
+            memcpy(frame.data, mmap_buf.start, output_len);
+        }
+
+        frame.len = output_len;
+        frame.format = sensor_format_;
+        frame.width = capture_width;
+        frame.height = capture_height;
+
+        if (!requeue_buffer()) {
+            heap_caps_free(frame.data);
+            frame = {};
+            return false;
+        }
+
+        ESP_LOGD(TAG, "CaptureFrame: %dx%d, fmt=0x%x, len=%lu",
+                 frame.width, frame.height, (unsigned)frame.format, (unsigned long)frame.len);
+        return true;
     }
 
-    ESP_LOGD(TAG, "CaptureFrame: %dx%d, fmt=0x%x, len=%lu",
-             frame.width, frame.height, (unsigned)frame.format, (unsigned long)frame.len);
-    return true;
+    ESP_LOGE(TAG, "CaptureFrame: no complete frame after retries");
+    return false;
 }

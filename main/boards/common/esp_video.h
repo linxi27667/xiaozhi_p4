@@ -2,8 +2,10 @@
 #include "sdkconfig.h"
 
 #include <lvgl.h>
+#include <atomic>
 #include <thread>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #include <freertos/FreeRTOS.h>
@@ -28,12 +30,14 @@ private:
         v4l2_pix_fmt_t format = 0;
     } frame_;
     v4l2_pix_fmt_t sensor_format_ = 0;
+    size_t sensor_stride_ = 0;
+    std::mutex capture_mutex_;
 #ifdef CONFIG_XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE
     uint16_t sensor_width_ = 0;
     uint16_t sensor_height_ = 0;
 #endif  // CONFIG_XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE
     int video_fd_ = -1;
-    bool streaming_on_ = false;
+    std::atomic_bool streaming_on_{false};
     struct MmapBuffer { void *start = nullptr; size_t length = 0; };
     std::vector<MmapBuffer> mmap_buffers_;
     std::string explain_url_;

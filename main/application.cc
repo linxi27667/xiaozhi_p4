@@ -150,15 +150,13 @@ static void face_recognition_task(void *arg)
     ESP_LOGI(TAG, "Face detection login task started");
 
     auto &face_recog = smart_home::FaceRecognition::GetInstance();
-    bool face_init_ok = face_recog.InitializeDetector();
+    const bool face_init_ok = face_recog.InitializeDetector();
     if (!face_init_ok) {
         ESP_LOGW(TAG, "Face detector init failed, face login unavailable");
     }
 
     const TickType_t frame_interval = pdMS_TO_TICKS(400);
     const TickType_t detect_interval = pdMS_TO_TICKS(900);
-    const float min_face_score = 0.65f;
-    const int min_face_size = 60;
     const int required_face_detections = 2;
     int no_face_count = 0;
     int consecutive_face_detections = 0;
@@ -183,8 +181,7 @@ static void face_recognition_task(void *arg)
         }
 
         // 获取摄像头
-        auto *board = &Board::GetInstance();
-        auto *camera = board->GetCamera();
+        auto *camera = Board::GetInstance().GetCamera();
         if (!camera) {
             ESP_LOGW(TAG, "No camera available");
             vTaskDelay(pdMS_TO_TICKS(1000));
@@ -298,23 +295,10 @@ static void face_recognition_task(void *arg)
             }
         }
 
-        const int face_center_x = detect.x + detect.width / 2;
-        const int face_center_y = detect.y + detect.height / 2;
-        const bool face_centered =
-            face_center_x >= FACE_PREVIEW_W / 10 && face_center_x <= FACE_PREVIEW_W * 9 / 10 &&
-            face_center_y >= FACE_PREVIEW_H / 10 && face_center_y <= FACE_PREVIEW_H * 9 / 10;
-        const bool face_quality_ok = detect.score >= min_face_score &&
-                                     detect.width >= min_face_size &&
-                                     detect.height >= min_face_size &&
-                                     face_centered;
-
-        if (face_quality_ok) {
-            consecutive_face_detections++;
-        } else {
-            consecutive_face_detections = 0;
-            ESP_LOGD(TAG, "Face rejected: score=%.2f size=%dx%d center=(%d,%d)",
-                     detect.score, detect.width, detect.height, face_center_x, face_center_y);
-        }
+        consecutive_face_detections++;
+        ESP_LOGI(TAG, "Face detected: score=%.2f size=%dx%d confirmation=%d/%d",
+                 detect.score, detect.width, detect.height,
+                 consecutive_face_detections, required_face_detections);
 
         // 更新检测框(在 LVGL 任务中执行)
         Application::GetInstance().Schedule([detect]() {
