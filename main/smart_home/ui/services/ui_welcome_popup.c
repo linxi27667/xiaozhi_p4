@@ -1,7 +1,5 @@
 #include "ui_welcome_popup.h"
 
-#include "mqtt_device_model.h"
-#include "mqtt_iot_protocol.h"
 #include "ui_asset_service.h"
 #include "ui_events.h"
 #include "ui_font.h"
@@ -13,7 +11,6 @@
 #include <stdbool.h>
 
 static lv_obj_t *s_popup;
-static uint32_t s_last_scene_seq;
 static bool s_initialized;
 
 static const char *tr(const char *zh, const char *en)
@@ -101,17 +98,10 @@ static void show_home_popup(void)
     lv_obj_set_style_text_align(x, LV_TEXT_ALIGN_CENTER, 0);
 }
 
-static void on_scene_changed(void *user_data)
+static void on_face_unlocked(void *user_data)
 {
     (void)user_data;
-    const mqtt_device_model_t *model = device_model_get();
-    if (model->scene_seq == s_last_scene_seq) {
-        return;
-    }
-    s_last_scene_seq = model->scene_seq;
-    if (model->current_scene == IOT_SCENE_HOME) {
-        show_home_popup();
-    }
+    show_home_popup();
 }
 
 void ui_welcome_popup_init(void)
@@ -120,5 +110,5 @@ void ui_welcome_popup_init(void)
         return;
     }
     s_initialized = true;
-    ui_event_subscribe(UI_EVENT_SCENE_CHANGED, on_scene_changed, NULL);
+    ui_event_subscribe(UI_EVENT_FACE_UNLOCKED, on_face_unlocked, NULL);
 }

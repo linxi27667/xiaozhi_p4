@@ -774,8 +774,8 @@ void LcdDisplay::CreateSmartHomeShell() {
 
     // 预先初始化智能家居 UI(即使容器仍 HIDDEN)。
     // 原因:UI_Manager_Init() 负责创建 50ms 事件轮询定时器,并注册
-    // ui_welcome_popup 的 SCENE_CHANGED 订阅。若延迟到用户首次切换页面才初始化,
-    // 人脸识别成功后发布的 SCENE_CHANGED 事件无人分发/订阅,"欢迎回家"弹窗
+    // ui_welcome_popup 的 FACE_UNLOCKED 订阅。若延迟到用户首次切换页面才初始化,
+    // 人脸识别成功后发布的 FACE_UNLOCKED 事件无人分发/订阅,"欢迎回家"弹窗
     // 直到用户点击总览页才会出现。
     EnsureSmartHomeUi();
 

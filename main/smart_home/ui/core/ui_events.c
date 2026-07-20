@@ -24,6 +24,7 @@ static const char *s_event_names[] = {
     [UI_EVENT_FACE_DETECTED]          = "FACE_DETECTED",
     [UI_EVENT_FACE_RECOGNIZED]        = "FACE_RECOGNIZED",
     [UI_EVENT_FACE_NOT_RECOGNIZED]    = "FACE_NOT_RECOGNIZED",
+    [UI_EVENT_FACE_UNLOCKED]          = "FACE_UNLOCKED",
     [UI_EVENT_FACE_PREVIEW_FRAME]     = "FACE_PREVIEW_FRAME",
 };
 

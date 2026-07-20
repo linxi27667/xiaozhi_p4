@@ -396,6 +396,10 @@ static void face_recognition_task(void *arg)
                              DeviceStateMachine::GetStateName(state_after));
                 }
 
+                if (state_after == kDeviceStateIdle) {
+                    ui_event_publish(UI_EVENT_FACE_UNLOCKED);
+                }
+
                 ESP_LOGI(TAG, "Face unlock callback done: state=%s ui=%s",
                          DeviceStateMachine::GetStateName(state_after),
                          ui_finished ? "finished" : "skipped");
