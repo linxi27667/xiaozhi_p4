@@ -164,7 +164,7 @@ static void apply_scene(uint8_t index)
         case AMBIENT_SCENE_READING:     fill_rgb(index, 255, 220, 160); break;
         case AMBIENT_SCENE_MOVIE:       fill_rgb(index, 60, 80, 255); break;
         case AMBIENT_SCENE_SLEEP:       fill_rgb(index, 20, 30, 80); break;
-        case AMBIENT_SCENE_WARNING:     fill_rgb(index, 255, 0, 0); break;
+        case AMBIENT_SCENE_WARNING:     fill_rgb(index, s->red, s->green, s->blue); break;
         case AMBIENT_SCENE_RAIN:        fill_rgb(index, 0, 120, 255); break;
         case AMBIENT_SCENE_ENERGY_SAVE: fill_rgb(index, 0, 180, 80); break;
         default:                        fill_rgb(index, 255, 150, 60); break;
@@ -452,7 +452,7 @@ void App_Ambient_Light_Tick(void)
             continue;
         }
 
-        /* 警示效果: 红色闪烁 (每5次tick切换一次) */
+        /* 安全警示效果: 按告警命令指定的颜色闪烁 */
         if (s_strips[i].effect == IOT_LIGHT_EFFECT_WARNING ||
             s_strips[i].scene == AMBIENT_SCENE_WARNING) {
             if (is_rain_notify_color(&s_strips[i]) &&

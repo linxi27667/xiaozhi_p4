@@ -140,8 +140,8 @@ static void Process_RGB_Command(const iot_rgb_light_packet_t* cmd) {
     uint8_t brightness = cmd->brightness > 100 ? 100 : cmd->brightness;
     App_Ambient_Light_Set_RGB(cmd->index, cmd->red, cmd->green, cmd->blue, brightness, cmd->effect);
     g_device_flags.light[cmd->index] = brightness ? ON : OFF;
-    ESP_LOGI(TAG, "RGB[%u] = (%u,%u,%u) br=%u effect=%u",
-             cmd->index, cmd->red, cmd->green, cmd->blue, brightness, cmd->effect);
+    ESP_LOGI(TAG, "RGB[%u] = (%u,%u,%u) br=%u effect=%u param=%u",
+             cmd->index, cmd->red, cmd->green, cmd->blue, brightness, cmd->effect, cmd->speed);
     Send_RGB_Response(cmd);
     MQTT_Heartbeat_Publish_Now();
 }

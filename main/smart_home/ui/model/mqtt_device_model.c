@@ -192,7 +192,7 @@ void device_model_init(void)
 
     rc_device_t *gate = find_device("floor1_gate");
     if (gate) {
-        gate->servo_open_angle = 180;
+        gate->servo_open_angle = 135;
         gate->servo_close_angle = 0;
     }
 

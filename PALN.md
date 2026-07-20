@@ -1140,7 +1140,7 @@ self.iot.set_servo_by_index(device, index, angle)
 映射：
 
 ```text
-一楼设备: index0=大门, 0=关闭, 180=打开
+一楼设备: index0=大门, 0=关闭, 135=打开
 二楼设备: index0=晾衣架, 0=收衣服, 180=晾衣服
 三楼设备: index0=左天窗, index1=右天窗, index2=晾衣架
 ```
@@ -1391,7 +1391,7 @@ list(APPEND SOURCES
 
 - “打开大厅灯”调用 `self.iot.set_light(device=一楼设备,index=0,value=true)`。
 - “关闭风扇”调用 `self.iot.set_relay(device=二楼设备,index=0,value=false)`。
-- “打开一楼大门”调用 `self.iot.set_servo_by_index(device=一楼设备,index=0,angle=180)`。
+- “打开一楼大门”调用 `self.iot.set_servo_by_index(device=一楼设备,index=0,angle=135)`。
 - “晾衣服”调用 `self.iot.clothes_rack(device=二楼设备,action=hang)`。
 - “关闭所有灯”调用 `self.iot.all_lights_off`。
 - “查看设备状态”调用 `self.iot.get_status`。

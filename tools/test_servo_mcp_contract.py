@@ -69,10 +69,10 @@ class ServoMcpContractTest(unittest.TestCase):
         )
         self.assertIsNotNone(home_case)
         self.assertIn(
-            "mqtt_send_command(1, IOT_CMD_SET_SERVO, 6, 180);",
+            "mqtt_send_command(1, IOT_CMD_SET_SERVO, 6, 135);",
             home_case.group(1),
         )
-        self.assertNotIn("IOT_CMD_SET_SERVO, 6, 135", home_case.group(1))
+        self.assertNotIn("IOT_CMD_SET_SERVO, 6, 180", home_case.group(1))
 
     def test_tool_and_servo_dispatch_are_observable(self):
         mcp_server = (ROOT / "main/mcp_server.cc").read_text(encoding="utf-8")

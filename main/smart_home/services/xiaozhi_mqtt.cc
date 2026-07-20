@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <string>
 
 static const char* TAG = "SH_MQTT";
@@ -37,6 +38,21 @@ static int64_t s_last_network_wait_log_ms = 0;
 static bool s_pending_scene_valid = false;
 static uint8_t s_pending_scene_id = IOT_SCENE_NONE;
 static bool s_flushing_pending_scene = false;
+
+struct RgbBlinkState {
+    bool active = false;
+    bool light_on = false;
+    uint8_t floor_id = 0;
+    uint8_t index = 0;
+    uint8_t red = 0;
+    uint8_t green = 0;
+    uint8_t blue = 0;
+    uint8_t brightness = 0;
+    uint8_t remaining_flashes = 0;
+};
+
+static std::mutex s_rgb_command_mutex;
+static RgbBlinkState s_rgb_blink;
 
 /* MAC->楼层映射表: 从机 announce/heartbeat 时注册, 用于 response topic 反查楼层 */
 static char s_floor_mac[4][13] = {{0}};
@@ -160,9 +176,9 @@ static void process_response(const std::string& topic, const std::string& payloa
         if (rgb->command == IOT_CMD_SET_RGB_LIGHT &&
             rgb->protocol_version == IOT_PROTOCOL_VERSION_V3 &&
             rgb->device_id >= 1 && rgb->device_id <= 3) {
-            ESP_LOGI(TAG, "RGB response: dev=%u idx=%u rgb=(%u,%u,%u) br=%u effect=%u",
+            ESP_LOGI(TAG, "RGB response: dev=%u idx=%u rgb=(%u,%u,%u) br=%u effect=%u param=%u",
                      rgb->device_id, rgb->index, rgb->red, rgb->green, rgb->blue,
-                     rgb->brightness, rgb->effect);
+                     rgb->brightness, rgb->effect, rgb->speed);
             device_model_apply_rgb_ack(rgb->device_id, rgb->index, rgb->red, rgb->green,
                                        rgb->blue, rgb->brightness, rgb->effect);
             return;
@@ -473,11 +489,11 @@ extern "C" void mqtt_send_ambient_scene(uint8_t floor_id, uint8_t index, uint8_t
     ESP_LOGI(TAG, "AMBIENT -> floor=%u idx=%u scene=%u", floor_id, index, ambient_scene);
 }
 
-extern "C" void mqtt_send_rgb_light(uint8_t floor_id, uint8_t index, uint8_t red, uint8_t green,
-                                    uint8_t blue, uint8_t brightness, uint8_t effect, uint8_t speed) {
+static bool publish_rgb_light(uint8_t floor_id, uint8_t index, uint8_t red, uint8_t green,
+                              uint8_t blue, uint8_t brightness, uint8_t effect, uint8_t speed) {
     if (!mqtt_client_is_connected()) {
         ESP_LOGW(TAG, "Cannot send RGB command: MQTT not connected");
-        return;
+        return false;
     }
 
     iot_rgb_light_packet_t pkt = {};
@@ -496,9 +512,85 @@ extern "C" void mqtt_send_rgb_light(uint8_t floor_id, uint8_t index, uint8_t red
     snprintf(topic, sizeof(topic), "%s%u", MQTT_TOPIC_CMD_PREFIX, floor_id);
 
     std::string payload(reinterpret_cast<const char*>(&pkt), sizeof(pkt));
-    s_mqtt->Publish(topic, payload, 0);
-    ESP_LOGI(TAG, "RGB -> %s: idx=%u rgb=(%u,%u,%u) br=%u effect=%u",
-             topic, index, red, green, blue, brightness, effect);
+    if (!s_mqtt->Publish(topic, payload, 0)) {
+        ESP_LOGE(TAG, "Failed to publish RGB command: topic=%s", topic);
+        return false;
+    }
+    ESP_LOGI(TAG, "RGB -> %s: idx=%u rgb=(%u,%u,%u) br=%u effect=%u param=%u",
+             topic, index, red, green, blue, brightness, effect, speed);
+    return true;
+}
+
+extern "C" void mqtt_send_rgb_light(uint8_t floor_id, uint8_t index, uint8_t red, uint8_t green,
+                                    uint8_t blue, uint8_t brightness, uint8_t effect, uint8_t speed) {
+    std::lock_guard<std::mutex> lock(s_rgb_command_mutex);
+    s_rgb_blink.active = false;
+    publish_rgb_light(floor_id, index, red, green, blue, brightness, effect, speed);
+}
+
+extern "C" bool mqtt_start_rgb_blink(uint8_t floor_id, uint8_t index, uint8_t red, uint8_t green,
+                                      uint8_t blue, uint8_t brightness, uint8_t blink_count) {
+    if (brightness == 0 || blink_count == 0) {
+        ESP_LOGW(TAG, "Cannot blink RGB light: brightness and blink_count must be non-zero");
+        return false;
+    }
+
+    std::lock_guard<std::mutex> lock(s_rgb_command_mutex);
+    if (!mqtt_client_is_connected()) {
+        ESP_LOGW(TAG, "Cannot start RGB blink: MQTT not connected");
+        return false;
+    }
+
+    s_rgb_blink.active = true;
+    s_rgb_blink.light_on = true;
+    s_rgb_blink.floor_id = floor_id;
+    s_rgb_blink.index = index;
+    s_rgb_blink.red = red;
+    s_rgb_blink.green = green;
+    s_rgb_blink.blue = blue;
+    s_rgb_blink.brightness = brightness;
+    s_rgb_blink.remaining_flashes = blink_count;
+
+    ESP_LOGI(TAG, "RGB blink start: floor=%u idx=%u count=%u interval=250ms",
+             floor_id, index, blink_count);
+    bool published = publish_rgb_light(floor_id, index, red, green, blue, brightness,
+                                       IOT_LIGHT_EFFECT_STATIC, 0);
+    if (!published) {
+        s_rgb_blink.active = false;
+    }
+    return published;
+}
+
+extern "C" void mqtt_rgb_blink_tick(void) {
+    std::lock_guard<std::mutex> lock(s_rgb_command_mutex);
+    if (!s_rgb_blink.active) {
+        return;
+    }
+    if (!mqtt_client_is_connected()) {
+        s_rgb_blink.active = false;
+        ESP_LOGW(TAG, "RGB blink cancelled: MQTT disconnected");
+        return;
+    }
+
+    if (s_rgb_blink.light_on) {
+        s_rgb_blink.light_on = false;
+        if (s_rgb_blink.remaining_flashes > 0) {
+            s_rgb_blink.remaining_flashes--;
+        }
+        publish_rgb_light(s_rgb_blink.floor_id, s_rgb_blink.index,
+                          s_rgb_blink.red, s_rgb_blink.green, s_rgb_blink.blue,
+                          0, IOT_LIGHT_EFFECT_STATIC, 0);
+        return;
+    }
+
+    s_rgb_blink.light_on = true;
+    publish_rgb_light(s_rgb_blink.floor_id, s_rgb_blink.index,
+                      s_rgb_blink.red, s_rgb_blink.green, s_rgb_blink.blue,
+                      s_rgb_blink.brightness, IOT_LIGHT_EFFECT_STATIC, 0);
+    if (s_rgb_blink.remaining_flashes == 0) {
+        s_rgb_blink.active = false;
+        ESP_LOGI(TAG, "RGB blink complete; target color remains on");
+    }
 }
 
 extern "C" void mqtt_send_scene(uint8_t scene_id) {
@@ -555,7 +647,7 @@ extern "C" void mqtt_send_scene(uint8_t scene_id) {
             mqtt_send_command(3, IOT_CMD_SET_SERVO, 6, 90);
             mqtt_send_command(3, IOT_CMD_SET_SERVO, 7, 90);
             mqtt_send_broadcast(IOT_CMD_BROADCAST_LIGHTS_ON);
-            mqtt_send_command(1, IOT_CMD_SET_SERVO, 6, 180);  // 一楼大门全开 180° 便于疏散
+            mqtt_send_command(1, IOT_CMD_SET_SERVO, 6, 135);  // 一楼大门全开 135° 便于疏散
             mqtt_send_command(1, IOT_CMD_SET_LIGHT, 0, 1);
             mqtt_send_rgb_light(2, 0, 255, 0, 0, 100, IOT_LIGHT_EFFECT_WARNING, 5);
             mqtt_send_command(2, IOT_CMD_SET_LIGHT, 1, 1);
@@ -578,7 +670,7 @@ extern "C" void mqtt_send_scene(uint8_t scene_id) {
         case IOT_SCENE_HOME:
             mqtt_send_all_main_power(true);
             mqtt_send_broadcast(IOT_CMD_BROADCAST_LIGHTS_ON);
-            mqtt_send_command(1, IOT_CMD_SET_SERVO, 6, 180);
+            mqtt_send_command(1, IOT_CMD_SET_SERVO, 6, 135);
             mqtt_send_command(1, IOT_CMD_SET_LIGHT, 0, 1);
             mqtt_send_command(2, IOT_CMD_SET_LIGHT, 1, 1);
             mqtt_send_command(2, IOT_CMD_SET_LIGHT, 2, 1);

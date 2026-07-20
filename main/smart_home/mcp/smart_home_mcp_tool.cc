@@ -3,6 +3,7 @@
 #include "mcp_server.h"
 #include "mqtt_device_model.h"
 #include "../services/mqtt_iot_protocol.h"
+#include "../services/weather_service.h"
 #include "../services/xiaozhi_mqtt.h"
 
 #include <cJSON.h>
@@ -82,6 +83,19 @@ static cJSON* build_sensors_json() {
         cJSON_AddItemToArray(floors, item);
     }
 
+    return root;
+}
+
+static cJSON* build_location_json() {
+    cJSON* root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "province", "福建省");
+    cJSON_AddStringToObject(root, "city", "厦门市");
+    cJSON_AddStringToObject(root, "location", "福建省厦门市");
+    cJSON_AddNumberToObject(root, "latitude", WEATHER_LAT);
+    cJSON_AddNumberToObject(root, "longitude", WEATHER_LON);
+    cJSON_AddStringToObject(root, "timezone", WEATHER_TIMEZONE);
+    cJSON_AddStringToObject(root, "source", "configured_home_location");
+    cJSON_AddBoolToObject(root, "has_gps", false);
     return root;
 }
 
@@ -219,8 +233,44 @@ static uint8_t scene_id_from_name(const std::string& scene_name) {
     throw std::runtime_error("Unknown scene_name: " + scene_name);
 }
 
+static uint8_t light_effect_from_name(const std::string& effect_name) {
+    struct LightEffectNameMap {
+        const char* name;
+        uint8_t effect;
+    };
+    static constexpr LightEffectNameMap kLightEffectNames[] = {
+        {"static", IOT_LIGHT_EFFECT_STATIC}, {"常亮", IOT_LIGHT_EFFECT_STATIC},
+        {"breathe", IOT_LIGHT_EFFECT_BREATHE}, {"呼吸", IOT_LIGHT_EFFECT_BREATHE},
+        {"rainbow", IOT_LIGHT_EFFECT_RAINBOW}, {"彩虹", IOT_LIGHT_EFFECT_RAINBOW},
+        {"warning", IOT_LIGHT_EFFECT_WARNING}, {"警示", IOT_LIGHT_EFFECT_WARNING},
+    };
+
+    for (const auto& item : kLightEffectNames) {
+        if (effect_name == item.name) {
+            return item.effect;
+        }
+    }
+    throw std::runtime_error("Unknown light effect_name: " + effect_name);
+}
+
+static bool is_blink_effect_name(const std::string& effect_name) {
+    return effect_name == "blink" || effect_name == "闪烁";
+}
+
 extern "C" void SmartHomeMcp_RegisterTools(void) {
     auto& server = McpServer::GetInstance();
+
+    server.AddTool("self.iot.get_location",
+        "Get the authoritative configured location of this smart-home device. "
+        "Always call this tool when the user asks for the current province, city, location, "
+        "where the device is, or the local weather location. The device is configured in "
+        "Xiamen City, Fujian Province and has no GPS. If cloud/IP context reports city as "
+        "Unknown, never infer or guess the provincial capital; use this tool result instead.",
+        PropertyList(),
+        [](const PropertyList& properties) -> ReturnValue {
+            (void)properties;
+            return build_location_json();
+        });
 
     server.AddTool("self.iot.get_status",
         "Get smart-home controller, device, and MQTT status.",
@@ -334,40 +384,79 @@ extern "C" void SmartHomeMcp_RegisterTools(void) {
         });
 
     server.AddTool("self.iot.set_light",
-        "Turn a smart-home light on or off.",
+        "Turn a smart-home light on or off. Light mapping: 1F index 0 hall; "
+        "2F index 0 bedroom, index 1 living room, index 2 toilet; 3F index 0 balcony. "
+        "The 2F fan is a relay, not a light: for fan/风扇 always call self.iot.set_relay "
+        "with floor=2 and index=0.",
         PropertyList({
             Property("floor", kPropertyTypeInteger, 1, 3),
             Property("index", kPropertyTypeInteger, 0, 15),
             Property("on", kPropertyTypeBoolean),
         }),
         [](const PropertyList& properties) -> ReturnValue {
+            uint8_t floor = static_cast<uint8_t>(properties["floor"].value<int>());
+            uint8_t index = static_cast<uint8_t>(properties["index"].value<int>());
+            uint8_t command = IOT_CMD_SET_LIGHT;
+            if (floor == 2 && index == 3) {
+                ESP_LOGW(TAG, "Correcting legacy fan call: light 2F index 3 -> relay 2F index 0");
+                command = IOT_CMD_SET_RELAY;
+                index = 0;
+            }
             mqtt_send_command(
-                static_cast<uint8_t>(properties["floor"].value<int>()),
-                IOT_CMD_SET_LIGHT,
-                static_cast<uint8_t>(properties["index"].value<int>()),
+                floor,
+                command,
+                index,
                 properties["on"].value<bool>() ? 1 : 0);
             return true;
         });
 
     server.AddTool("self.iot.set_rgb_light",
-        "Set the 2F master bedroom RGB ambient light color, brightness, and effect.",
+        "Set the 2F master bedroom RGB ambient light color, brightness, and effect. "
+        "Use effect_name for every request: static/常亮, breathe/呼吸, rainbow/彩虹, "
+        "warning/警示, or blink/闪烁. warning is the continuous safety warning effect; "
+        "blink alternates static brightness on the P4 and stops after blink_count flashes, "
+        "so blink brightness must be 1 to 100. The numeric effect parameter remains available "
+        "for compatibility: 0=static, 1=breathe, 2=rainbow, 3=warning.",
         PropertyList({
             Property("red", kPropertyTypeInteger, 0, 255),
             Property("green", kPropertyTypeInteger, 0, 255),
             Property("blue", kPropertyTypeInteger, 0, 255),
             Property("brightness", kPropertyTypeInteger, 0, 100),
-            Property("effect", kPropertyTypeInteger, 0, 3),
+            Property("effect_name", kPropertyTypeString, std::string()),
+            Property("effect", kPropertyTypeInteger, 0, 0, 3),
+            Property("blink_count", kPropertyTypeInteger, 3, 1, 10),
         }),
         [](const PropertyList& properties) -> ReturnValue {
+            uint8_t red = static_cast<uint8_t>(properties["red"].value<int>());
+            uint8_t green = static_cast<uint8_t>(properties["green"].value<int>());
+            uint8_t blue = static_cast<uint8_t>(properties["blue"].value<int>());
+            const std::string effect_name = properties["effect_name"].value<std::string>();
+            uint8_t effect = static_cast<uint8_t>(properties["effect"].value<int>());
+            uint8_t blink_count = static_cast<uint8_t>(properties["blink_count"].value<int>());
+            bool blink = is_blink_effect_name(effect_name);
+            if (!effect_name.empty() && !blink) {
+                effect = light_effect_from_name(effect_name);
+            } else if (effect == IOT_LIGHT_EFFECT_WARNING &&
+                !(red == 255 && green == 0 && blue == 0)) {
+                ESP_LOGW(TAG, "Correcting legacy RGB blink: use P4 brightness sequence");
+                blink = true;
+            }
+            ESP_LOGI(TAG, "RGB effect: name=%s id=%u blink=%s count=%u",
+                     effect_name.empty() ? "legacy-number" : effect_name.c_str(),
+                     effect, blink ? "yes" : "no", blink_count);
+            uint8_t brightness = static_cast<uint8_t>(properties["brightness"].value<int>());
+            if (blink) {
+                return mqtt_start_rgb_blink(2, 0, red, green, blue, brightness, blink_count);
+            }
             mqtt_send_rgb_light(
                 2,
                 0,
-                static_cast<uint8_t>(properties["red"].value<int>()),
-                static_cast<uint8_t>(properties["green"].value<int>()),
-                static_cast<uint8_t>(properties["blue"].value<int>()),
-                static_cast<uint8_t>(properties["brightness"].value<int>()),
-                static_cast<uint8_t>(properties["effect"].value<int>()),
-                16);
+                red,
+                green,
+                blue,
+                brightness,
+                effect,
+                blink_count);
             return true;
         });
 
@@ -398,7 +487,8 @@ extern "C" void SmartHomeMcp_RegisterTools(void) {
         });
 
     server.AddTool("self.iot.set_relay",
-        "Turn a smart-home relay on or off.",
+        "Turn a smart-home relay on or off. The fan/风扇 is the 2F relay at floor=2, "
+        "index=0. Always use this tool for turning the fan on or off.",
         PropertyList({
             Property("floor", kPropertyTypeInteger, 1, 3),
             Property("index", kPropertyTypeInteger, 0, 15),

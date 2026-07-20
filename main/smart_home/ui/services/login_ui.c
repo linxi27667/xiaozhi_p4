@@ -628,17 +628,29 @@ void login_ui_update_face_detect(int x, int y, int w, int h)
     lv_obj_set_pos(s_face_detect_box, canvas_x + x, canvas_y + y);
 }
 
-bool login_ui_complete_face(int x, int y, int w, int h)
+bool login_ui_show_face_success(int x, int y, int w, int h)
 {
     if (!login_ui_is_face_mode()) {
-        ESP_LOGW(TAG, "Face completion skipped: face UI is no longer active");
+        ESP_LOGW(TAG, "Face success display skipped: face UI is no longer active");
         return false;
     }
 
     login_ui_update_face_detect(x, y, w, h);
-    bool completed = complete_login_ui();
-    ESP_LOGI(TAG, "Face completion UI: %s", completed ? "completed" : "already completed");
-    return completed;
+    login_ui_set_status(tr("检测通过", "Face detected"));
+    ESP_LOGI(TAG, "Face success box displayed");
+    return true;
+}
+
+bool login_ui_finish_face_success(void)
+{
+    if (!login_ui_is_face_mode()) {
+        ESP_LOGW(TAG, "Face success finish skipped: face UI is no longer active");
+        return false;
+    }
+
+    login_ui_hide();
+    ESP_LOGI(TAG, "Face success UI finished");
+    return true;
 }
 
 void login_ui_clear_face_detect(void)

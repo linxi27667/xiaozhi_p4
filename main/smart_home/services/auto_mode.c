@@ -123,7 +123,7 @@ void auto_mode_on_event(const smart_home_event_t *event)
         mqtt_send_command(3, IOT_CMD_SET_SERVO, 6, 90);
         mqtt_send_command(3, IOT_CMD_SET_SERVO, 7, 90);
         mqtt_send_broadcast(IOT_CMD_BROADCAST_LIGHTS_ON);
-        mqtt_send_command(1, IOT_CMD_SET_SERVO, 6, 180);  // 一楼大门全开 180° 便于疏散
+        mqtt_send_command(1, IOT_CMD_SET_SERVO, 6, 135);  // 一楼大门全开 135° 便于疏散
         mqtt_send_command(1, IOT_CMD_SET_LIGHT, 0, 1);
         mqtt_send_rgb_light(2, 0, 255, 0, 0, 100, IOT_LIGHT_EFFECT_WARNING, 5);
         mqtt_send_command(2, IOT_CMD_SET_LIGHT, 1, 1);

@@ -45,16 +45,21 @@ static void smart_home_mqtt_task(void* arg) {
     (void)arg;
 
     vTaskDelay(pdMS_TO_TICKS(1000));
+    uint8_t slow_tick = 0;
 
     while (true) {
-        if (!mqtt_client_is_connected()) {
-            mqtt_client_start();
-        } else {
-            mqtt_client_poll();
+        if (slow_tick == 0) {
+            if (!mqtt_client_is_connected()) {
+                mqtt_client_start();
+            } else {
+                mqtt_client_poll();
+            }
+            weather_service_poll();
+            auto_mode_tick();
         }
-        weather_service_poll();
-        auto_mode_tick();
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        mqtt_rgb_blink_tick();
+        slow_tick = (uint8_t)((slow_tick + 1) % 4);
+        vTaskDelay(pdMS_TO_TICKS(250));
     }
 }
 

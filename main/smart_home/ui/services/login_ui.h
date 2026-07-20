@@ -42,9 +42,13 @@ void login_ui_update_face_preview(const uint8_t *rgb565, int width, int height);
 // 显示人脸检测框(坐标相对于预览区域)
 void login_ui_update_face_detect(int x, int y, int w, int h);
 
-// 人脸解锁完成后直接更新成功状态并延迟隐藏弹窗
+// 显示人脸检测成功状态，保留界面供 LVGL 完成一次可见刷新
 // 注意:此函数在持有 LVGL 显示锁时调用
-bool login_ui_complete_face(int x, int y, int w, int h);
+bool login_ui_show_face_success(int x, int y, int w, int h);
+
+// 完成人脸成功界面并进入系统
+// 注意:此函数在持有 LVGL 显示锁时调用
+bool login_ui_finish_face_success(void);
 
 // 清除人脸检测框
 void login_ui_clear_face_detect(void);

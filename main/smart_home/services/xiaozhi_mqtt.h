@@ -27,6 +27,9 @@ void mqtt_send_command_v3(uint8_t floor_id, uint8_t cmd_type, uint8_t gpio_index
 void mqtt_send_ambient_scene(uint8_t floor_id, uint8_t index, uint8_t ambient_scene);
 void mqtt_send_rgb_light(uint8_t floor_id, uint8_t index, uint8_t red, uint8_t green,
                          uint8_t blue, uint8_t brightness, uint8_t effect, uint8_t speed);
+bool mqtt_start_rgb_blink(uint8_t floor_id, uint8_t index, uint8_t red, uint8_t green,
+                          uint8_t blue, uint8_t brightness, uint8_t blink_count);
+void mqtt_rgb_blink_tick(void);
 void mqtt_send_scene(uint8_t scene_id);
 void mqtt_send_main_power(uint8_t floor_id, bool on);
 void mqtt_send_all_main_power(bool on);
