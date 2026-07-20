@@ -102,6 +102,9 @@ void McpServer::AddCommonTools() {
 
     auto camera = board.GetCamera();
     if (camera) {
+        if (!EnsureBackgroundTask()) {
+            ESP_LOGE(TAG, "Camera worker unavailable; take_photo will stay disabled");
+        }
         AddTool("self.camera.take_photo",
             "Always remember you have a camera. If the user asks you to see something, use this tool to take a photo and then explain it.\n"
             "Args:\n"
@@ -321,7 +324,7 @@ bool McpServer::EnsureBackgroundTask() {
         return true;
     }
 
-    background_tool_queue_ = xQueueCreate(2, sizeof(BackgroundToolCall*));
+    background_tool_queue_ = xQueueCreate(1, sizeof(BackgroundToolCall*));
     if (background_tool_queue_ == nullptr) {
         ESP_LOGE(TAG, "Failed to create background tool queue");
         return false;
@@ -343,6 +346,10 @@ bool McpServer::EnsureBackgroundTask() {
         background_tool_task_ = nullptr;
         return false;
     }
+    ESP_LOGI(TAG, "Camera worker ready CAM_FIX_V4: internal=%u dma_largest=%u psram=%u",
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA),
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
     return true;
 }
 
@@ -391,6 +398,13 @@ void McpServer::BackgroundTask(void* arg) {
         ESP_LOGI(TAG, "Background tool finished: %s, stack high water=%u",
                  call->tool->name().c_str(),
                  (unsigned)uxTaskGetStackHighWaterMark(nullptr));
+        call.reset();
+        ESP_LOGI(TAG, "Background tool cleanup: internal=%u dma_largest=%u psram=%u psram_largest=%u",
+                 (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA),
+                 (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT),
+                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+        server->background_tool_busy_.store(false, std::memory_order_release);
     }
 }
 
@@ -645,8 +659,16 @@ void McpServer::DoToolCall(int id, const std::string& tool_name, const cJSON* to
         return;
     }
 
-    if (!EnsureBackgroundTask()) {
-        ReplyError(id, "Not enough memory to run camera tool");
+    if (background_tool_task_ == nullptr || background_tool_queue_ == nullptr) {
+        ReplyError(id, "Camera worker is unavailable");
+        return;
+    }
+
+    bool expected_idle = false;
+    if (!background_tool_busy_.compare_exchange_strong(
+            expected_idle, true, std::memory_order_acq_rel)) {
+        ESP_LOGW(TAG, "Background camera tool is busy");
+        ReplyError(id, "Camera is busy");
         return;
     }
 
@@ -654,6 +676,7 @@ void McpServer::DoToolCall(int id, const std::string& tool_name, const cJSON* to
         id, tool, std::move(arguments)
     };
     if (call == nullptr) {
+        background_tool_busy_.store(false, std::memory_order_release);
         ESP_LOGE(TAG, "Failed to allocate background tool context");
         ReplyError(id, "Not enough memory to run camera tool");
         return;
@@ -661,6 +684,7 @@ void McpServer::DoToolCall(int id, const std::string& tool_name, const cJSON* to
 
     if (xQueueSend(background_tool_queue_, &call, 0) != pdTRUE) {
         delete call;
+        background_tool_busy_.store(false, std::memory_order_release);
         ESP_LOGW(TAG, "Background camera queue is full");
         ReplyError(id, "Camera is busy");
     }

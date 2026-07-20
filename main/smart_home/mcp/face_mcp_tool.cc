@@ -9,10 +9,8 @@
 #include <cJSON.h>
 #include <esp_log.h>
 #include <esp_heap_caps.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/queue.h>
-#include <thread>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -22,62 +20,21 @@ static const char *TAG = "FaceMcp";
 static std::string encode_jpeg(const uint8_t *data, size_t len, int width, int height,
                                 uint32_t format, int quality = 80)
 {
-    // 创建 JPEG 队列
-    QueueHandle_t jpeg_queue = xQueueCreate(40, sizeof(JpegChunk));
-    if (!jpeg_queue) {
-        ESP_LOGE(TAG, "Failed to create JPEG queue");
+    uint8_t *jpeg = nullptr;
+    size_t jpeg_len = 0;
+    if (!image_to_jpeg(const_cast<uint8_t *>(data), len,
+                       (uint16_t)width, (uint16_t)height,
+                       (v4l2_pix_fmt_t)format, quality, &jpeg, &jpeg_len) ||
+        jpeg == nullptr || jpeg_len == 0) {
+        if (jpeg != nullptr) {
+            heap_caps_free(jpeg);
+        }
+        ESP_LOGE(TAG, "JPEG encode failed");
         return "";
     }
 
-    // 编码线程(image_to_jpeg_cb 内部不修改源数据,但签名要求非 const,这里 const_cast)
-    std::thread encoder([&]() {
-        bool ok = image_to_jpeg_cb(
-            const_cast<uint8_t *>(data), len, (uint16_t)width, (uint16_t)height, (v4l2_pix_fmt_t)format, quality,
-            [](void *arg, size_t index, const void *chunk_data, size_t chunk_len) -> size_t {
-                auto queue = static_cast<QueueHandle_t>(arg);
-                JpegChunk chunk = {.data = nullptr, .len = chunk_len};
-                if (index == 0 && chunk_data && chunk_len > 0) {
-                    chunk.data = (uint8_t *)heap_caps_aligned_alloc(16, chunk_len,
-                                                                     MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-                    if (chunk.data) {
-                        memcpy(chunk.data, chunk_data, chunk_len);
-                    } else {
-                        chunk.len = 0;
-                    }
-                } else {
-                    chunk.len = 0;
-                }
-                xQueueSend(queue, &chunk, portMAX_DELAY);
-                return chunk_len;
-            },
-            jpeg_queue);
-        if (!ok) {
-            JpegChunk chunk = {.data = nullptr, .len = 0};
-            xQueueSend(jpeg_queue, &chunk, portMAX_DELAY);
-        }
-    });
-
-    // 收集 JPEG 数据
-    std::string jpeg_data;
-    while (true) {
-        JpegChunk chunk;
-        if (xQueueReceive(jpeg_queue, &chunk, pdMS_TO_TICKS(5000)) != pdPASS) {
-            ESP_LOGE(TAG, "JPEG encode timeout");
-            break;
-        }
-        if (chunk.data == nullptr && chunk.len == 0) {
-            // 结束标记或错误
-            break;
-        }
-        if (chunk.data && chunk.len > 0) {
-            jpeg_data.append((char *)chunk.data, chunk.len);
-            free(chunk.data);
-        }
-    }
-
-    encoder.join();
-    vQueueDelete(jpeg_queue);
-
+    std::unique_ptr<uint8_t, decltype(&heap_caps_free)> jpeg_guard(jpeg, heap_caps_free);
+    std::string jpeg_data(reinterpret_cast<const char *>(jpeg), jpeg_len);
     ESP_LOGI(TAG, "JPEG encoded: %d bytes", (int)jpeg_data.size());
     return jpeg_data;
 }

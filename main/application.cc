@@ -23,6 +23,7 @@
 #include <cstring>
 #include <esp_heap_caps.h>
 #include <esp_log.h>
+#include <freertos/idf_additions.h>
 #include <cJSON.h>
 #include <driver/gpio.h>
 #include <arpa/inet.h>
@@ -78,7 +79,7 @@ bool Application::SetDeviceState(DeviceState state) {
 static void on_login_success_event(void *user_data)
 {
     (void)user_data;
-    ESP_LOGI(TAG, "Login success event received");
+    ESP_LOGI(TAG, "Login success event received, scheduling device unlock");
     Application::GetInstance().Schedule([]() {
         Application::GetInstance().OnLoginSuccess();
     });
@@ -92,6 +93,8 @@ static void on_login_failed_event(void *user_data)
 
 static constexpr int FACE_PREVIEW_W = 420;
 static constexpr int FACE_PREVIEW_H = 315;
+static std::atomic_bool s_face_login_pending{false};
+static std::atomic_bool s_face_preview_pending{false};
 
 static uint8_t *scale_rgb565_frame(const EspVideo::CapturedFrame &src, int dst_w, int dst_h)
 {
@@ -137,17 +140,13 @@ static uint8_t *copy_face_frame_mirrored(const uint8_t *src)
     return dst;
 }
 
-static void publish_ui_event_now(ui_event_type_t event)
-{
-    ui_event_publish(event);
-    ui_events_dispatch_pending();
-}
-
 // 演示模式人脸登录任务:检测到人脸后立即解锁
 static void face_recognition_task(void *arg)
 {
     (void)arg;
-    ESP_LOGI(TAG, "Face detection login task started");
+    uint8_t stack_probe = 0;
+    ESP_LOGI(TAG, "Face detection login task started (FACE_FIX_V3 FACE_STACK_INTERNAL_V2 stack=%p)",
+             &stack_probe);
 
     auto &face_recog = smart_home::FaceRecognition::GetInstance();
     bool face_init_ok = face_recog.InitializeDetector();
@@ -158,24 +157,39 @@ static void face_recognition_task(void *arg)
     const TickType_t frame_interval = pdMS_TO_TICKS(400);
     const TickType_t detect_interval = pdMS_TO_TICKS(900);
     const TickType_t detector_retry_interval = pdMS_TO_TICKS(2000);
+    const TickType_t unlock_dispatch_timeout = pdMS_TO_TICKS(3000);
     int no_face_count = 0;
     const int max_no_face = 4;  // 约4秒无人脸则提示
     bool preview_started = false;
     bool camera_wait_status_shown = false;
-    bool face_login_done = false;
     TickType_t last_detect_tick = 0;
     TickType_t last_detector_init_attempt = xTaskGetTickCount();
+    TickType_t face_login_queued_at = 0;
 
     while (true) {
         // 只在登录 UI 可见且处于人脸模式时工作
         if (!login_ui_is_face_mode()) {
-            face_login_done = false;
+            s_face_login_pending.store(false, std::memory_order_release);
             vTaskDelay(pdMS_TO_TICKS(500));
             continue;
         }
 
-        if (face_login_done) {
-            vTaskDelay(pdMS_TO_TICKS(300));
+        if (s_face_login_pending.load(std::memory_order_acquire)) {
+            TickType_t now = xTaskGetTickCount();
+            if (face_login_queued_at != 0 &&
+                (now - face_login_queued_at) >= unlock_dispatch_timeout) {
+                ESP_LOGW(TAG, "Face unlock callback timed out after %lums; retrying",
+                         (unsigned long)((now - face_login_queued_at) * portTICK_PERIOD_MS));
+                s_face_login_pending.store(false, std::memory_order_release);
+                face_login_queued_at = 0;
+            } else {
+                vTaskDelay(pdMS_TO_TICKS(300));
+                continue;
+            }
+        }
+
+        if (Application::GetInstance().GetDeviceState() != kDeviceStateLocked) {
+            vTaskDelay(pdMS_TO_TICKS(500));
             continue;
         }
 
@@ -247,18 +261,33 @@ static void face_recognition_task(void *arg)
             continue;
         }
 
-        uint8_t *preview_frame = copy_face_frame_mirrored(face_frame);
-        if (preview_frame) {
-            Application::GetInstance().Schedule([preview_frame]() {
-                DisplayLockGuard lock(Board::GetInstance().GetDisplay());
-                if (login_ui_is_face_mode()) {
-                    login_ui_update_face_preview(preview_frame, FACE_PREVIEW_W, FACE_PREVIEW_H);
+        bool preview_expected_idle = false;
+        if (s_face_preview_pending.compare_exchange_strong(
+                preview_expected_idle, true, std::memory_order_acq_rel)) {
+            uint8_t *preview_frame = copy_face_frame_mirrored(face_frame);
+            if (preview_frame) {
+                try {
+                    Application::GetInstance().Schedule([preview_frame]() {
+                        {
+                            DisplayLockGuard lock(Board::GetInstance().GetDisplay());
+                            if (login_ui_is_face_mode()) {
+                                login_ui_update_face_preview(preview_frame, FACE_PREVIEW_W, FACE_PREVIEW_H);
+                            }
+                        }
+                        free(preview_frame);
+                        s_face_preview_pending.store(false, std::memory_order_release);
+                    });
+                    if (!preview_started) {
+                        ESP_LOGI(TAG, "Face preview started (%dx%d)", FACE_PREVIEW_W, FACE_PREVIEW_H);
+                        preview_started = true;
+                    }
+                } catch (...) {
+                    free(preview_frame);
+                    s_face_preview_pending.store(false, std::memory_order_release);
+                    ESP_LOGE(TAG, "Failed to queue face preview frame");
                 }
-                free(preview_frame);
-            });
-            if (!preview_started) {
-                ESP_LOGI(TAG, "Face preview started (%dx%d)", FACE_PREVIEW_W, FACE_PREVIEW_H);
-                preview_started = true;
+            } else {
+                s_face_preview_pending.store(false, std::memory_order_release);
             }
         }
 
@@ -301,21 +330,48 @@ static void face_recognition_task(void *arg)
             }
         }
 
-        ESP_LOGI(TAG, "Face detected: score=%.2f size=%dx%d, unlocking demo",
-                 detect.score, detect.width, detect.height);
-        face_login_done = true;
+        DeviceState queued_state = Application::GetInstance().GetDeviceState();
+        ESP_LOGI(TAG, "Face unlock queued: state=%s score=%.2f box=%d,%d %dx%d",
+                 DeviceStateMachine::GetStateName(queued_state), detect.score,
+                 detect.x, detect.y, detect.width, detect.height);
+        s_face_login_pending.store(true, std::memory_order_release);
+        face_login_queued_at = xTaskGetTickCount();
+        TickType_t queued_tick = face_login_queued_at;
 
-        // 在同一次主任务调度中显示检测框并发布解锁事件。
-        Application::GetInstance().Schedule([detect]() {
-            DisplayLockGuard lock(Board::GetInstance().GetDisplay());
-            int preview_x = FACE_PREVIEW_W - detect.x - detect.width;
-            login_ui_update_face_detect(preview_x, detect.y, detect.width, detect.height);
-            publish_ui_event_now(UI_EVENT_FACE_DETECTED);
-            publish_ui_event_now(UI_EVENT_FACE_RECOGNIZED);
-        });
+        // 先完成状态转换，再更新 UI。这样 UI 卡顿不会阻断真正的解锁。
+        try {
+            Application::GetInstance().Schedule([detect, queued_tick]() {
+                auto &app = Application::GetInstance();
+                ESP_LOGI(TAG, "Face unlock callback begin: state=%s latency=%lums",
+                         DeviceStateMachine::GetStateName(app.GetDeviceState()),
+                         (unsigned long)((xTaskGetTickCount() - queued_tick) * portTICK_PERIOD_MS));
+
+                app.OnLoginSuccess();
+                DeviceState state_after = app.GetDeviceState();
+                bool ui_completed = false;
+                if (state_after == kDeviceStateIdle) {
+                    DisplayLockGuard lock(Board::GetInstance().GetDisplay());
+                    int preview_x = FACE_PREVIEW_W - detect.x - detect.width;
+                    ui_completed = login_ui_complete_face(
+                        preview_x, detect.y, detect.width, detect.height);
+                } else {
+                    ESP_LOGE(TAG, "Face unlock callback did not reach idle: state=%s",
+                             DeviceStateMachine::GetStateName(state_after));
+                }
+
+                ESP_LOGI(TAG, "Face unlock callback done: state=%s ui=%s",
+                         DeviceStateMachine::GetStateName(state_after),
+                         ui_completed ? "completed" : "skipped");
+                s_face_login_pending.store(false, std::memory_order_release);
+            });
+        } catch (...) {
+            s_face_login_pending.store(false, std::memory_order_release);
+            face_login_queued_at = 0;
+            ESP_LOGE(TAG, "Failed to queue face unlock callback");
+        }
 
         free(face_frame);
-        // 等待登录 UI 隐藏
+        // 给主任务时间执行解锁回调；若回调超时，检测循环会自动重试。
         vTaskDelay(pdMS_TO_TICKS(300));
     }
 }
@@ -364,8 +420,14 @@ void Application::Initialize() {
     ui_event_subscribe(UI_EVENT_LOGIN_SUCCESS, on_login_success_event, NULL);
     ui_event_subscribe(UI_EVENT_LOGIN_FAILED, on_login_failed_event, NULL);
 
-    xTaskCreatePinnedToCore(face_recognition_task, "face_recog", 12 * 1024,
-                            nullptr, 4, nullptr, 1);
+    BaseType_t face_task_result = xTaskCreatePinnedToCoreWithCaps(
+        face_recognition_task, "face_recog", 12 * 1024, nullptr, 4, nullptr, 1,
+        MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (face_task_result != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create face detection task");
+    } else {
+        ESP_LOGI(TAG, "Face task stack allocated with INTERNAL capability (FACE_STACK_INTERNAL_V2)");
+    }
 
     SetDeviceState(kDeviceStateLocked);
     login_ui_show();
@@ -974,6 +1036,7 @@ void Application::StopListening() {
 void Application::LockDevice() {
     ESP_LOGI(TAG, "Locking device");
     if (SetDeviceState(kDeviceStateLocked)) {
+        login_completion_claimed_.store(false, std::memory_order_release);
         Schedule([]() {
             ui_event_publish(UI_EVENT_LOGIN_REQUIRED);
         });
@@ -982,12 +1045,35 @@ void Application::LockDevice() {
 
 void Application::OnLoginSuccess() {
     auto state = GetDeviceState();
+    ESP_LOGI(TAG, "Completing login from state %s", DeviceStateMachine::GetStateName(state));
     if (state == kDeviceStateWifiConfiguring) {
         ESP_LOGI(TAG, "Login succeeded while WiFi is configuring; staying in config mode");
         return;
     }
+    if (state == kDeviceStateIdle) {
+        ESP_LOGI(TAG, "Ignoring login completion because device is already unlocked");
+        return;
+    }
+    if (state != kDeviceStateLocked) {
+        ESP_LOGW(TAG, "Ignoring login completion from unexpected state %s",
+                 DeviceStateMachine::GetStateName(state));
+        return;
+    }
 
-    SetDeviceState(kDeviceStateIdle);
+    bool expected = false;
+    if (!login_completion_claimed_.compare_exchange_strong(
+            expected, true, std::memory_order_acq_rel)) {
+        ESP_LOGI(TAG, "Ignoring duplicate login completion");
+        return;
+    }
+
+    if (!SetDeviceState(kDeviceStateIdle)) {
+        ESP_LOGE(TAG, "Login accepted but device unlock failed from state %s",
+                 DeviceStateMachine::GetStateName(state));
+        login_completion_claimed_.store(false, std::memory_order_release);
+        return;
+    }
+    ESP_LOGI(TAG, "Device unlocked after login");
 
     /*
      * Face login is a local security/scene trigger.  Do not wait for cloud

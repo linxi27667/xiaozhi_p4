@@ -192,6 +192,33 @@ static uint8_t canonical_servo_index(uint8_t index) {
     return (index < 6) ? static_cast<uint8_t>(index + 6) : index;
 }
 
+static uint8_t scene_id_from_name(const std::string& scene_name) {
+    struct SceneNameMap {
+        const char* name;
+        uint8_t id;
+    };
+    static constexpr SceneNameMap kSceneNames[] = {
+        {"sleep", IOT_SCENE_SLEEP}, {"睡眠", IOT_SCENE_SLEEP}, {"睡眠场景", IOT_SCENE_SLEEP},
+        {"movie", IOT_SCENE_MOVIE}, {"观影", IOT_SCENE_MOVIE}, {"观影场景", IOT_SCENE_MOVIE},
+        {"night", IOT_SCENE_NIGHT}, {"起夜", IOT_SCENE_NIGHT}, {"起夜场景", IOT_SCENE_NIGHT},
+        {"夜间", IOT_SCENE_NIGHT},
+        {"fire", IOT_SCENE_FIRE}, {"fire_demo", IOT_SCENE_FIRE}, {"火警", IOT_SCENE_FIRE},
+        {"火警场景", IOT_SCENE_FIRE},
+        {"rain", IOT_SCENE_RAIN}, {"雨天", IOT_SCENE_RAIN}, {"雨天收衣", IOT_SCENE_RAIN},
+        {"雨天场景", IOT_SCENE_RAIN},
+        {"away", IOT_SCENE_AWAY}, {"离家", IOT_SCENE_AWAY}, {"离家场景", IOT_SCENE_AWAY},
+        {"home", IOT_SCENE_HOME}, {"回家", IOT_SCENE_HOME}, {"回家场景", IOT_SCENE_HOME},
+        {"bright", IOT_SCENE_BRIGHT}, {"明亮", IOT_SCENE_BRIGHT}, {"明亮场景", IOT_SCENE_BRIGHT},
+    };
+
+    for (const auto& scene : kSceneNames) {
+        if (scene_name == scene.name) {
+            return scene.id;
+        }
+    }
+    throw std::runtime_error("Unknown scene_name: " + scene_name);
+}
+
 extern "C" void SmartHomeMcp_RegisterTools(void) {
     auto& server = McpServer::GetInstance();
 
@@ -345,7 +372,23 @@ extern "C" void SmartHomeMcp_RegisterTools(void) {
         });
 
     server.AddTool("self.iot.set_scene",
-        "Run a smart-home scene. scene_id: 1 sleep, 2 movie, 3 night, 4 fire demo, 5 rain, 6 away, 7 home, 8 bright.",
+        "Run exactly one smart-home scene. scene_name must be: night for 起夜/夜间; home for 回家; "
+        "away for 离家; sleep for 睡眠; movie for 观影; fire for 火警演示; rain for 雨天收衣; "
+        "bright for 明亮. Important: 起夜 always uses scene_name=night, never home or away.",
+        PropertyList({
+            Property("scene_name", kPropertyTypeString),
+        }),
+        [](const PropertyList& properties) -> ReturnValue {
+            const std::string scene_name = properties["scene_name"].value<std::string>();
+            const uint8_t scene_id = scene_id_from_name(scene_name);
+            ESP_LOGI(TAG, "Scene command: name=%s id=%u", scene_name.c_str(), scene_id);
+            mqtt_send_scene(scene_id);
+            return true;
+        });
+
+    server.AddUserOnlyTool("self.iot.set_scene_by_id",
+        "Run a smart-home scene by protocol ID for manual debugging: 1 sleep, 2 movie, 3 night, "
+        "4 fire demo, 5 rain, 6 away, 7 home, 8 bright.",
         PropertyList({
             Property("scene_id", kPropertyTypeInteger, 1, 8),
         }),

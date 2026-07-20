@@ -95,18 +95,30 @@ static void delayed_hide_cb(lv_timer_t *timer)
     lv_timer_del(timer);
 }
 
-// 发布登录成功事件并隐藏弹窗
-static void notify_login_success(void)
+// 显示登录成功状态并隐藏弹窗。返回 false 表示本次登录已处理。
+static bool complete_login_ui(void)
 {
-    if (s_login_completed) return;
+    if (s_login_completed) return false;
     s_login_completed = true;
     ESP_LOGI(TAG, "Login success");
     login_ui_set_status(tr("检测通过", "Login success"));
-    ui_event_publish(UI_EVENT_LOGIN_SUCCESS);
-    ui_events_dispatch_pending();
     // 延迟隐藏,让用户看到成功状态
     lv_timer_t *t = lv_timer_create(delayed_hide_cb, 500, NULL);
-    lv_timer_set_repeat_count(t, 1);
+    if (t != NULL) {
+        lv_timer_set_repeat_count(t, 1);
+    } else {
+        ESP_LOGE(TAG, "Failed to create login hide timer");
+        login_ui_hide();
+    }
+    return true;
+}
+
+// 密码登录通过事件总线通知 Application 完成解锁。
+static void notify_login_success(void)
+{
+    if (!complete_login_ui()) return;
+    ui_event_publish(UI_EVENT_LOGIN_SUCCESS);
+    ui_events_dispatch_pending();
 }
 
 // 发布登录失败事件
@@ -417,8 +429,8 @@ static void on_login_required(void *user_data)
 static void on_face_recognized(void *user_data)
 {
     (void)user_data;
-    login_ui_set_status(tr("检测通过", "Face recognized"));
-    notify_login_success();
+    // 人脸演示由检测所在的 Application 主任务直接完成状态切换；此处只更新 UI。
+    (void)complete_login_ui();
 }
 
 // 事件回调:人脸识别失败
@@ -614,6 +626,19 @@ void login_ui_update_face_detect(int x, int y, int w, int h)
     lv_obj_clear_flag(s_face_detect_box, LV_OBJ_FLAG_HIDDEN);
     lv_obj_set_size(s_face_detect_box, w, h);
     lv_obj_set_pos(s_face_detect_box, canvas_x + x, canvas_y + y);
+}
+
+bool login_ui_complete_face(int x, int y, int w, int h)
+{
+    if (!login_ui_is_face_mode()) {
+        ESP_LOGW(TAG, "Face completion skipped: face UI is no longer active");
+        return false;
+    }
+
+    login_ui_update_face_detect(x, y, w, h);
+    bool completed = complete_login_ui();
+    ESP_LOGI(TAG, "Face completion UI: %s", completed ? "completed" : "already completed");
+    return completed;
 }
 
 void login_ui_clear_face_detect(void)

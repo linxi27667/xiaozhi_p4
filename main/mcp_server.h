@@ -5,6 +5,7 @@
 #include <vector>
 #include <map>
 #include <functional>
+#include <atomic>
 #include <variant>
 #include <optional>
 #include <stdexcept>
@@ -356,6 +357,7 @@ private:
     std::vector<McpTool*> tools_;
     QueueHandle_t background_tool_queue_ = nullptr;
     TaskHandle_t background_tool_task_ = nullptr;
+    std::atomic_bool background_tool_busy_{false};
 };
 
 #endif // MCP_SERVER_H

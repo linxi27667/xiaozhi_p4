@@ -1,0 +1,13 @@
+{
+  "name": "xiaozhi-p4-defense-ppt",
+  "version": "1.0.0",
+  "description": "ESP32-P4 AIoT 多模态家居中控 答辩 PPT",
+  "private": true,
+  "scripts": {
+    "placeholders": "python make_placeholders.py",
+    "build": "node build_ppt.js"
+  },
+  "dependencies": {
+    "pptxgenjs": "^3.12.0"
+  }
+}

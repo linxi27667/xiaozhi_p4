@@ -194,11 +194,16 @@ static uint8_t* convert_input_to_encoder_buf(const uint8_t* src, uint16_t width,
 
 #if CONFIG_XIAOZHI_ENABLE_HARDWARE_JPEG_ENCODER
 static jpeg_encoder_handle_t s_hw_jpeg_handle = NULL;
+static bool s_hw_jpeg_init_attempted = false;
 
 static bool hw_jpeg_ensure_inited(void) {
     if (s_hw_jpeg_handle) {
         return true;
     }
+    if (s_hw_jpeg_init_attempted) {
+        return false;
+    }
+    s_hw_jpeg_init_attempted = true;
     jpeg_encode_engine_cfg_t eng_cfg = {
         .intr_priority = 0,
         .timeout_ms = 100,
@@ -210,6 +215,10 @@ static bool hw_jpeg_ensure_inited(void) {
         return false;
     }
     return true;
+}
+
+bool image_to_jpeg_init(void) {
+    return hw_jpeg_ensure_inited();
 }
 
 static uint8_t* convert_input_to_hw_encoder_buf(const uint8_t* src, uint16_t width, uint16_t height, v4l2_pix_fmt_t format,
@@ -283,16 +292,45 @@ static bool encode_with_hw_jpeg(const uint8_t* src, size_t src_len, uint16_t wid
     if (quality > 100)
         quality = 100;
 
+    if (!hw_jpeg_ensure_inited()) {
+        return false;
+    }
+
     jpeg_enc_input_format_t enc_src_type = JPEG_ENCODE_IN_FORMAT_RGB888;
     int enc_in_size = 0;
-    uint8_t* enc_in = convert_input_to_hw_encoder_buf(src, width, height, format, &enc_src_type, &enc_in_size);
+    uint8_t* enc_in = nullptr;
+    bool enc_in_owned = false;
+
+    // Camera frames already live in PSRAM, which the P4 JPEG DMA can read directly.
+    // Only YUYV needs a converted copy for the hardware byte order.
+    if (format == V4L2_PIX_FMT_GREY) {
+        enc_src_type = JPEG_ENCODE_IN_FORMAT_GRAY;
+        enc_in_size = (int)width * (int)height;
+        enc_in = const_cast<uint8_t *>(src);
+    } else if (format == V4L2_PIX_FMT_RGB24) {
+        enc_src_type = JPEG_ENCODE_IN_FORMAT_RGB888;
+        enc_in_size = (int)width * (int)height * 3;
+        enc_in = const_cast<uint8_t *>(src);
+    } else if (format == V4L2_PIX_FMT_RGB565) {
+        enc_src_type = JPEG_ENCODE_IN_FORMAT_RGB565;
+        enc_in_size = (int)width * (int)height * 2;
+        enc_in = const_cast<uint8_t *>(src);
+    } else {
+        enc_in = convert_input_to_hw_encoder_buf(src, width, height, format,
+                                                 &enc_src_type, &enc_in_size);
+        enc_in_owned = enc_in != nullptr;
+    }
+
     if (!enc_in) {
         ESP_LOGW(TAG, "hw jpeg: unsupported format, fallback to sw");
         return false;
     }
-
-    if (!hw_jpeg_ensure_inited()) {
-        free(enc_in);
+    if (enc_in_size <= 0 || src_len < static_cast<size_t>(enc_in_size)) {
+        if (enc_in_owned) {
+            free(enc_in);
+        }
+        ESP_LOGE(TAG, "hw jpeg: incomplete input (%u < %d)",
+                 (unsigned)src_len, enc_in_size);
         return false;
     }
 
@@ -310,14 +348,18 @@ static bool encode_with_hw_jpeg(const uint8_t* src, size_t src_len, uint16_t wid
     size_t out_cap_aligned = 0;
     uint8_t* outbuf = (uint8_t*)jpeg_alloc_encoder_mem(out_cap, &jpeg_enc_output_mem_cfg, &out_cap_aligned);
     if (!outbuf) {
-        free(enc_in);
+        if (enc_in_owned) {
+            free(enc_in);
+        }
         ESP_LOGE(TAG, "alloc out buffer failed");
         return false;
     }
 
     uint32_t out_len = 0;
     esp_err_t er = jpeg_encoder_process(s_hw_jpeg_handle, &enc_cfg, enc_in, (uint32_t)enc_in_size, outbuf, (uint32_t)out_cap_aligned, &out_len);
-    free(enc_in);
+    if (enc_in_owned) {
+        free(enc_in);
+    }
 
     if (er != ESP_OK) {
         free(outbuf);
@@ -347,9 +389,16 @@ static bool encode_with_hw_jpeg(const uint8_t* src, size_t src_len, uint16_t wid
 }
 #endif // CONFIG_XIAOZHI_ENABLE_HARDWARE_JPEG_ENCODER
 
-static bool encode_with_esp_new_jpeg(const uint8_t* src, size_t src_len, uint16_t width, uint16_t height,
-                                     v4l2_pix_fmt_t format, uint8_t quality, uint8_t** jpg_out, size_t* jpg_out_len,
-                                     jpg_out_cb cb, void* cb_arg) {
+#if !CONFIG_XIAOZHI_ENABLE_HARDWARE_JPEG_ENCODER
+bool image_to_jpeg_init(void) {
+    return true;
+}
+#endif
+
+[[maybe_unused]] static bool encode_with_esp_new_jpeg(
+    const uint8_t* src, size_t src_len, uint16_t width, uint16_t height,
+    v4l2_pix_fmt_t format, uint8_t quality, uint8_t** jpg_out, size_t* jpg_out_len,
+    jpg_out_cb cb, void* cb_arg) {
     if (quality < 1)
         quality = 1;
     if (quality > 100)
@@ -443,9 +492,13 @@ bool image_to_jpeg(uint8_t* src, size_t src_len, uint16_t width, uint16_t height
     if (encode_with_hw_jpeg(src, src_len, width, height, format, quality, out, out_len, NULL, NULL)) {
         return true;
     }
-    // Fallback to esp_new_jpeg
-#endif
+    // On P4, a hardware failure usually means internal DMA memory is already
+    // exhausted. A full-frame software fallback raises the peak further and
+    // can starve ESP-Hosted, so fail this photo deterministically instead.
+    return false;
+#else
     return encode_with_esp_new_jpeg(src, src_len, width, height, format, quality, out, out_len, NULL, NULL);
+#endif
 }
 
 bool image_to_jpeg_cb(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, v4l2_pix_fmt_t format,
@@ -461,7 +514,8 @@ bool image_to_jpeg_cb(uint8_t* src, size_t src_len, uint16_t width, uint16_t hei
     if (encode_with_hw_jpeg(src, src_len, width, height, format, quality, NULL, NULL, cb, arg)) {
         return true;
     }
-    // Fallback to esp_new_jpeg
-#endif
+    return false;
+#else
     return encode_with_esp_new_jpeg(src, src_len, width, height, format, quality, NULL, NULL, cb, arg);
+#endif
 }

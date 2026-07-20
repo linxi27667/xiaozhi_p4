@@ -26,7 +26,9 @@ constexpr char kUiAssetVersion[] = "premium-2026-06-v3\n";
 constexpr gpio_num_t kSdPowerEnableGpio = GPIO_NUM_45;  // SD_PWRn (active low)
 constexpr int kSdLdoChannel = 4;                         // LDO_VO4
 constexpr int kSdVoltageMv = 3300;
+constexpr int kSdPowerOffDelayMs = 200;
 constexpr int kSdPowerOnDelayMs = 500;
+constexpr int kSdMountAttempts = 2;
 constexpr int kSdMaxOpenFiles = 5;
 constexpr size_t kSdAllocationUnitSize = 64 * 1024;
 
@@ -279,14 +281,7 @@ esp_err_t EspP4TfCard::Mount()
 
     ESP_LOGI(TAG, "Initializing TF card");
 
-    // Step 1: Enable SD card power (BSP official path: esp_ldo_regulator + SD_PWRn=0)
-    esp_err_t ret = EnablePower();
-    if (ret != ESP_OK) {
-        ReleasePower();
-        return ret;
-    }
-
-    // Step 2: Configure SDMMC host (1-bit, conservative frequency, NO pwr_ctrl_handle)
+    // Configure SDMMC host (1-bit, conservative frequency, NO pwr_ctrl_handle).
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     host.slot = SDMMC_HOST_SLOT_0;
     host.max_freq_khz = SDMMC_FREQ_PROBING;
@@ -312,11 +307,26 @@ esp_err_t EspP4TfCard::Mount()
     ESP_LOGI(TAG, "Mounting TF card via SDMMC slot 0, 1-bit, %dkHz: CLK=%d CMD=%d D0=%d",
              host.max_freq_khz, BSP_SD_CLK, BSP_SD_CMD, BSP_SD_D0);
 
-    card_ = nullptr;
-    ret = esp_vfs_fat_sdmmc_mount(kSdMountPoint, &host, &slot, &mount_config, &card_);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "TF card SDMMC mount failed: %s", esp_err_to_name(ret));
+    esp_err_t ret = ESP_FAIL;
+    for (int attempt = 1; attempt <= kSdMountAttempts; ++attempt) {
+        ret = EnablePower();
+        if (ret == ESP_OK) {
+            card_ = nullptr;
+            ret = esp_vfs_fat_sdmmc_mount(kSdMountPoint, &host, &slot,
+                                          &mount_config, &card_);
+        }
+        if (ret == ESP_OK) {
+            break;
+        }
+
+        ESP_LOGW(TAG, "TF card mount attempt %d/%d failed: %s",
+                 attempt, kSdMountAttempts, esp_err_to_name(ret));
+        card_ = nullptr;
         ReleasePower();
+    }
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "TF card SDMMC mount failed after %d attempts: %s",
+                 kSdMountAttempts, esp_err_to_name(ret));
         return ret;
     }
 
@@ -343,21 +353,9 @@ void EspP4TfCard::Unmount()
 
 esp_err_t EspP4TfCard::EnablePower()
 {
-    // Acquire LDO_VO4 at 3.3V via the regular LDO regulator API (BSP official path).
-    if (ldo_chan_ == nullptr) {
-        esp_ldo_channel_config_t ldo_config = {
-            .chan_id = kSdLdoChannel,
-            .voltage_mv = kSdVoltageMv,
-        };
-        esp_err_t ret = esp_ldo_acquire_channel(&ldo_config, &ldo_chan_);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to acquire LDO_VO%d at %dmV: %s",
-                     kSdLdoChannel, kSdVoltageMv, esp_err_to_name(ret));
-            return ret;
-        }
-    }
-
-    // Drive SD_PWRn (GPIO45) low to enable SD card power (active-low enable).
+    // A CPU reset does not necessarily remove power from the external TF card.
+    // Force SD_PWRn high first so a card left in a bad transfer state receives
+    // the same hardware reset it would get from a full board power cycle.
     const gpio_config_t io_conf = {
         .pin_bit_mask = (1ULL << kSdPowerEnableGpio),
         .mode = GPIO_MODE_OUTPUT,
@@ -371,6 +369,28 @@ esp_err_t EspP4TfCard::EnablePower()
                  kSdPowerEnableGpio, esp_err_to_name(ret));
         return ret;
     }
+    ret = gpio_set_level(kSdPowerEnableGpio, 1);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to disable SD_PWRn GPIO%d: %s",
+                 kSdPowerEnableGpio, esp_err_to_name(ret));
+        return ret;
+    }
+    vTaskDelay(pdMS_TO_TICKS(kSdPowerOffDelayMs));
+
+    // Acquire LDO_VO4 at 3.3V via the regular LDO regulator API (BSP official path).
+    if (ldo_chan_ == nullptr) {
+        esp_ldo_channel_config_t ldo_config = {
+            .chan_id = kSdLdoChannel,
+            .voltage_mv = kSdVoltageMv,
+        };
+        ret = esp_ldo_acquire_channel(&ldo_config, &ldo_chan_);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to acquire LDO_VO%d at %dmV: %s",
+                     kSdLdoChannel, kSdVoltageMv, esp_err_to_name(ret));
+            return ret;
+        }
+    }
+
     ret = gpio_set_level(kSdPowerEnableGpio, 0);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to enable SD_PWRn GPIO%d: %s",
@@ -379,8 +399,8 @@ esp_err_t EspP4TfCard::EnablePower()
     }
     vTaskDelay(pdMS_TO_TICKS(kSdPowerOnDelayMs));
 
-    ESP_LOGI(TAG, "SD card power enabled: GPIO45(SD_PWRn)=0, LDO_VO%d=%dmV",
-             kSdLdoChannel, kSdVoltageMv);
+    ESP_LOGI(TAG, "SD warm-reset recovery complete: GPIO45 off=%dms on=%dms, LDO_VO%d=%dmV",
+             kSdPowerOffDelayMs, kSdPowerOnDelayMs, kSdLdoChannel, kSdVoltageMv);
     return ESP_OK;
 }
 

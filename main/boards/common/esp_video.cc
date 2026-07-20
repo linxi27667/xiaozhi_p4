@@ -11,6 +11,11 @@
 #include <cstdio>
 #include <cstring>
 
+#ifdef CONFIG_ESP_HOSTED_ENABLED
+#include <esp_crt_bundle.h>
+#include <esp_http_client.h>
+#endif
+
 #include "esp_imgfx_color_convert.h"
 #include "esp_video_device.h"
 #include "esp_video_init.h"
@@ -57,6 +62,34 @@
 
 #define TAG "EspVideo"
 
+static void log_camera_memory(const char *stage)
+{
+    ESP_LOGI(TAG,
+             "Camera memory [%s]: internal=%u min_internal=%u dma_largest=%u psram=%u psram_largest=%u",
+             stage,
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+             (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA),
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT),
+             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+}
+
+static bool camera_dma_ready(const char *stage)
+{
+    constexpr size_t kMinimumDmaFree = 16 * 1024;
+    constexpr size_t kMinimumDmaLargest = 4 * 1024;
+    size_t dma_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+    size_t dma_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+    if (dma_free >= kMinimumDmaFree && dma_largest >= kMinimumDmaLargest) {
+        return true;
+    }
+
+    ESP_LOGE(TAG, "CAM_FIX_V4 blocked %s: dma_free=%u dma_largest=%u required=%u/%u",
+             stage, (unsigned)dma_free, (unsigned)dma_largest,
+             (unsigned)kMinimumDmaFree, (unsigned)kMinimumDmaLargest);
+    return false;
+}
+
 #if defined(CONFIG_CAMERA_SENSOR_SWAP_PIXEL_BYTE_ORDER) || defined(CONFIG_XIAOZHI_ENABLE_CAMERA_ENDIANNESS_SWAP)
 #warning \
     "CAMERA_SENSOR_SWAP_PIXEL_BYTE_ORDER or CONFIG_XIAOZHI_ENABLE_CAMERA_ENDIANNESS_SWAP is enabled, which may cause image corruption in YUV422 format!"
@@ -98,6 +131,11 @@ static void log_available_video_devices() {
 #endif  // CONFIG_XIAOZHI_ENABLE_CAMERA_DEBUG_MODE
 
 EspVideo::EspVideo(const esp_video_init_config_t& config) {
+    bool jpeg_encoder_ready = image_to_jpeg_init();
+    ESP_LOGI(TAG, "Camera reliability path CAM_FIX_V4: JPEG encoder=%s",
+             jpeg_encoder_ready ? "reserved" : "unavailable");
+    log_camera_memory("jpeg-reserved");
+
     if (esp_video_init(&config) != ESP_OK) {
         ESP_LOGE(TAG, "esp_video_init failed");
         return;
@@ -397,6 +435,7 @@ void EspVideo::SetExplainUrl(const std::string& url, const std::string& token) {
 
 bool EspVideo::Capture() {
     std::lock_guard<std::mutex> capture_lock(capture_mutex_);
+    log_camera_memory("capture-start");
 
     if (!streaming_on_ || video_fd_ < 0) {
         return false;
@@ -428,10 +467,10 @@ bool EspVideo::Capture() {
             }
 
 #ifdef CONFIG_XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE
-            ESP_LOGW(TAG, "mmap_buffers_[buf.index].length = %d, sensor_width = %d, sensor_height = %d",
+            ESP_LOGI(TAG, "Photo frame: mmap=%d sensor=%dx%d",
                      mmap_buffers_[buf.index].length, sensor_width_, sensor_height_);
 #else
-            ESP_LOGW(TAG, "mmap_buffers_[buf.index].length = %d, frame.width = %d, frame.height = %d",
+            ESP_LOGI(TAG, "Photo frame: mmap=%d output=%dx%d",
                      mmap_buffers_[buf.index].length, frame_.width, frame_.height);
 #endif  // CONFIG_XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE
             ESP_LOG_BUFFER_HEXDUMP(TAG, mmap_buffers_[buf.index].start, MIN(mmap_buffers_[buf.index].length, 256),
@@ -845,6 +884,7 @@ bool EspVideo::Capture() {
         auto image = std::make_unique<LvglAllocatedImage>(data, lvgl_image_size, w, h, stride, color_format);
         display->SetPreviewImage(std::move(image));
     }
+    log_camera_memory("capture-done");
     return true;
 }
 
@@ -908,6 +948,15 @@ std::string EspVideo::Explain(const std::string& question) {
         throw std::runtime_error("Image explain URL or token is not set");
     }
 
+    if (!camera_dma_ready("photo-preflight")) {
+        throw std::runtime_error("Camera DMA memory is busy, please try again");
+    }
+#if CONFIG_XIAOZHI_ENABLE_HARDWARE_JPEG_ENCODER
+    if (!image_to_jpeg_init()) {
+        throw std::runtime_error("Camera JPEG engine is unavailable");
+    }
+#endif
+
     uint8_t* jpeg_data = nullptr;
     size_t jpeg_len = 0;
     size_t source_len = 0;
@@ -921,19 +970,124 @@ std::string EspVideo::Explain(const std::string& question) {
         uint16_t h = frame_.height ? frame_.height : 240;
         v4l2_pix_fmt_t enc_fmt = frame_.format;
         source_len = frame_.len;
-        if (!image_to_jpeg(frame_.data, frame_.len, w, h, enc_fmt, 80, &jpeg_data, &jpeg_len) ||
-            jpeg_data == nullptr || jpeg_len == 0) {
+        ESP_LOGI(TAG, "Photo encode start: source=%u", (unsigned)source_len);
+        log_camera_memory("encode-start");
+
+        bool encoded = image_to_jpeg(frame_.data, frame_.len, w, h, enc_fmt, 80,
+                                     &jpeg_data, &jpeg_len);
+        heap_caps_free(frame_.data);
+        frame_.data = nullptr;
+        frame_.len = 0;
+        frame_.format = 0;
+
+        if (!encoded || jpeg_data == nullptr || jpeg_len == 0) {
+            if (jpeg_data != nullptr) {
+                heap_caps_free(jpeg_data);
+            }
             throw std::runtime_error("Failed to encode image to JPEG");
         }
+        ESP_LOGI(TAG, "Photo encode done: jpeg=%u raw frame released", (unsigned)jpeg_len);
+        log_camera_memory("encode-done");
     }
     std::unique_ptr<uint8_t, decltype(&heap_caps_free)> jpeg_guard(jpeg_data, heap_caps_free);
 
+    if (!camera_dma_ready("upload-preflight")) {
+        throw std::runtime_error("Camera network memory is busy, please try again");
+    }
+
+    std::string boundary = "----ESP32_CAMERA_BOUNDARY";
+    std::string multipart_header;
+    multipart_header += "--" + boundary + "\r\n";
+    multipart_header += "Content-Disposition: form-data; name=\"question\"\r\n\r\n";
+    multipart_header += question + "\r\n";
+    multipart_header += "--" + boundary + "\r\n";
+    multipart_header += "Content-Disposition: form-data; name=\"file\"; filename=\"camera.jpg\"\r\n";
+    multipart_header += "Content-Type: image/jpeg\r\n\r\n";
+    std::string multipart_footer = "\r\n--" + boundary + "--\r\n";
+    std::string result;
+
+    ESP_LOGI(TAG, "Photo upload start: jpeg=%u", (unsigned)jpeg_len);
+    log_camera_memory("upload-start");
+
+#ifdef CONFIG_ESP_HOSTED_ENABLED
+    esp_http_client_config_t config = {};
+    config.url = explain_url_.c_str();
+    config.timeout_ms = 15000;
+    config.buffer_size = 1024;
+    config.buffer_size_tx = 1024;
+    config.crt_bundle_attach = esp_crt_bundle_attach;
+
+    std::unique_ptr<esp_http_client, decltype(&esp_http_client_cleanup)> http(
+        esp_http_client_init(&config), esp_http_client_cleanup);
+    if (!http) {
+        throw std::runtime_error("Failed to create photo HTTP client");
+    }
+
+    std::string content_type = "multipart/form-data; boundary=" + boundary;
+    std::string device_id = SystemInfo::GetMacAddress();
+    std::string client_id = Board::GetInstance().GetUuid();
+    esp_http_client_set_method(http.get(), HTTP_METHOD_POST);
+    esp_http_client_set_header(http.get(), "Content-Type", content_type.c_str());
+    esp_http_client_set_header(http.get(), "Device-Id", device_id.c_str());
+    esp_http_client_set_header(http.get(), "Client-Id", client_id.c_str());
+    if (!explain_token_.empty()) {
+        std::string authorization = "Bearer " + explain_token_;
+        esp_http_client_set_header(http.get(), "Authorization", authorization.c_str());
+    }
+
+    size_t body_len = multipart_header.size() + jpeg_len + multipart_footer.size();
+    if (esp_http_client_open(http.get(), static_cast<int>(body_len)) != ESP_OK) {
+        throw std::runtime_error("Failed to connect to explain URL");
+    }
+    vTaskDelay(pdMS_TO_TICKS(15));
+
+    // The generic HTTP wrapper creates a 4 KB internal receive task. The IDF client is
+    // synchronous, so the camera worker's external stack handles both upload and reply.
+    const auto write_http = [&http](const char* data, size_t len) {
+        constexpr size_t kUploadChunkSize = 1024;
+        size_t offset = 0;
+        while (offset < len) {
+            size_t chunk_len = std::min(kUploadChunkSize, len - offset);
+            int written = esp_http_client_write(http.get(), data + offset,
+                                                static_cast<int>(chunk_len));
+            if (written <= 0) {
+                throw std::runtime_error("Failed to upload photo data");
+            }
+            offset += static_cast<size_t>(written);
+            // ESP-Hosted uses 1536-byte internal DMA blocks. Let the SDIO TX callback
+            // return each block before queuing the next one.
+            vTaskDelay(pdMS_TO_TICKS(15));
+        }
+    };
+
+    write_http(multipart_header.data(), multipart_header.size());
+    write_http(reinterpret_cast<const char*>(jpeg_data), jpeg_len);
+    write_http(multipart_footer.data(), multipart_footer.size());
+
+    if (esp_http_client_fetch_headers(http.get()) < 0) {
+        throw std::runtime_error("Failed to read photo response headers");
+    }
+    int status_code = esp_http_client_get_status_code(http.get());
+    if (status_code != 200) {
+        ESP_LOGE(TAG, "Failed to upload photo, status code: %d", status_code);
+        throw std::runtime_error("Failed to upload photo");
+    }
+
+    char response_buffer[512];
+    while (true) {
+        int read = esp_http_client_read(http.get(), response_buffer, sizeof(response_buffer));
+        if (read < 0) {
+            throw std::runtime_error("Failed to read photo response");
+        }
+        if (read == 0) {
+            break;
+        }
+        result.append(response_buffer, static_cast<size_t>(read));
+    }
+    esp_http_client_close(http.get());
+#else
     auto network = Board::GetInstance().GetNetwork();
     auto http = network->CreateHttp(3);
-    // 构造multipart/form-data请求体
-    std::string boundary = "----ESP32_CAMERA_BOUNDARY";
-
-    // 配置HTTP客户端，使用分块传输编码
     http->SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
     http->SetHeader("Client-Id", Board::GetInstance().GetUuid().c_str());
     if (!explain_token_.empty()) {
@@ -943,66 +1097,18 @@ std::string EspVideo::Explain(const std::string& question) {
     http->SetHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
     http->SetHeader("Transfer-Encoding", "chunked");
     if (!http->Open("POST", explain_url_)) {
-        ESP_LOGE(TAG, "Failed to connect to explain URL");
         throw std::runtime_error("Failed to connect to explain URL");
     }
 
-    const auto write_http = [&http](const char* data, size_t len, bool paced = false) {
-#ifdef CONFIG_ESP_HOSTED_ENABLED
-        constexpr size_t kUploadChunkSize = 1024;
-#else
-        constexpr size_t kUploadChunkSize = 4096;
-#endif
-        size_t offset = 0;
-
-        do {
-            size_t chunk_len = paced ? std::min(kUploadChunkSize, len - offset) : len;
-            int written = http->Write(data + offset, chunk_len);
-            if (written < 0 || (chunk_len > 0 && static_cast<size_t>(written) < chunk_len)) {
-                throw std::runtime_error("Failed to upload photo data");
-            }
-            offset += chunk_len;
-#ifdef CONFIG_ESP_HOSTED_ENABLED
-            if (paced && offset < len) {
-                // ESP-Hosted caches 1536-byte DMA blocks. Pacing lets the SDIO TX path
-                // return and reuse a small set instead of exhausting internal memory.
-                vTaskDelay(pdMS_TO_TICKS(10));
-            }
-#endif
-        } while (offset < len);
+    const auto write_http = [&http](const char* data, size_t len) {
+        int written = http->Write(data, len);
+        if (written < 0 || (len > 0 && static_cast<size_t>(written) < len)) {
+            throw std::runtime_error("Failed to upload photo data");
+        }
     };
-
-    {
-        // 第一块：question字段
-        std::string question_field;
-        question_field += "--" + boundary + "\r\n";
-        question_field += "Content-Disposition: form-data; name=\"question\"\r\n";
-        question_field += "\r\n";
-        question_field += question + "\r\n";
-        write_http(question_field.c_str(), question_field.size());
-    }
-    {
-        // 第二块：文件字段头部
-        std::string file_header;
-        file_header += "--" + boundary + "\r\n";
-        file_header += "Content-Disposition: form-data; name=\"file\"; filename=\"camera.jpg\"\r\n";
-        file_header += "Content-Type: image/jpeg\r\n";
-        file_header += "\r\n";
-        write_http(file_header.c_str(), file_header.size());
-    }
-
-    ESP_LOGI(TAG, "Photo upload start: jpeg=%u internal_free=%u largest=%u",
-             (unsigned)jpeg_len,
-             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
-             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
-    write_http(reinterpret_cast<const char*>(jpeg_data), jpeg_len, true);
-
-    {
-        // 第四块：multipart尾部
-        std::string multipart_footer;
-        multipart_footer += "\r\n--" + boundary + "--\r\n";
-        write_http(multipart_footer.c_str(), multipart_footer.size());
-    }
+    write_http(multipart_header.data(), multipart_header.size());
+    write_http(reinterpret_cast<const char*>(jpeg_data), jpeg_len);
+    write_http(multipart_footer.data(), multipart_footer.size());
     write_http("", 0);
 
     int status_code = http->GetStatusCode();
@@ -1010,13 +1116,12 @@ std::string EspVideo::Explain(const std::string& question) {
         ESP_LOGE(TAG, "Failed to upload photo, status code: %d", status_code);
         throw std::runtime_error("Failed to upload photo");
     }
-
-    std::string result = http->ReadAll();
+    result = http->ReadAll();
     http->Close();
+#endif
 
-    ESP_LOGI(TAG, "Photo upload done: internal_free=%u largest=%u",
-             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
-             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+    ESP_LOGI(TAG, "Photo upload done");
+    log_camera_memory("upload-done");
 
     // Get remain task stack size
     size_t remain_stack_size = uxTaskGetStackHighWaterMark(nullptr);

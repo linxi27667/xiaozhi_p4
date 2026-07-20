@@ -198,7 +198,7 @@ static void process_sensor(const std::string& payload) {
 
     uint16_t sensor_val = static_cast<uint16_t>(pkt->value) |
                           (static_cast<uint16_t>(pkt->reserved[0]) << 8);
-    ESP_LOGI(TAG, "Sensor: floor=%u type=%u val=%u",
+    ESP_LOGD(TAG, "Sensor: floor=%u type=%u val=%u",
              pkt->device_id, pkt->gpio_index, sensor_val);
     device_model_update_sensor_value(pkt->device_id, pkt->gpio_index, sensor_val);
 }

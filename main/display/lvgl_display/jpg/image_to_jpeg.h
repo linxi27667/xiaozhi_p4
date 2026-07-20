@@ -36,6 +36,13 @@ extern "C"
     typedef size_t (*jpg_out_cb)(void *arg, size_t index, const void *data, size_t len);
 
     /**
+     * @brief Initialize the hardware JPEG encoder while internal DMA memory is available.
+     *
+     * @return true if the encoder is ready, or when hardware JPEG is disabled.
+     */
+    bool image_to_jpeg_init(void);
+
+    /**
      * @brief 将图像格式高效转换为JPEG
      *
      * 这个函数使用优化的JPEG编码器进行编码，主要特点：
