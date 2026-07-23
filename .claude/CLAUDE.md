@@ -37,6 +37,11 @@ ESP32-P4 多媒体/AIoT 中控 + 三套 ESP32-S3 楼层从机。P4 运行小智�
 - 城市名与坐标统一维护在 `main/smart_home/services/weather_service.h`。
 - 天气卡资源名统一为 `weather_xiamen.png`，修改城市时需同步 UI、嵌入资源和中文字库。
 
+## 系统时间
+
+- POSIX 系统时钟保存 UTC Unix 时间戳，不得把服务器的 `timezone_offset` 预先加到 `settimeofday()` 输入。
+- 本地显示统一通过 `TZ=CST-8` 和 `localtime()` 转为北京时间，避免重复增加 8 小时。
+
 ## 设置面板硬件控制
 
 - 设置页通过 `smart_home/services/ui_device_settings` 桥接 C UI 与 C++ 板级驱动。
