@@ -75,6 +75,14 @@ list(APPEND INCLUDE_DIRS
     "smart_home/mcp"
 )
 
+if(CONFIG_IDF_TARGET_ESP32P4)
+    list(APPEND SOURCES
+        "smart_home/services/gesture_filter.cc"
+        "smart_home/services/gesture_mode.cc"
+        "smart_home/mcp/gesture_mcp_tool.cc"
+    )
+endif()
+
 # Add board common files
 list(APPEND SOURCES
     "boards/common/board.cc"

@@ -38,6 +38,12 @@ static int64_t now_ms(void)
     return esp_timer_get_time() / 1000;
 }
 
+static bool camera_foreground_active(void)
+{
+    auto* camera = Board::GetInstance().GetCamera();
+    return camera != nullptr && camera->IsForegroundCaptureActive();
+}
+
 static bool read_json_url(const char* url, std::string* out)
 {
     if (!url || !out) return false;
@@ -164,6 +170,18 @@ static bool fetch_weather(void)
         return false;
     }
 
+    // Photo capture and image analysis are user-facing and use the same hosted
+    // network link. If a photo request arrived while the forecast was loading,
+    // keep the forecast result and skip the optional air-quality TLS request
+    // for this refresh.
+    if (camera_foreground_active()) {
+        ESP_LOGI(TAG, "Photo request active; skipping air-quality refresh");
+        device_model_update_weather(WEATHER_LOCATION_NAME, sample.temp, sample.humidity,
+            sample.precipitation, sample.wind_speed, sample.weather_code,
+            0.0f, 0, false);
+        return true;
+    }
+
     body.clear();
     if (!read_json_url(air_url, &body) || !parse_air_quality(body, &sample)) {
         sample.air_valid = false;
@@ -193,6 +211,12 @@ extern "C" void weather_service_start(void)
 extern "C" void weather_service_poll(void)
 {
     if (!s_started || !wifi_manager_is_connected()) {
+        return;
+    }
+
+    // Do not begin a background TLS fetch while a foreground photo request is
+    // capturing, encoding, uploading, or waiting for its analysis response.
+    if (camera_foreground_active()) {
         return;
     }
 

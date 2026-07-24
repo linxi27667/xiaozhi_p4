@@ -1,6 +1,10 @@
 #include "page_scene.h"
+#include "sdkconfig.h"
 
 #include "../../services/auto_mode.h"
+#ifdef CONFIG_IDF_TARGET_ESP32P4
+#include "../../services/gesture_mode.h"
+#endif
 #include "mqtt_device_model.h"
 #include "mqtt_iot_protocol.h"
 #include "ui_asset_service.h"
@@ -23,6 +27,7 @@ static const char *TAG = "PAGE_SCENE";
 typedef enum {
     SCENE_ACTION_SCENE = 0,
     SCENE_ACTION_AUTO,
+    SCENE_ACTION_GESTURE,
 } scene_action_t;
 
 typedef struct {
@@ -70,6 +75,13 @@ static const scene_item_t s_scenes[] = {
       "\xE9\x9B\xA8\xE5\xA4\xA9", "Rain",
       "\xE8\x87\xAA\xE5\x8A\xA8\xE6\x94\xB6\xE8\xA1\xA3+\xE5\x85\xB3\xE9\x97\xAD\xE5\xA4\xA9\xE7\xAA\x97", "Auto collect + close skylights",
       0x3B82F6 },
+#ifdef CONFIG_IDF_TARGET_ESP32P4
+    /* Gesture mode entry (id=0xFE, not a real scene) */
+    { 0xFE,            SCENE_ACTION_GESTURE, ICON_CONTROL,  NULL,
+      "\xE6\x89\x8B\xE6\x8E\xA7\xE6\xA8\xA1\xE5\xBC\x8F", "Gesture",
+      "\xE5\x9C\xBA\xE6\x99\xAF\xE6\x89\x8B\xE6\x8E\xA7\xE8\x81\x94\xE5\x8A\xA8", "Touchless scene control",
+      0x0EA5E9 },
+#endif
     /* Auto mode toggle (id=0xFF, not a real scene) */
     { 0xFF,            SCENE_ACTION_AUTO,   ICON_SETTINGS,  NULL,
       "\xE8\x87\xAA\xE5\x8A\xA8", "Auto",
@@ -158,6 +170,10 @@ static void on_scene_click(lv_event_t *e)
 
     if (item->action == SCENE_ACTION_AUTO) {
         auto_mode_set_global(!auto_mode_get_global());
+#ifdef CONFIG_IDF_TARGET_ESP32P4
+    } else if (item->action == SCENE_ACTION_GESTURE) {
+        gesture_mode_start(GESTURE_START_TOUCH);
+#endif
     } else {
         mqtt_send_scene(item->id);
     }
@@ -197,6 +213,10 @@ static void refresh_scene(scene_ctx_t *ctx)
             active = (m->current_scene == item->id);
         } else if (item->action == SCENE_ACTION_AUTO) {
             active = auto_mode_get_global();
+#ifdef CONFIG_IDF_TARGET_ESP32P4
+        } else if (item->action == SCENE_ACTION_GESTURE) {
+            active = gesture_mode_is_active();
+#endif
         }
         set_card_active(ctx->cards[i].card, scene_accent(item), active);
     }

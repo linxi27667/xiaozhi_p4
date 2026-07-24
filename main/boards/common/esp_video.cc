@@ -37,9 +37,12 @@
 #endif  // CONFIG_XIAOZHI_ENABLE_CAMERA_DEBUG_MODE
 #include <esp_log.h> // should be after LOCAL_LOG_LEVEL definition
 
-#ifdef CONFIG_XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE
 #ifdef CONFIG_IDF_TARGET_ESP32P4
 #include "driver/ppa.h"
+#endif
+
+#ifdef CONFIG_XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE
+#ifdef CONFIG_IDF_TARGET_ESP32P4
 #if defined(CONFIG_XIAOZHI_CAMERA_IMAGE_ROTATION_ANGLE_90)
 #define IMAGE_ROTATION_ANGLE (PPA_SRM_ROTATION_ANGLE_270)
 #elif defined(CONFIG_XIAOZHI_CAMERA_IMAGE_ROTATION_ANGLE_270)
@@ -217,10 +220,8 @@ EspVideo::EspVideo(const esp_video_init_config_t& config) {
 
     struct v4l2_format setformat = {};
     setformat.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-#ifdef CONFIG_XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE
     sensor_width_ = format.fmt.pix.width;
     sensor_height_ = format.fmt.pix.height;
-#endif  // CONFIG_XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE
     setformat.fmt.pix.width = format.fmt.pix.width;
     setformat.fmt.pix.height = format.fmt.pix.height;
 
@@ -411,6 +412,12 @@ EspVideo::EspVideo(const esp_video_init_config_t& config) {
 }
 
 EspVideo::~EspVideo() {
+#ifdef CONFIG_IDF_TARGET_ESP32P4
+    if (scaled_capture_ppa_client_ != nullptr) {
+        (void)ppa_unregister_client(scaled_capture_ppa_client_);
+        scaled_capture_ppa_client_ = nullptr;
+    }
+#endif
     if (streaming_on_ && video_fd_ >= 0) {
         int type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         ioctl(video_fd_, VIDIOC_STREAMOFF, &type);
@@ -434,6 +441,7 @@ void EspVideo::SetExplainUrl(const std::string& url, const std::string& token) {
 }
 
 bool EspVideo::Capture() {
+    ForegroundCaptureGuard foreground_guard(foreground_capture_requests_);
     std::lock_guard<std::mutex> capture_lock(capture_mutex_);
     log_camera_memory("capture-start");
 
@@ -944,6 +952,7 @@ bool EspVideo::SetVFlip(bool enabled) {
  * @warning 如果摄像头缓冲区为空或网络连接失败，将返回错误信息
  */
 std::string EspVideo::Explain(const std::string& question) {
+    ForegroundCaptureGuard foreground_guard(foreground_capture_requests_);
     if (explain_url_.empty()) {
         throw std::runtime_error("Image explain URL or token is not set");
     }
@@ -1131,6 +1140,7 @@ std::string EspVideo::Explain(const std::string& question) {
 }
 
 bool EspVideo::CaptureFrame(CapturedFrame& frame) {
+    ForegroundCaptureGuard foreground_guard(foreground_capture_requests_);
     std::lock_guard<std::mutex> capture_lock(capture_mutex_);
 
     frame = {};
@@ -1246,4 +1256,130 @@ bool EspVideo::CaptureFrame(CapturedFrame& frame) {
 
     ESP_LOGE(TAG, "CaptureFrame: no complete frame after retries");
     return false;
+}
+
+EspVideo::ScaledCaptureResult EspVideo::TryCaptureScaledRgb565(
+    uint8_t* output, size_t output_len, int output_width, int output_height) {
+#ifndef CONFIG_IDF_TARGET_ESP32P4
+    (void)output;
+    (void)output_len;
+    (void)output_width;
+    (void)output_height;
+    return ScaledCaptureResult::UnsupportedFormat;
+#else
+    if (output == nullptr || output_width <= 0 || output_height <= 0) {
+        return ScaledCaptureResult::InvalidArgument;
+    }
+
+    const size_t required_output_len =
+        static_cast<size_t>(output_width) * static_cast<size_t>(output_height) * 2;
+    if (output_len < required_output_len || (reinterpret_cast<uintptr_t>(output) & 0x3F) != 0) {
+        return ScaledCaptureResult::InvalidArgument;
+    }
+    if (!streaming_on_ || video_fd_ < 0) {
+        return ScaledCaptureResult::NotReady;
+    }
+    if (sensor_format_ != V4L2_PIX_FMT_RGB565) {
+        return ScaledCaptureResult::UnsupportedFormat;
+    }
+    if (foreground_capture_requests_.load(std::memory_order_acquire) != 0) {
+        return ScaledCaptureResult::Busy;
+    }
+
+    std::unique_lock<std::mutex> capture_lock(capture_mutex_, std::try_to_lock);
+    if (!capture_lock.owns_lock() ||
+        foreground_capture_requests_.load(std::memory_order_acquire) != 0) {
+        return ScaledCaptureResult::Busy;
+    }
+
+    const size_t row_len = static_cast<size_t>(sensor_width_) * 2;
+    const size_t source_stride = std::max(sensor_stride_, row_len);
+    if (sensor_width_ == 0 || sensor_height_ == 0 || source_stride % 2 != 0) {
+        return ScaledCaptureResult::Error;
+    }
+
+    if (scaled_capture_ppa_client_ == nullptr) {
+        ppa_client_config_t client_config = {
+            .oper_type = PPA_OPERATION_SRM,
+            .max_pending_trans_num = 1,
+        };
+        esp_err_t err = ppa_register_client(&client_config, &scaled_capture_ppa_client_);
+        if (err != ESP_OK || scaled_capture_ppa_client_ == nullptr) {
+            ESP_LOGE(TAG, "Gesture capture: PPA client registration failed: %s",
+                     esp_err_to_name(err));
+            scaled_capture_ppa_client_ = nullptr;
+            return ScaledCaptureResult::Error;
+        }
+    }
+
+    struct v4l2_buffer buffer = {};
+    buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    buffer.memory = V4L2_MEMORY_MMAP;
+    if (ioctl(video_fd_, VIDIOC_DQBUF, &buffer) != 0) {
+        ESP_LOGW(TAG, "Gesture capture: VIDIOC_DQBUF failed, errno=%d", errno);
+        return ScaledCaptureResult::Error;
+    }
+
+    const auto requeue = [this, &buffer]() {
+        if (ioctl(video_fd_, VIDIOC_QBUF, &buffer) != 0) {
+            ESP_LOGE(TAG, "Gesture capture: VIDIOC_QBUF failed, errno=%d", errno);
+            return false;
+        }
+        return true;
+    };
+
+    if (buffer.index >= mmap_buffers_.size()) {
+        ESP_LOGE(TAG, "Gesture capture: invalid MMAP index %lu",
+                 static_cast<unsigned long>(buffer.index));
+        (void)requeue();
+        return ScaledCaptureResult::Error;
+    }
+
+    const auto& mmap_buffer = mmap_buffers_[buffer.index];
+    const size_t required_source_len = source_stride * sensor_height_;
+    const size_t available_len = buffer.bytesused > 0 ? buffer.bytesused : mmap_buffer.length;
+    if (mmap_buffer.start == nullptr || mmap_buffer.length < required_source_len ||
+        available_len < required_source_len) {
+        ESP_LOGW(TAG, "Gesture capture: incomplete frame bytes=%u required=%u mmap=%u",
+                 static_cast<unsigned>(available_len),
+                 static_cast<unsigned>(required_source_len),
+                 static_cast<unsigned>(mmap_buffer.length));
+        (void)requeue();
+        return ScaledCaptureResult::Error;
+    }
+
+    ppa_srm_oper_config_t operation = {};
+    operation.in.buffer = mmap_buffer.start;
+    operation.in.pic_w = source_stride / 2;
+    operation.in.pic_h = sensor_height_;
+    operation.in.block_w = sensor_width_;
+    operation.in.block_h = sensor_height_;
+    operation.in.block_offset_x = 0;
+    operation.in.block_offset_y = 0;
+    operation.in.srm_cm = PPA_SRM_COLOR_MODE_RGB565;
+    operation.out.buffer = output;
+    operation.out.buffer_size = required_output_len;
+    operation.out.pic_w = output_width;
+    operation.out.pic_h = output_height;
+    operation.out.block_offset_x = 0;
+    operation.out.block_offset_y = 0;
+    operation.out.srm_cm = PPA_SRM_COLOR_MODE_RGB565;
+    operation.rotation_angle = PPA_SRM_ROTATION_ANGLE_0;
+    operation.scale_x = static_cast<float>(output_width) / sensor_width_;
+    operation.scale_y = static_cast<float>(output_height) / sensor_height_;
+#ifdef CONFIG_XIAOZHI_ENABLE_CAMERA_ENDIANNESS_SWAP
+    operation.byte_swap = true;
+#endif
+    operation.mode = PPA_TRANS_MODE_BLOCKING;
+
+    const esp_err_t ppa_result =
+        ppa_do_scale_rotate_mirror(scaled_capture_ppa_client_, &operation);
+    const bool requeued = requeue();
+    if (ppa_result != ESP_OK || !requeued) {
+        ESP_LOGW(TAG, "Gesture capture: PPA scale failed: %s",
+                 esp_err_to_name(ppa_result));
+        return ScaledCaptureResult::Error;
+    }
+    return ScaledCaptureResult::Ok;
+#endif
 }

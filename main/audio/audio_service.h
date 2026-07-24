@@ -1,6 +1,7 @@
 #ifndef AUDIO_SERVICE_H
 #define AUDIO_SERVICE_H
 
+#include <atomic>
 #include <memory>
 #include <deque>
 #include <condition_variable>
@@ -113,7 +114,9 @@ public:
     void EncodeWakeWord();
     std::unique_ptr<AudioStreamPacket> PopWakeWordPacket();
     const std::string& GetLastWakeWord() const;
-    bool IsVoiceDetected() const { return voice_detected_; }
+    bool IsVoiceDetected() const {
+        return voice_detected_.load(std::memory_order_acquire);
+    }
     bool IsIdle();
     void WaitForPlaybackQueueEmpty();
     bool IsWakeWordRunning() const { return xEventGroupGetBits(event_group_) & AS_EVENT_WAKE_WORD_RUNNING; }
@@ -124,6 +127,8 @@ public:
     void EnableVoiceProcessing(bool enable);
     void EnableAudioTesting(bool enable);
     void EnableDeviceAec(bool enable);
+    void SetAudioPowerManagementPaused(bool paused);
+    bool RecoverOutputPath();
 
     void SetCallbacks(AudioServiceCallbacks& callbacks);
 
@@ -176,9 +181,12 @@ private:
 
     bool wake_word_initialized_ = false;
     bool audio_processor_initialized_ = false;
-    bool voice_detected_ = false;
+    std::atomic_bool voice_detected_{false};
     bool service_stopped_ = true;
     bool audio_input_need_warmup_ = false;
+    std::atomic_bool audio_power_management_paused_{false};
+    std::atomic_uint8_t output_recovery_probe_frames_{0};
+    std::atomic_int32_t output_recovery_max_peak_{0};
 
     esp_timer_handle_t audio_power_timer_ = nullptr;
     std::chrono::steady_clock::time_point last_input_time_;
@@ -189,6 +197,7 @@ private:
     void OpusCodecTask();
     void PushTaskToEncodeQueue(AudioTaskType type, std::vector<int16_t>&& pcm);
     void SetDecodeSampleRate(int sample_rate, int frame_duration);
+    void RestartAudioPowerTimer();
     void CheckAndUpdateAudioPowerState();
 };
 

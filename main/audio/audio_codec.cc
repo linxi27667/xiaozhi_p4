@@ -5,6 +5,7 @@
 #include <esp_log.h>
 #include <cstring>
 #include <driver/i2s_common.h>
+#include <freertos/task.h>
 
 #define TAG "AudioCodec"
 
@@ -24,6 +25,15 @@ bool AudioCodec::InputData(std::vector<int16_t>& data) {
         return true;
     }
     return false;
+}
+
+bool AudioCodec::RecoverOutput() {
+    if (output_enabled_) {
+        EnableOutput(false);
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+    EnableOutput(true);
+    return output_enabled_;
 }
 
 void AudioCodec::Start() {

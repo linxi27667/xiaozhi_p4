@@ -12,6 +12,10 @@
 #include "smart_home_tasks.h"
 #include "smart_home_mcp_tool.h"
 #include "smart_home/mcp/face_mcp_tool.h"
+#ifdef CONFIG_IDF_TARGET_ESP32P4
+#include "smart_home/mcp/gesture_mcp_tool.h"
+#include "smart_home/services/gesture_mode.h"
+#endif
 #include "smart_home/ui/model/mqtt_device_model.h"
 #include "smart_home/ui/core/ui_events.h"
 #include "smart_home/ui/services/login_ui.h"
@@ -445,6 +449,14 @@ void Application::Initialize() {
     // Add state change listeners
     state_machine_.AddStateChangeListener([this](DeviceState old_state, DeviceState new_state) {
         xEventGroupSetBits(event_group_, MAIN_EVENT_STATE_CHANGED);
+#ifdef CONFIG_IDF_TARGET_ESP32P4
+        if (new_state == kDeviceStateLocked ||
+            new_state == kDeviceStateStarting ||
+            new_state == kDeviceStateUpgrading ||
+            new_state == kDeviceStateFatalError) {
+            gesture_mode_stop(GESTURE_STOP_CRITICAL_STATE);
+        }
+#endif
     });
 
     // Start the clock timer to update the status bar
@@ -456,6 +468,12 @@ void Application::Initialize() {
     mcp_server.AddUserOnlyTools();
     SmartHomeMcp_RegisterTools();
     FaceMcp_RegisterTools();
+#ifdef CONFIG_IDF_TARGET_ESP32P4
+    GestureMcp_RegisterTools();
+    if (!gesture_mode_init()) {
+        ESP_LOGE(TAG, "Gesture mode worker initialization failed");
+    }
+#endif
 
     login_ui_init();
     ui_event_subscribe(UI_EVENT_LOGIN_SUCCESS, on_login_success_event, NULL);
@@ -616,9 +634,14 @@ void Application::Run() {
         }
 
         if (bits & MAIN_EVENT_SEND_AUDIO) {
-            while (auto packet = audio_service_.PopPacketFromSendQueue()) {
-                if (protocol_ && !protocol_->SendAudio(std::move(packet))) {
-                    break;
+            if (gesture_exclusive_requested_.load(std::memory_order_acquire)) {
+                while (audio_service_.PopPacketFromSendQueue()) {
+                }
+            } else {
+                while (auto packet = audio_service_.PopPacketFromSendQueue()) {
+                    if (protocol_ && !protocol_->SendAudio(std::move(packet))) {
+                        break;
+                    }
                 }
             }
         }
@@ -928,6 +951,14 @@ void Application::InitializeProtocol() {
             auto state = cJSON_GetObjectItem(root, "state");
             if (strcmp(state->valuestring, "start") == 0) {
                 Schedule([this]() {
+                    // A gesture MCP request may close the audio channel before
+                    // a delayed TTS start arrives. Do not let that stale event
+                    // revive online audio after the exclusive mode is ready.
+                    if (gesture_exclusive_requested_.load(std::memory_order_acquire) &&
+                        GetDeviceState() != kDeviceStateSpeaking) {
+                        ESP_LOGI(TAG, "Ignoring delayed TTS start in gesture exclusive mode");
+                        return;
+                    }
                     aborted_ = false;
                     SetDeviceState(kDeviceStateSpeaking);
                 });
@@ -1074,6 +1105,108 @@ void Application::StopListening() {
     xEventGroupSetBits(event_group_, MAIN_EVENT_STOP_LISTENING);
 }
 
+void Application::RequestGestureExclusiveMode() {
+    gesture_exclusive_ready_.store(false, std::memory_order_release);
+    const bool already_requested =
+        gesture_exclusive_requested_.exchange(true, std::memory_order_acq_rel);
+    if (already_requested) {
+        return;
+    }
+
+    Schedule([this]() {
+        HandleGestureExclusiveRequest();
+    });
+}
+
+void Application::ReleaseGestureExclusiveMode() {
+    const bool was_requested =
+        gesture_exclusive_requested_.exchange(false, std::memory_order_acq_rel);
+    gesture_exclusive_ready_.store(false, std::memory_order_release);
+    if (!was_requested) {
+        return;
+    }
+
+    Schedule([this]() {
+        if (gesture_exclusive_requested_.load(std::memory_order_acquire)) {
+            return;
+        }
+
+        const bool restore_assistant = GetDeviceState() == kDeviceStateIdle;
+        if (restore_assistant) {
+            audio_service_.EnableVoiceProcessing(false);
+            audio_service_.EnableWakeWordDetection(false);
+            audio_service_.ResetDecoder();
+            // Keep the duplex I2S/DMA driver alive and restore only the ES8311
+            // codec state before the local cue. Reopening or directly toggling
+            // the TX channel desynchronizes esp_codec_dev on ESP32-P4.
+            audio_service_.RecoverOutputPath();
+            audio_service_.PlaySound(Lang::Sounds::OGG_POPUP);
+            audio_service_.EnableWakeWordDetection(true);
+        }
+        // Critical-state exits (for example, locking the device) do not
+        // restore voice immediately, but must still release this pause.
+        audio_service_.SetAudioPowerManagementPaused(false);
+        if (restore_assistant) {
+            auto &board = Board::GetInstance();
+            board.GetLed()->OnStateChanged();
+            auto display = board.GetDisplay();
+            display->SetStatus(Lang::Strings::STANDBY);
+            display->ClearChatMessages();
+            display->SetEmotion("neutral");
+            ESP_LOGI(TAG, "Gesture exclusive mode released; assistant restored");
+        }
+    });
+}
+
+void Application::HandleGestureExclusiveRequest() {
+    if (!gesture_exclusive_requested_.load(std::memory_order_acquire)) {
+        return;
+    }
+
+    const DeviceState state = GetDeviceState();
+    if (state == kDeviceStateSpeaking || state == kDeviceStateConnecting) {
+        ESP_LOGI(TAG, "Gesture exclusive mode waiting for assistant audio to finish");
+        return;
+    }
+
+    if (state == kDeviceStateListening) {
+        // A TTS stop message can arrive before the final PCM frame is played.
+        // Finish that sentence before taking audio and PSRAM away from Xiaozhi.
+        audio_service_.WaitForPlaybackQueueEmpty();
+        audio_service_.EnableVoiceProcessing(false);
+        audio_service_.EnableWakeWordDetection(false);
+        while (audio_service_.PopPacketFromSendQueue()) {
+        }
+        if (protocol_ && protocol_->IsAudioChannelOpened()) {
+            protocol_->CloseAudioChannel();
+        }
+        SetDeviceState(kDeviceStateIdle);
+        return;
+    }
+
+    if (state != kDeviceStateIdle) {
+        ESP_LOGI(TAG, "Gesture exclusive mode waiting for idle state (current=%s)",
+                 DeviceStateMachine::GetStateName(state));
+        return;
+    }
+
+    audio_service_.WaitForPlaybackQueueEmpty();
+    audio_service_.EnableVoiceProcessing(false);
+    audio_service_.EnableWakeWordDetection(false);
+    while (audio_service_.PopPacketFromSendQueue()) {
+    }
+    if (protocol_ && protocol_->IsAudioChannelOpened()) {
+        protocol_->CloseAudioChannel();
+    }
+    // Keep the already-open ES8311/I2S paths alive while gesture inference
+    // owns the UI. Reopening them after the power timer closes both paths is
+    // unreliable on ESP32-P4 and can leave later TTS permanently silent.
+    audio_service_.SetAudioPowerManagementPaused(true);
+    Board::GetInstance().GetLed()->OnStateChanged();
+    gesture_exclusive_ready_.store(true, std::memory_order_release);
+    ESP_LOGI(TAG, "Gesture exclusive mode ready; assistant audio is offline");
+}
+
 void Application::LockDevice() {
     ESP_LOGI(TAG, "Locking device");
     if (SetDeviceState(kDeviceStateLocked)) {
@@ -1136,6 +1269,11 @@ void Application::OnLoginSuccess() {
 
 void Application::HandleToggleChatEvent() {
     auto state = GetDeviceState();
+
+    if (gesture_exclusive_requested_.load(std::memory_order_acquire)) {
+        ESP_LOGI(TAG, "Ignoring chat toggle while gesture exclusive mode is active");
+        return;
+    }
     
     // 锁定状态下阻止所有交互
     if (state == kDeviceStateLocked) {
@@ -1196,6 +1334,11 @@ void Application::ContinueOpenAudioChannel(ListeningMode mode) {
 
 void Application::HandleStartListeningEvent() {
     auto state = GetDeviceState();
+
+    if (gesture_exclusive_requested_.load(std::memory_order_acquire)) {
+        ESP_LOGI(TAG, "Ignoring listening request while gesture exclusive mode is active");
+        return;
+    }
     
     if (state == kDeviceStateActivating) {
         SetDeviceState(kDeviceStateIdle);
@@ -1243,6 +1386,11 @@ void Application::HandleStopListeningEvent() {
 }
 
 void Application::HandleWakeWordDetectedEvent() {
+    if (gesture_exclusive_requested_.load(std::memory_order_acquire)) {
+        ESP_LOGI(TAG, "Ignoring wake word while gesture exclusive mode is active");
+        return;
+    }
+
     if (!protocol_) {
         return;
     }
@@ -1330,6 +1478,12 @@ void Application::ContinueWakeWordInvoke(const std::string& wake_word) {
 void Application::HandleStateChangedEvent() {
     DeviceState new_state = state_machine_.GetState();
     clock_ticks_ = 0;
+
+    if (gesture_exclusive_requested_.load(std::memory_order_acquire) &&
+        (new_state == kDeviceStateListening || new_state == kDeviceStateIdle)) {
+        HandleGestureExclusiveRequest();
+        return;
+    }
 
     auto& board = Board::GetInstance();
     auto display = board.GetDisplay();

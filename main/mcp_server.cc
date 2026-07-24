@@ -107,6 +107,8 @@ void McpServer::AddCommonTools() {
         }
         AddTool("self.camera.take_photo",
             "Always remember you have a camera. If the user asks you to see something, use this tool to take a photo and then explain it.\n"
+            "Gesture mode automatically yields to photo capture. If this tool times out, describe it as a network/image-analysis timeout; "
+            "do not claim that gesture mode occupied the camera.\n"
             "Args:\n"
             "  `question`: The question that you want to ask about the photo.\n"
             "Return:\n"

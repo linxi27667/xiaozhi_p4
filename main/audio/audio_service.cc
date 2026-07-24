@@ -1,5 +1,6 @@
 #include "audio_service.h"
 #include <esp_log.h>
+#include <algorithm>
 #include <cstring>
 
 #define RATE_CVT_CFG(_src_rate, _dest_rate, _channel)        \
@@ -103,7 +104,7 @@ void AudioService::Initialize(AudioCodec* codec) {
     });
 
     audio_processor_->OnVadStateChange([this](bool speaking) {
-        voice_detected_ = speaking;
+        voice_detected_.store(speaking, std::memory_order_release);
         if (callbacks_.on_vad_change) {
             callbacks_.on_vad_change(speaking);
         }
@@ -126,7 +127,7 @@ void AudioService::Start() {
     service_stopped_ = false;
     xEventGroupClearBits(event_group_, AS_EVENT_AUDIO_TESTING_RUNNING | AS_EVENT_WAKE_WORD_RUNNING | AS_EVENT_AUDIO_PROCESSOR_RUNNING);
 
-    esp_timer_start_periodic(audio_power_timer_, 1000000);
+    RestartAudioPowerTimer();
 
 #if CONFIG_USE_AUDIO_PROCESSOR
     /* Start the audio input task */
@@ -183,8 +184,7 @@ void AudioService::Stop() {
 
 bool AudioService::ReadAudioData(std::vector<int16_t>& data, int sample_rate, int samples) {
     if (!codec_->input_enabled()) {
-        esp_timer_stop(audio_power_timer_);
-        esp_timer_start_periodic(audio_power_timer_, AUDIO_POWER_CHECK_INTERVAL_MS * 1000);
+        RestartAudioPowerTimer();
         codec_->EnableInput(true);
     }
 
@@ -301,9 +301,44 @@ void AudioService::AudioOutputTask() {
         lock.unlock();
 
         if (!codec_->output_enabled()) {
-            esp_timer_stop(audio_power_timer_);
-            esp_timer_start_periodic(audio_power_timer_, AUDIO_POWER_CHECK_INTERVAL_MS * 1000);
+            RestartAudioPowerTimer();
             codec_->EnableOutput(true);
+        }
+
+        const uint8_t recovery_probe_frames =
+            output_recovery_probe_frames_.load(std::memory_order_acquire);
+        if (recovery_probe_frames > 0) {
+            int32_t peak = 0;
+            for (const int16_t sample : task->pcm) {
+                int32_t magnitude = static_cast<int32_t>(sample);
+                if (magnitude < 0) {
+                    magnitude = -magnitude;
+                }
+                peak = std::max(peak, magnitude);
+            }
+            int32_t previous_peak =
+                output_recovery_max_peak_.load(std::memory_order_relaxed);
+            while (peak > previous_peak &&
+                   !output_recovery_max_peak_.compare_exchange_weak(
+                       previous_peak, peak, std::memory_order_relaxed)) {
+            }
+
+            const uint8_t remaining =
+                output_recovery_probe_frames_.fetch_sub(
+                    1, std::memory_order_acq_rel);
+            if (remaining == 8) {
+                ESP_LOGI(TAG,
+                         "PCM recovery probe started: samples=%u first_peak=%ld",
+                         static_cast<unsigned>(task->pcm.size()),
+                         static_cast<long>(peak));
+            }
+            if (remaining == 1) {
+                ESP_LOGI(
+                    TAG,
+                    "PCM recovery probe complete: frames=8 max_peak=%ld",
+                    static_cast<long>(
+                        output_recovery_max_peak_.load(std::memory_order_acquire)));
+            }
         }
 
         codec_->OutputData(task->pcm);
@@ -632,8 +667,7 @@ void AudioService::SetCallbacks(AudioServiceCallbacks& callbacks) {
 
 void AudioService::PlaySound(const std::string_view& ogg) {
     if (!codec_->output_enabled()) {
-        esp_timer_stop(audio_power_timer_);
-        esp_timer_start_periodic(audio_power_timer_, AUDIO_POWER_CHECK_INTERVAL_MS * 1000);
+        RestartAudioPowerTimer();
         codec_->EnableOutput(true);
     }
 
@@ -679,7 +713,47 @@ void AudioService::ResetDecoder() {
     audio_queue_cv_.notify_all();
 }
 
+void AudioService::SetAudioPowerManagementPaused(bool paused) {
+    const bool previous =
+        audio_power_management_paused_.exchange(paused, std::memory_order_acq_rel);
+    if (previous == paused) {
+        return;
+    }
+    if (paused) {
+        esp_timer_stop(audio_power_timer_);
+    } else {
+        const auto now = std::chrono::steady_clock::now();
+        last_input_time_ = now;
+        last_output_time_ = now;
+        RestartAudioPowerTimer();
+    }
+    ESP_LOGI(TAG, "Audio power management %s",
+             paused ? "paused" : "resumed");
+}
+
+bool AudioService::RecoverOutputPath() {
+    const bool recovered = codec_->RecoverOutput();
+    output_recovery_max_peak_.store(0, std::memory_order_relaxed);
+    output_recovery_probe_frames_.store(8, std::memory_order_release);
+    last_output_time_ = std::chrono::steady_clock::now();
+    ESP_LOGI(TAG, "Output path recovery requested: %s",
+             recovered ? "ready" : "degraded");
+    return recovered;
+}
+
+void AudioService::RestartAudioPowerTimer() {
+    if (audio_power_management_paused_.load(std::memory_order_acquire)) {
+        return;
+    }
+    esp_timer_stop(audio_power_timer_);
+    esp_timer_start_periodic(
+        audio_power_timer_, AUDIO_POWER_CHECK_INTERVAL_MS * 1000);
+}
+
 void AudioService::CheckAndUpdateAudioPowerState() {
+    if (audio_power_management_paused_.load(std::memory_order_acquire)) {
+        return;
+    }
     auto now = std::chrono::steady_clock::now();
     auto input_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_input_time_).count();
     auto output_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_output_time_).count();

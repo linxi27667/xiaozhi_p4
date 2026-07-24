@@ -73,6 +73,19 @@ dependencies:
     rules:
     - if: target in [esp32p4]
 
+  # 按需启用的手势控制模式(仅 P4 使用)
+  # ESP-DL 3.3.0 只能加载 PER_TENSOR 模型。0.2.0 的 P4 模型改为
+  # PER_CHANNEL 后会在建图阶段崩溃，因此将接口兼容的两套模型固定在
+  # 最后的 PER_TENSOR 版本；不要放宽为 ^ 或 ~。
+  espressif/hand_detect:
+    version: '==0.1.1'
+    rules:
+    - if: target in [esp32p4]
+  espressif/hand_gesture_recognition:
+    version: '==0.1.2'
+    rules:
+    - if: target in [esp32p4]
+
   # SenseCAP Watcher Board
   wvirgil123/sscma_client:
     version: 1.0.2

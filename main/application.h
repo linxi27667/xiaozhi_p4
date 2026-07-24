@@ -104,6 +104,17 @@ public:
      */
     void StopListening();
 
+    /**
+     * Hand control uses an exclusive offline window on ESP32-P4. These
+     * methods are thread-safe and keep all protocol/audio mutations in the
+     * main application task.
+     */
+    void RequestGestureExclusiveMode();
+    void ReleaseGestureExclusiveMode();
+    bool IsGestureExclusiveModeReady() const {
+        return gesture_exclusive_ready_.load(std::memory_order_acquire);
+    }
+
     void Reboot();
     void WakeWordInvoke(const std::string& wake_word);
     bool UpgradeFirmware(const std::string& url, const std::string& version = "");
@@ -151,6 +162,8 @@ private:
     bool network_ready_ = false;
     bool play_popup_on_listening_ = false;  // Flag to play popup sound after state changes to listening
     std::atomic_bool login_completion_claimed_{false};
+    std::atomic_bool gesture_exclusive_requested_{false};
+    std::atomic_bool gesture_exclusive_ready_{false};
     int clock_ticks_ = 0;
     TaskHandle_t activation_task_handle_ = nullptr;
 
@@ -164,6 +177,7 @@ private:
     void HandleNetworkDisconnectedEvent();
     void HandleActivationDoneEvent();
     void HandleWakeWordDetectedEvent();
+    void HandleGestureExclusiveRequest();
     void ContinueOpenAudioChannel(ListeningMode mode);
     void ContinueWakeWordInvoke(const std::string& wake_word);
 

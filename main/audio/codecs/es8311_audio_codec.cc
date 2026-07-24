@@ -1,6 +1,8 @@
 #include "es8311_audio_codec.h"
 
+#include <array>
 #include <esp_log.h>
+#include <freertos/task.h>
 
 #define TAG "Es8311AudioCodec"
 
@@ -182,6 +184,120 @@ void Es8311AudioCodec::EnableOutput(bool enable) {
     }
     AudioCodec::EnableOutput(enable);
     UpdateDeviceState();
+}
+
+bool Es8311AudioCodec::RecoverOutput() {
+    std::lock_guard<std::mutex> lock(data_if_mutex_);
+    if (codec_if_ == nullptr) {
+        ESP_LOGE(TAG, "Cannot recover output: codec interface is unavailable");
+        return false;
+    }
+
+    if (!output_enabled_) {
+        AudioCodec::EnableOutput(true);
+        UpdateDeviceState();
+    }
+    if (dev_ == nullptr || tx_handle_ == nullptr) {
+        ESP_LOGE(TAG, "Cannot recover output: codec device or TX channel is unavailable");
+        return false;
+    }
+
+    bool was_muted = false;
+    const int get_mute_ret = esp_codec_dev_get_out_mute(dev_, &was_muted);
+    int reported_volume = -1;
+    const int get_volume_ret =
+        esp_codec_dev_get_out_vol(dev_, &reported_volume);
+
+    // Gesture inference leaves the duplex I2S driver open. Resetting that
+    // driver behind esp_codec_dev causes its data interface and the real
+    // channel state to diverge. Restart only the ES8311 and then restore its
+    // format/settings while the audio producer tasks are stopped.
+    if (pa_pin_ != GPIO_NUM_NC) {
+        gpio_set_level(pa_pin_, pa_inverted_ ? 1 : 0);
+    }
+
+    i2s_chan_info_t tx_info = {};
+    const esp_err_t info_ret = i2s_channel_get_info(tx_handle_, &tx_info);
+    const int codec_disable_ret =
+        codec_if_->enable != nullptr
+            ? codec_if_->enable(codec_if_, false)
+            : ESP_CODEC_DEV_NOT_SUPPORT;
+    vTaskDelay(pdMS_TO_TICKS(10));
+
+    esp_codec_dev_sample_info_t sample_info = {
+        .bits_per_sample = 16,
+        .channel = 1,
+        .channel_mask = 0,
+        .sample_rate = static_cast<uint32_t>(output_sample_rate_),
+        .mclk_multiple = 0,
+    };
+    const int format_ret =
+        codec_if_->set_fs != nullptr
+            ? codec_if_->set_fs(codec_if_, &sample_info)
+            : ESP_CODEC_DEV_NOT_SUPPORT;
+    const int codec_enable_ret =
+        codec_if_->enable != nullptr
+            ? codec_if_->enable(codec_if_, true)
+            : ESP_CODEC_DEV_NOT_SUPPORT;
+
+    const int unmute_ret = esp_codec_dev_set_out_mute(dev_, false);
+    const int volume_ret = esp_codec_dev_set_out_vol(dev_, output_volume_);
+    const int input_gain_ret =
+        input_enabled_ ? esp_codec_dev_set_in_gain(dev_, input_gain_)
+                       : ESP_CODEC_DEV_OK;
+    std::array<int16_t, AUDIO_CODEC_DMA_FRAME_NUM> silence = {};
+    const int prime_ret =
+        esp_codec_dev_write(dev_, silence.data(), sizeof(silence));
+
+    if (pa_pin_ != GPIO_NUM_NC) {
+        gpio_set_level(pa_pin_, pa_inverted_ ? 0 : 1);
+    }
+    vTaskDelay(pdMS_TO_TICKS(30));
+
+    int dac_control_reg = -1;
+    int dac_volume_reg = -1;
+    const int dac_control_ret =
+        esp_codec_dev_read_reg(dev_, 0x31, &dac_control_reg);
+    const int dac_volume_ret =
+        esp_codec_dev_read_reg(dev_, 0x32, &dac_volume_reg);
+    const int pa_level =
+        pa_pin_ != GPIO_NUM_NC ? gpio_get_level(pa_pin_) : -1;
+    const bool tx_ready = info_ret == ESP_OK && tx_info.is_enabled;
+    const bool recovered =
+        tx_ready &&
+        codec_disable_ret == ESP_CODEC_DEV_OK &&
+        format_ret == ESP_CODEC_DEV_OK &&
+        codec_enable_ret == ESP_CODEC_DEV_OK &&
+        unmute_ret == ESP_CODEC_DEV_OK &&
+        volume_ret == ESP_CODEC_DEV_OK &&
+        input_gain_ret == ESP_CODEC_DEV_OK &&
+        prime_ret == ESP_CODEC_DEV_OK;
+    ESP_LOGI(TAG,
+             "Output recovery %s: mute_before=%s mute_read=%d "
+             "volume_before=%d volume_read=%d tx_info=%s tx_enabled=%s "
+             "codec_disable=%d format=%d codec_enable=%d unmute=%d "
+             "volume=%d gain=%d prime=%d reg31=%d/%02x reg32=%d/%02x "
+             "pa=%d",
+             recovered ? "complete" : "degraded",
+             was_muted ? "true" : "false",
+             get_mute_ret,
+             reported_volume,
+             get_volume_ret,
+             esp_err_to_name(info_ret),
+             tx_info.is_enabled ? "true" : "false",
+             codec_disable_ret,
+             format_ret,
+             codec_enable_ret,
+             unmute_ret,
+             volume_ret,
+             input_gain_ret,
+             prime_ret,
+             dac_control_ret,
+             static_cast<unsigned>(dac_control_reg) & 0xFFU,
+             dac_volume_ret,
+             static_cast<unsigned>(dac_volume_reg) & 0xFFU,
+             pa_level);
+    return recovered;
 }
 
 int Es8311AudioCodec::Read(int16_t* dest, int samples) {

@@ -14,8 +14,28 @@
 #include "jpg/image_to_jpeg.h"
 #include "esp_video_init.h"
 
+#ifdef CONFIG_IDF_TARGET_ESP32P4
+#include "driver/ppa.h"
+#endif
+
 class EspVideo : public Camera {
 private:
+    class ForegroundCaptureGuard {
+    public:
+        explicit ForegroundCaptureGuard(std::atomic_uint32_t& requests) : requests_(requests) {
+            requests_.fetch_add(1, std::memory_order_acq_rel);
+        }
+        ~ForegroundCaptureGuard() {
+            requests_.fetch_sub(1, std::memory_order_acq_rel);
+        }
+
+        ForegroundCaptureGuard(const ForegroundCaptureGuard&) = delete;
+        ForegroundCaptureGuard& operator=(const ForegroundCaptureGuard&) = delete;
+
+    private:
+        std::atomic_uint32_t& requests_;
+    };
+
     struct FrameBuffer {
         uint8_t *data = nullptr;
         size_t len = 0;
@@ -26,10 +46,12 @@ private:
     v4l2_pix_fmt_t sensor_format_ = 0;
     size_t sensor_stride_ = 0;
     std::mutex capture_mutex_;
-#ifdef CONFIG_XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE
     uint16_t sensor_width_ = 0;
     uint16_t sensor_height_ = 0;
-#endif  // CONFIG_XIAOZHI_ENABLE_ROTATE_CAMERA_IMAGE
+    std::atomic_uint32_t foreground_capture_requests_{0};
+#ifdef CONFIG_IDF_TARGET_ESP32P4
+    ppa_client_handle_t scaled_capture_ppa_client_ = nullptr;
+#endif
     int video_fd_ = -1;
     std::atomic_bool streaming_on_{false};
     struct MmapBuffer { void *start = nullptr; size_t length = 0; };
@@ -47,8 +69,25 @@ public:
     virtual bool SetHMirror(bool enabled) override;
     virtual bool SetVFlip(bool enabled) override;
     virtual std::string Explain(const std::string& question);
+    bool IsForegroundCaptureActive() const override {
+        return foreground_capture_requests_.load(std::memory_order_acquire) != 0;
+    }
     bool IsReady() const { return video_fd_ >= 0; }
     bool IsStreaming() const { return streaming_on_ && video_fd_ >= 0; }
+
+    enum class ScaledCaptureResult {
+        Ok,
+        Busy,
+        NotReady,
+        InvalidArgument,
+        UnsupportedFormat,
+        Error,
+    };
+
+    // Non-blocking background capture for gesture inference. The caller owns an
+    // aligned RGB565 output buffer. Foreground photo/face requests always win.
+    ScaledCaptureResult TryCaptureScaledRgb565(uint8_t* output, size_t output_len,
+                                               int output_width, int output_height);
 
     // 非破坏性采集:不丢弃前 2 帧,不显示预览,不旋转
     // 用于人脸识别等需要快速获取帧的场景
