@@ -48,8 +48,8 @@ static const char *TAG = "PAGE_SET";
 #define STR_LANG_EN_NAME    "English"
 
 /* Weather location */
-#define STR_XIAMEN_ZH       "\xE5\x8E\xA6\xE9\x97\xA8"                          /* 厦门 */
-#define STR_XIAMEN_EN       "Xiamen"
+#define STR_NANJING_ZH      "\xE5\x8D\x97\xE4\xBA\xAC"                          /* 南京 */
+#define STR_NANJING_EN      "Nanjing"
 
 #define MQTT_BROKER_STR     "8.134.167.240:1883"
 #define MQTT_CLIENT_ID      "xiaozhi_p4_host"
@@ -245,7 +245,7 @@ lv_obj_t *page_set_create(lv_obj_t *parent)
 
     /* Weather location */
     lv_obj_t *loc_val = ui_create_label(ctx->page,
-        tr(STR_XIAMEN_ZH, STR_XIAMEN_EN),
+        tr(STR_NANJING_ZH, STR_NANJING_EN),
         ui_font_cn(13), UI_COLOR_TEXT_SEC);
     ui_kit_setting_row(ctx->page, ICON_DROP,
         tr(STR_WEATHER_LOC_ZH, STR_WEATHER_LOC_EN), loc_val);

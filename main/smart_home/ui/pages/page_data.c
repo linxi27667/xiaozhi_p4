@@ -320,7 +320,7 @@ static void add_weather_detail_line(lv_obj_t *parent, const mqtt_device_model_t 
 
     if (!m || !m->weather_valid) {
         lv_obj_t *sync = ui_create_label(parent,
-                                         tr("\xE5\x8E\xA6\xE9\x97\xA8\xE5\xAE\xA4\xE5\xA4\x96\xEF\xBC\x9A\xE5\x90\x8C\xE6\xAD\xA5\xE4\xB8\xAD", "Xiamen: syncing"),
+                                         tr("\xE5\x8D\x97\xE4\xBA\xAC\xE5\xAE\xA4\xE5\xA4\x96\xEF\xBC\x9A\xE5\x90\x8C\xE6\xAD\xA5\xE4\xB8\xAD", "Nanjing: syncing"),
                                          ui_font_cn(14), UI_COLOR_TEXT_SEC);
         lv_label_set_long_mode(sync, LV_LABEL_LONG_DOT);
         lv_obj_set_width(sync, lv_pct(100));
@@ -328,7 +328,7 @@ static void add_weather_detail_line(lv_obj_t *parent, const mqtt_device_model_t 
     }
 
     int temp_int = (int)(m->outdoor_temp + (m->outdoor_temp >= 0 ? 0.5f : -0.5f));
-    lv_snprintf(buf, sizeof(buf), "\xE5\x8E\xA6\xE9\x97\xA8 \xC2\xB7 %s  %d\xC2\xB0""C",
+    lv_snprintf(buf, sizeof(buf), "\xE5\x8D\x97\xE4\xBA\xAC \xC2\xB7 %s  %d\xC2\xB0""C",
                 weather_desc(m->weather_code), temp_int);
     lv_obj_t *summary = ui_create_label(parent, buf, ui_font_cn(17), UI_COLOR_ACCENT);
     lv_label_set_long_mode(summary, LV_LABEL_LONG_DOT);
@@ -409,7 +409,7 @@ static void build_pills(data_ctx_t *ctx)
         lv_snprintf(buf, sizeof(buf), "--:--");
     }
     ui_kit_status_pill(row_bot, buf, UI_COLOR_ACCENT, UI_COLOR_ACCENT_SOFT);
-    ui_kit_status_pill(row_bot, tr("\xE5\x8E\xA6\xE9\x97\xA8", "Xiamen"),
+    ui_kit_status_pill(row_bot, tr("\xE5\x8D\x97\xE4\xBA\xAC", "Nanjing"),
                        m->weather_valid ? UI_COLOR_GREEN : UI_COLOR_ORANGE,
                        m->weather_valid ? UI_COLOR_GREEN_SOFT : UI_COLOR_CARD_SOFT);
 }

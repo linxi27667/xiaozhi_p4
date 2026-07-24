@@ -174,7 +174,7 @@ public:
             snapshot_.state = GESTURE_STATE_PAUSED;
             snapshot_.timeout_seconds = 0;
             CopyText(snapshot_.status, sizeof(snapshot_.status),
-                     "小智关闭中...");
+                     "小鑫关闭中...");
         }
 
         // The assistant finishes its current sentence and closes the online
@@ -295,7 +295,7 @@ private:
                     SetState(GESTURE_STATE_LOADING, "模型初始化中...");
                     break;
                 }
-                SetState(GESTURE_STATE_PAUSED, "小智关闭中...");
+                SetState(GESTURE_STATE_PAUSED, "小鑫关闭中...");
                 vTaskDelay(pdMS_TO_TICKS(kPausePollMs));
             }
             if (!requested_active_.load(std::memory_order_acquire)) {

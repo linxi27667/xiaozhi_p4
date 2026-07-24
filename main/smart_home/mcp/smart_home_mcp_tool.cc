@@ -88,9 +88,9 @@ static cJSON* build_sensors_json() {
 
 static cJSON* build_location_json() {
     cJSON* root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "province", "福建省");
-    cJSON_AddStringToObject(root, "city", "厦门市");
-    cJSON_AddStringToObject(root, "location", "福建省厦门市");
+    cJSON_AddStringToObject(root, "province", "江苏省");
+    cJSON_AddStringToObject(root, "city", "南京市");
+    cJSON_AddStringToObject(root, "location", "江苏省南京市");
     cJSON_AddNumberToObject(root, "latitude", WEATHER_LAT);
     cJSON_AddNumberToObject(root, "longitude", WEATHER_LON);
     cJSON_AddStringToObject(root, "timezone", WEATHER_TIMEZONE);
@@ -264,7 +264,7 @@ extern "C" void SmartHomeMcp_RegisterTools(void) {
         "Get the authoritative configured location of this smart-home device. "
         "Always call this tool when the user asks for the current province, city, location, "
         "where the device is, or the local weather location. The device is configured in "
-        "Xiamen City, Fujian Province and has no GPS. If cloud/IP context reports city as "
+        "Nanjing City, Jiangsu Province and has no GPS. If cloud/IP context reports city as "
         "Unknown, never infer or guess the provincial capital; use this tool result instead.",
         PropertyList(),
         [](const PropertyList& properties) -> ReturnValue {

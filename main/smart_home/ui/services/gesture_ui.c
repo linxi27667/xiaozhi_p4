@@ -353,8 +353,8 @@ void gesture_ui_show(void)
 
     lv_obj_t *hint = create_label(
         panel,
-        tr("小智已暂停 点击返回恢复",
-           "Xiaozhi is offline in gesture mode. Voice returns after Exit releases the model."),
+        tr("小鑫已暂停 点击返回恢复",
+           "Xiaoxin is offline in gesture mode. Voice returns after Exit releases the model."),
         16, lv_color_hex(0x7F95AF));
     lv_obj_set_width(hint, 268);
     lv_label_set_long_mode(hint, LV_LABEL_LONG_WRAP);

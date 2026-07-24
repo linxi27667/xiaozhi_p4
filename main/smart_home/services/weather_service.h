@@ -4,11 +4,11 @@
 extern "C" {
 #endif
 
-#define WEATHER_LAT 24.4798
-#define WEATHER_LON 118.0894
-#define WEATHER_LAT_STR "24.4798"
-#define WEATHER_LON_STR "118.0894"
-#define WEATHER_LOCATION_NAME "厦门"
+#define WEATHER_LAT 32.06167
+#define WEATHER_LON 118.77778
+#define WEATHER_LAT_STR "32.06167"
+#define WEATHER_LON_STR "118.77778"
+#define WEATHER_LOCATION_NAME "南京"
 #define WEATHER_TIMEZONE "Asia/Shanghai"
 
 void weather_service_init(void);

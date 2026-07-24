@@ -33,7 +33,7 @@ extern "C" void GestureMcp_RegisterTools(void) {
     server.AddTool(
         "self.gesture.set_mode",
         "开启或退出手势控制模式、隔空控制模式。enabled=true 后请先完成本轮语音提示；"
-        "设备随后关闭在线语音并进入独占手势界面，只能通过右上角触屏退出恢复小智。"
+        "设备随后关闭在线语音并进入独占手势界面，只能通过右上角触屏退出恢复小鑫。"
         "该模式支持握拳=离家、全开手掌=回家、OK=观影、数字2=开门、数字3=关门、"
         "数字4=明亮；握拳属于实验识别，需要保持动作直至界面显示4/4。只有返回 "
         "active=true 且 ready=true、state=running 才表示已可识别；"
