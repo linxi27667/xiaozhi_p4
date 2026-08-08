@@ -95,6 +95,8 @@ struct DeviceLookupResult {
     bool found;
     uint16_t model_index;
     bool power_on;
+    uint8_t open_value;
+    uint8_t close_value;
 };
 
 DeviceLookupResult FindDeviceByCommand(uint8_t floor_id, uint8_t cmd_type,
@@ -112,10 +114,56 @@ DeviceLookupResult FindDeviceByCommand(uint8_t floor_id, uint8_t cmd_type,
             result.found = true;
             result.model_index = i;
             result.power_on = device.power_on;
+            result.open_value = device.cmd_type == IOT_CMD_SET_SERVO
+                                    ? device.servo_open_angle
+                                    : 1;
+            result.close_value = device.cmd_type == IOT_CMD_SET_SERVO
+                                     ? device.servo_close_angle
+                                     : 0;
             break;
         }
     }
     return result;
+}
+
+bool SendDevicePowerCommand(uint8_t floor_id, uint8_t cmd_type,
+                            uint8_t gpio_index, bool on) {
+    const DeviceLookupResult device =
+        FindDeviceByCommand(floor_id, cmd_type, gpio_index);
+    if (!device.found) {
+        return false;
+    }
+
+    const uint8_t value = cmd_type == IOT_CMD_SET_SERVO
+                              ? (on ? device.open_value : device.close_value)
+                              : (on ? 1 : 0);
+    if (!mqtt_send_command(floor_id, cmd_type, gpio_index, value)) {
+        return false;
+    }
+
+    device_model_apply_power(device.model_index, on);
+    return true;
+}
+
+bool SendSkylightAndBalconyCommand(bool open) {
+    constexpr struct {
+        uint8_t floor_id;
+        uint8_t cmd_type;
+        uint8_t gpio_index;
+    } kTargets[] = {
+        {3, IOT_CMD_SET_SERVO, 6},  // right skylight
+        {3, IOT_CMD_SET_SERVO, 7},  // left skylight
+        {3, IOT_CMD_SET_LIGHT, 0},  // balcony light
+    };
+
+    bool all_succeeded = true;
+    for (const auto &target : kTargets) {
+        if (!SendDevicePowerCommand(target.floor_id, target.cmd_type,
+                                    target.gpio_index, open)) {
+            all_succeeded = false;
+        }
+    }
+    return all_succeeded;
 }
 
 void CopyText(char *destination, size_t length, const char *source) {
@@ -703,8 +751,8 @@ private:
                 action = "大门已关闭";
                 break;
             case GestureClass::Four:
-                scene = IOT_SCENE_BRIGHT;
-                action = "明亮场景";
+                scene = IOT_SCENE_NIGHT;
+                action = "起夜场景";
                 break;
             case GestureClass::One: {
                 device_command = true;
@@ -718,20 +766,10 @@ private:
                 break;
             }
             case GestureClass::Like:
-                device_command = true;
-                device_floor = 2;
-                device_cmd_type = IOT_CMD_SET_RELAY;
-                device_index = 0;
-                device_value = 1;
-                action = "二楼风扇已打开";
+                action = "天窗和阳台灯已打开";
                 break;
             case GestureClass::Dislike:
-                device_command = true;
-                device_floor = 2;
-                device_cmd_type = IOT_CMD_SET_RELAY;
-                device_index = 0;
-                device_value = 0;
-                action = "二楼风扇已关闭";
+                action = "天窗和阳台灯已关闭";
                 break;
             default:
                 return;
@@ -741,14 +779,13 @@ private:
         if (door_command) {
             control_succeeded =
                 mqtt_send_command(1, IOT_CMD_SET_SERVO, 6, door_angle);
+        } else if (gesture == GestureClass::Like ||
+                   gesture == GestureClass::Dislike) {
+            control_succeeded = SendSkylightAndBalconyCommand(
+                gesture == GestureClass::Like);
         } else if (device_command) {
-            const DeviceLookupResult device =
-                FindDeviceByCommand(device_floor, device_cmd_type, device_index);
-            control_succeeded = device.found && mqtt_send_command(
-                device_floor, device_cmd_type, device_index, device_value);
-            if (control_succeeded) {
-                device_model_apply_power(device.model_index, device_value != 0);
-            }
+            control_succeeded = SendDevicePowerCommand(
+                device_floor, device_cmd_type, device_index, device_value != 0);
         } else {
             mqtt_send_scene(scene);
         }
