@@ -32,10 +32,10 @@ ESP32-P4 多媒体/AIoT 中控 + 三套 ESP32-S3 楼层从机。P4 运行小智�
 
 ## 演示城市配置
 
-- 当前演示城市：厦门（`Xiamen`）。
-- Open-Meteo 坐标：`24.4798, 118.0894`，时区：`Asia/Shanghai`。
+- 当前演示城市：江苏南京（`Nanjing, Jiangsu`）。
+- Open-Meteo 坐标：`32.06167, 118.77778`，时区：`Asia/Shanghai`。
 - 城市名与坐标统一维护在 `main/smart_home/services/weather_service.h`。
-- 天气卡资源名统一为 `weather_xiamen.png`，修改城市时需同步 UI、嵌入资源和中文字库。
+- 天气卡资源名统一为 `weather_nanjing.png`，修改城市时需同步 UI、嵌入资源和中文字库。
 
 ## 系统时间
 

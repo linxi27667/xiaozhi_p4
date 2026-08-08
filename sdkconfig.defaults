@@ -55,7 +55,7 @@ CONFIG_LV_USE_FONT_COMPRESSED=n
 CONFIG_LV_USE_FONT_PLACEHOLDER=n
 CONFIG_LV_USE_LODEPNG=y
 
-# TF card UI assets use names such as scene_home.png and weather_xiamen.png.
+# TF card UI assets use names such as scene_home.png and weather_nanjing.png.
 CONFIG_FATFS_LFN_NONE=n
 CONFIG_FATFS_LFN_HEAP=y
 

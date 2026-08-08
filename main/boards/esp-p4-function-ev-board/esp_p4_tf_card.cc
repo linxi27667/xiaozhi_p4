@@ -66,8 +66,8 @@ extern const uint8_t _binary_siyin_logo_png_start[] asm("_binary_siyin_logo_png_
 extern const uint8_t _binary_siyin_logo_png_end[] asm("_binary_siyin_logo_png_end");
 extern const uint8_t _binary_weather_cloud_png_start[] asm("_binary_weather_cloud_png_start");
 extern const uint8_t _binary_weather_cloud_png_end[] asm("_binary_weather_cloud_png_end");
-extern const uint8_t _binary_weather_xiamen_png_start[] asm("_binary_weather_xiamen_png_start");
-extern const uint8_t _binary_weather_xiamen_png_end[] asm("_binary_weather_xiamen_png_end");
+extern const uint8_t _binary_weather_nanjing_png_start[] asm("_binary_weather_nanjing_png_start");
+extern const uint8_t _binary_weather_nanjing_png_end[] asm("_binary_weather_nanjing_png_end");
 
 struct EmbeddedAsset {
     const char *name;
@@ -99,7 +99,7 @@ constexpr EmbeddedAsset kDefaultUiAssets[] = {
     {"scene_sleep.png", _binary_scene_sleep_png_start, _binary_scene_sleep_png_end},
     {"siyin_logo.png", _binary_siyin_logo_png_start, _binary_siyin_logo_png_end},
     {"weather_cloud.png", _binary_weather_cloud_png_start, _binary_weather_cloud_png_end},
-    {"weather_xiamen.png", _binary_weather_xiamen_png_start, _binary_weather_xiamen_png_end},
+    {"weather_nanjing.png", _binary_weather_nanjing_png_start, _binary_weather_nanjing_png_end},
 };
 
 constexpr LegacyAssetFingerprint kLegacyDefaultAssets[] = {
@@ -120,7 +120,7 @@ constexpr LegacyAssetFingerprint kLegacyDefaultAssets[] = {
     {"scene_sleep.png", 772, 0xa52d7812},
     {"siyin_logo.png", 9857, 0xe6aeff9a},
     {"weather_cloud.png", 1511, 0x6472981f},
-    {"weather_xiamen.png", 1381, 0x205aa4b5},
+    {"weather_nanjing.png", 1381, 0x205aa4b5},
 };
 
 esp_vfs_fat_sdmmc_mount_config_t MakeMountConfig()

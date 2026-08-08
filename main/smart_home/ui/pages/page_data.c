@@ -445,7 +445,7 @@ static void build_visual(data_ctx_t *ctx)
     lv_obj_set_width(weather, 0);
     lv_obj_set_flex_grow(weather, 1);
     lv_obj_set_style_pad_column(weather, 14, 0);
-    add_asset_or_icon(weather, "weather_xiamen.png", ICON_LOCATION, 88, 70, UI_COLOR_ACCENT);
+    add_asset_or_icon(weather, "weather_nanjing.png", ICON_LOCATION, 88, 70, UI_COLOR_ACCENT);
 
     lv_obj_t *weather_col = make_flex_col(weather, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_width(weather_col, 0);
