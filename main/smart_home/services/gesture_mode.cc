@@ -79,7 +79,43 @@ uint8_t ConfirmationFramesForCategory(const char *category) {
     if (std::strcmp(category, "four") == 0) {
         return GestureVotesRequired(GestureClass::Four);
     }
+    if (std::strcmp(category, "one") == 0) {
+        return GestureVotesRequired(GestureClass::One);
+    }
+    if (std::strcmp(category, "like") == 0) {
+        return GestureVotesRequired(GestureClass::Like);
+    }
+    if (std::strcmp(category, "dislike") == 0) {
+        return GestureVotesRequired(GestureClass::Dislike);
+    }
     return 3;
+}
+
+struct DeviceLookupResult {
+    bool found;
+    uint16_t model_index;
+    bool power_on;
+};
+
+DeviceLookupResult FindDeviceByCommand(uint8_t floor_id, uint8_t cmd_type,
+                                       uint8_t gpio_index) {
+    DeviceLookupResult result = {};
+    const mqtt_device_model_t *model = device_model_get();
+    if (model == nullptr) {
+        return result;
+    }
+
+    for (uint16_t i = 0; i < model->device_count; ++i) {
+        const rc_device_t &device = model->devices[i];
+        if (device.floor_id == floor_id && device.cmd_type == cmd_type &&
+            device.gpio_index == gpio_index) {
+            result.found = true;
+            result.model_index = i;
+            result.power_on = device.power_on;
+            break;
+        }
+    }
+    return result;
 }
 
 void CopyText(char *destination, size_t length, const char *source) {
@@ -636,6 +672,11 @@ private:
     void ExecuteGesture(GestureClass gesture) {
         uint8_t scene = IOT_SCENE_NONE;
         bool door_command = false;
+        bool device_command = false;
+        uint8_t device_floor = 0;
+        uint8_t device_cmd_type = 0;
+        uint8_t device_index = 0;
+        uint8_t device_value = 0;
         uint8_t door_angle = 0;
         const char *action = "";
         switch (gesture) {
@@ -665,6 +706,33 @@ private:
                 scene = IOT_SCENE_BRIGHT;
                 action = "明亮场景";
                 break;
+            case GestureClass::One: {
+                device_command = true;
+                device_floor = 1;
+                device_cmd_type = IOT_CMD_SET_LIGHT;
+                device_index = 0;
+                const DeviceLookupResult hall_light =
+                    FindDeviceByCommand(device_floor, device_cmd_type, device_index);
+                device_value = hall_light.power_on ? 0 : 1;
+                action = device_value ? "大厅灯已打开" : "大厅灯已关闭";
+                break;
+            }
+            case GestureClass::Like:
+                device_command = true;
+                device_floor = 2;
+                device_cmd_type = IOT_CMD_SET_RELAY;
+                device_index = 0;
+                device_value = 1;
+                action = "二楼风扇已打开";
+                break;
+            case GestureClass::Dislike:
+                device_command = true;
+                device_floor = 2;
+                device_cmd_type = IOT_CMD_SET_RELAY;
+                device_index = 0;
+                device_value = 0;
+                action = "二楼风扇已关闭";
+                break;
             default:
                 return;
         }
@@ -673,11 +741,23 @@ private:
         if (door_command) {
             control_succeeded =
                 mqtt_send_command(1, IOT_CMD_SET_SERVO, 6, door_angle);
+        } else if (device_command) {
+            const DeviceLookupResult device =
+                FindDeviceByCommand(device_floor, device_cmd_type, device_index);
+            control_succeeded = device.found && mqtt_send_command(
+                device_floor, device_cmd_type, device_index, device_value);
+            if (control_succeeded) {
+                device_model_apply_power(device.model_index, device_value != 0);
+            }
         } else {
             mqtt_send_scene(scene);
         }
         if (!control_succeeded) {
-            action = door_angle > 0 ? "开门失败" : "关门失败";
+            if (door_command) {
+                action = door_angle > 0 ? "开门失败" : "关门失败";
+            } else {
+                action = "设备控制失败";
+            }
         }
         {
             std::lock_guard<std::mutex> lock(state_mutex_);

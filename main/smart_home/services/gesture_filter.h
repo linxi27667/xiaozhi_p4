@@ -10,11 +10,15 @@ enum class GestureClass : uint8_t {
     Two,
     Three,
     Four,
+    One,
+    Like,
+    Dislike,
 };
 
 constexpr float kGestureDetectionThreshold = 0.50f;
 constexpr float kGestureClassificationThreshold = 0.85f;
 constexpr float kDoorGestureClassificationThreshold = 0.90f;
+constexpr float kDeviceGestureClassificationThreshold = 0.90f;
 // The bundled classifier has no fist class. A sustained, very high-confidence
 // no_gesture result is used only as an experimental fist proxy.
 constexpr float kFistGestureClassificationThreshold = 0.90f;

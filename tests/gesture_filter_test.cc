@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cstring>
 #include <iostream>
+#include <utility>
 
 static void TestThresholdsAndIgnoredClasses() {
     assert(!GestureDetectionAccepted(0.499f));
@@ -36,11 +37,20 @@ static void TestThresholdsAndIgnoredClasses() {
     assert(observation.gesture == GestureClass::Four);
     assert(GestureVotesRequired(GestureClass::Four) == 3);
 
-    for (const char *ignored : {"one", "like", "call", "dislike"}) {
-        observation = NormalizeGestureObservation(ignored, 0.99f, true);
+    for (const auto &device_gesture : {
+             std::pair{"one", GestureClass::One},
+             std::pair{"like", GestureClass::Like},
+             std::pair{"dislike", GestureClass::Dislike}}) {
+        observation = NormalizeGestureObservation(device_gesture.first, 0.899f, true);
         assert(observation.gesture == GestureClass::None);
-        assert(observation.hand_present);
+        observation = NormalizeGestureObservation(device_gesture.first, 0.90f, true);
+        assert(observation.gesture == device_gesture.second);
+        assert(GestureVotesRequired(device_gesture.second) == 4);
     }
+
+    observation = NormalizeGestureObservation("call", 0.99f, true);
+    assert(observation.gesture == GestureClass::None);
+    assert(observation.hand_present);
 
     observation = NormalizeGestureObservation("no_hand", 0.99f, true);
     assert(observation.gesture == GestureClass::None);
@@ -81,6 +91,15 @@ static void TestSafetyVoteRequirements() {
     GestureFilterResult fist = filter.Process(GestureClass::Fist, true, 300);
     assert(fist.triggered == GestureClass::Fist);
     assert(fist.votes_required == 4);
+
+    filter.Reset();
+    for (uint64_t i = 0; i < 3; ++i) {
+        assert(filter.Process(GestureClass::Like, true, i * 100).triggered ==
+               GestureClass::None);
+    }
+    GestureFilterResult device = filter.Process(GestureClass::Like, true, 300);
+    assert(device.triggered == GestureClass::Like);
+    assert(device.votes_required == 4);
 }
 
 static void TestLatchCooldownAndDisappearance() {

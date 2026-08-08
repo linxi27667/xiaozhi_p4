@@ -75,13 +75,13 @@ static const char *gesture_display_name(const char *name)
     if (strcmp(name, "ok") == 0) return tr("确认", "OK");
     if (strcmp(name, "five") == 0) return tr("全开", "OPEN PALM");
     if (strcmp(name, "no_gesture") == 0) return tr("握拳", "FIST");
-    if (strcmp(name, "one") == 0) return tr("数字一", "ONE");
+    if (strcmp(name, "one") == 0) return tr("大厅灯", "HALL LIGHT");
     if (strcmp(name, "two") == 0) return tr("数字2", "TWO");
     if (strcmp(name, "three") == 0) return tr("数字3", "THREE");
     if (strcmp(name, "four") == 0) return tr("数字4", "FOUR");
-    if (strcmp(name, "like") == 0) return tr("向上", "LIKE");
+    if (strcmp(name, "like") == 0) return tr("风扇开", "FAN ON");
     if (strcmp(name, "call") == 0) return tr("呼唤", "CALL");
-    if (strcmp(name, "dislike") == 0) return tr("向下", "DISLIKE");
+    if (strcmp(name, "dislike") == 0) return tr("风扇关", "FAN OFF");
     return tr("无效", name);
 }
 
@@ -90,14 +90,18 @@ static bool is_actionable_gesture(const char *name)
     return name != NULL &&
            (strcmp(name, "no_gesture") == 0 || strcmp(name, "ok") == 0 ||
             strcmp(name, "five") == 0 || strcmp(name, "two") == 0 ||
-            strcmp(name, "three") == 0 || strcmp(name, "four") == 0);
+            strcmp(name, "three") == 0 || strcmp(name, "four") == 0 ||
+            strcmp(name, "one") == 0 || strcmp(name, "like") == 0 ||
+            strcmp(name, "dislike") == 0);
 }
 
 static float gesture_action_threshold(const char *name)
 {
     if (name == NULL) return 1.0f;
     if (strcmp(name, "no_gesture") == 0) return 0.90f;
-    if (strcmp(name, "two") == 0 || strcmp(name, "three") == 0) return 0.90f;
+    if (strcmp(name, "two") == 0 || strcmp(name, "three") == 0 ||
+        strcmp(name, "one") == 0 || strcmp(name, "like") == 0 ||
+        strcmp(name, "dislike") == 0) return 0.90f;
     return 0.85f;
 }
 

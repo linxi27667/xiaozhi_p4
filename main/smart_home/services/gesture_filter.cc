@@ -37,6 +37,18 @@ GestureObservation NormalizeGestureObservation(
         if (score >= kDoorGestureClassificationThreshold) {
             observation.gesture = GestureClass::Three;
         }
+    } else if (std::strcmp(category, "one") == 0) {
+        if (score >= kDeviceGestureClassificationThreshold) {
+            observation.gesture = GestureClass::One;
+        }
+    } else if (std::strcmp(category, "like") == 0) {
+        if (score >= kDeviceGestureClassificationThreshold) {
+            observation.gesture = GestureClass::Like;
+        }
+    } else if (std::strcmp(category, "dislike") == 0) {
+        if (score >= kDeviceGestureClassificationThreshold) {
+            observation.gesture = GestureClass::Dislike;
+        }
     } else if (score < kGestureClassificationThreshold) {
         return observation;
     } else if (std::strcmp(category, "ok") == 0) {
@@ -63,6 +75,12 @@ const char *GestureClassName(GestureClass gesture) {
             return "three";
         case GestureClass::Four:
             return "four";
+        case GestureClass::One:
+            return "one";
+        case GestureClass::Like:
+            return "like";
+        case GestureClass::Dislike:
+            return "dislike";
         default:
             return "";
     }
@@ -74,6 +92,9 @@ uint8_t GestureVotesRequired(GestureClass gesture) {
             return 4;
         case GestureClass::Two:
         case GestureClass::Three:
+        case GestureClass::One:
+        case GestureClass::Like:
+        case GestureClass::Dislike:
             return 4;
         default:
             return 3;
