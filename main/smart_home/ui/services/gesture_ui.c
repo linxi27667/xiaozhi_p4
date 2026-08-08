@@ -78,7 +78,7 @@ static const char *gesture_display_name(const char *name)
     if (strcmp(name, "one") == 0) return tr("数字一", "ONE");
     if (strcmp(name, "two") == 0) return tr("数字2", "TWO");
     if (strcmp(name, "three") == 0) return tr("数字3", "THREE");
-    if (strcmp(name, "four") == 0) return tr("数字四", "FOUR");
+    if (strcmp(name, "four") == 0) return tr("数字4", "FOUR");
     if (strcmp(name, "like") == 0) return tr("点赞", "LIKE");
     if (strcmp(name, "call") == 0) return tr("呼唤", "CALL");
     if (strcmp(name, "dislike") == 0) return tr("倒赞", "DISLIKE");
