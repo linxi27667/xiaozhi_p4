@@ -17,6 +17,7 @@ static const char *s_event_names[] = {
     [UI_EVENT_LANG_CHANGED]           = "LANG_CHANGED",
     [UI_EVENT_PAGE_SWITCHED]          = "PAGE_SWITCHED",
     [UI_EVENT_FIRE_ALARM]             = "FIRE_ALARM",
+    [UI_EVENT_RAIN_ALARM]             = "RAIN_ALARM",
     [UI_EVENT_SCENE_CHANGED]          = "SCENE_CHANGED",
     [UI_EVENT_LOGIN_REQUIRED]         = "LOGIN_REQUIRED",
     [UI_EVENT_LOGIN_SUCCESS]          = "LOGIN_SUCCESS",

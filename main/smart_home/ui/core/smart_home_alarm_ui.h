@@ -9,6 +9,7 @@ extern "C" {
 
 void smart_home_alarm_ui_init(void);
 void smart_home_alarm_ui_set_fire(uint8_t floor_id, bool active);
+void smart_home_alarm_ui_set_rain(uint8_t floor_id, bool active);
 
 #ifdef __cplusplus
 }

@@ -17,6 +17,10 @@ static lv_obj_t *s_modal;
 static uint8_t s_fire_floor_id;
 static bool s_fire_active;
 static bool s_fire_acknowledged;
+static lv_obj_t *s_rain_modal;
+static lv_timer_t *s_rain_close_timer;
+static uint8_t s_rain_floor_id;
+static bool s_rain_active;
 static bool s_initialized;
 static lv_timer_t *s_poll_timer;
 static lv_timer_t *s_flash_timer;
@@ -69,11 +73,41 @@ static void start_fire_flash(void)
     fire_flash_timer_cb(s_flash_timer);
 }
 
+static void close_rain_modal(void)
+{
+    if (s_rain_close_timer) {
+        lv_timer_delete(s_rain_close_timer);
+        s_rain_close_timer = NULL;
+    }
+    if (s_rain_modal) {
+        lv_msgbox_close_async(s_rain_modal);
+        s_rain_modal = NULL;
+    }
+}
+
+static void rain_close_timer_cb(lv_timer_t *timer)
+{
+    if (timer == s_rain_close_timer) {
+        s_rain_close_timer = NULL;
+    }
+    if (s_rain_modal) {
+        lv_msgbox_close_async(s_rain_modal);
+        s_rain_modal = NULL;
+    }
+    lv_timer_delete(timer);
+}
+
 static void on_alarm_ack(lv_event_t *e)
 {
     (void)e;
     s_fire_acknowledged = true;
     close_modal();
+}
+
+static void on_rain_ack(lv_event_t *e)
+{
+    (void)e;
+    close_rain_modal();
 }
 
 static void show_fire_modal(void)
@@ -190,10 +224,106 @@ static void show_fire_modal(void)
     ESP_LOGW(TAG, "Fire modal shown for floor %d", s_fire_floor_id);
 }
 
+static void show_rain_modal(void)
+{
+    if (!s_rain_active || s_rain_modal) {
+        return;
+    }
+
+    s_rain_modal = lv_msgbox_create(NULL);
+    lv_obj_set_size(s_rain_modal, 560, 318);
+    lv_obj_center(s_rain_modal);
+    lv_msgbox_add_title(s_rain_modal, "\xE9\x9B\xA8\xE5\xA4\xA9\xE6\x8F\x90\xE9\x86\x92");
+
+    lv_obj_t *header = lv_msgbox_get_header(s_rain_modal);
+    if (header) {
+        lv_obj_t *icon = ui_create_icon(header, ICON_WATER, ui_font_icon(36), lv_color_white());
+        if (icon) {
+            lv_obj_move_to_index(icon, 0);
+        }
+    }
+
+    lv_obj_t *body_label = lv_msgbox_add_text(s_rain_modal,
+        "\xE4\xB8\x8B\xE9\x9B\xA8\xE4\xBA\x86\xEF\xBC\x8C\xE5\xB7\xB2\xE7\xBB\x8F\xE5\xB8\xAE\xE4\xBD\xA0\xE6\x94\xB6\xE5\xA5\xBD\xE8\xA1\xA3\xE6\x9C\x8D\xE5\x95\xA6");
+    lv_obj_t *btn = lv_msgbox_add_footer_button(s_rain_modal,
+        "\xE7\x9F\xA5\xE9\x81\x93\xE4\xBA\x86");
+    if (btn) {
+        lv_obj_add_event_cb(btn, on_rain_ack, LV_EVENT_CLICKED, NULL);
+    }
+
+    lv_color_t blue = lv_color_hex(0x1976D2);
+    lv_color_t dark_blue = lv_color_hex(0x0D47A1);
+    lv_obj_set_style_bg_color(s_rain_modal, blue, 0);
+    lv_obj_set_style_bg_opa(s_rain_modal, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(s_rain_modal, dark_blue, 0);
+    lv_obj_set_style_border_width(s_rain_modal, 3, 0);
+    lv_obj_set_style_radius(s_rain_modal, 12, 0);
+    lv_obj_set_style_pad_all(s_rain_modal, 28, 0);
+    lv_obj_set_style_shadow_color(s_rain_modal, lv_color_hex(0x42A5F5), 0);
+    lv_obj_set_style_shadow_width(s_rain_modal, 24, 0);
+    lv_obj_set_style_shadow_spread(s_rain_modal, 4, 0);
+    lv_obj_set_style_shadow_opa(s_rain_modal, LV_OPA_30, 0);
+
+    if (header) {
+        lv_obj_set_style_bg_opa(header, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_pad_column(header, 8, 0);
+        lv_obj_t *title_label = lv_msgbox_get_title(s_rain_modal);
+        if (title_label) {
+            lv_obj_set_style_text_color(title_label, lv_color_white(), 0);
+            lv_obj_set_style_text_font(title_label, ui_font_cn(32), 0);
+        }
+    }
+
+    lv_obj_t *content = lv_msgbox_get_content(s_rain_modal);
+    if (content) {
+        lv_obj_set_style_bg_opa(content, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_pad_ver(content, 16, 0);
+        uint32_t count = lv_obj_get_child_count(content);
+        for (uint32_t i = 0; i < count; i++) {
+            lv_obj_t *child = lv_obj_get_child(content, i);
+            lv_obj_set_style_text_color(child, lv_color_white(), 0);
+            lv_obj_set_style_text_font(child, ui_font_cn(19), 0);
+            lv_obj_set_style_text_line_space(child, 8, 0);
+        }
+    }
+    if (body_label) {
+        lv_obj_set_width(body_label, 500);
+        lv_label_set_long_mode(body_label, LV_LABEL_LONG_WRAP);
+    }
+
+    lv_obj_t *footer = lv_msgbox_get_footer(s_rain_modal);
+    if (footer) {
+        lv_obj_set_style_bg_opa(footer, LV_OPA_TRANSP, 0);
+        uint32_t count = lv_obj_get_child_count(footer);
+        for (uint32_t i = 0; i < count; i++) {
+            lv_obj_t *child = lv_obj_get_child(footer, i);
+            lv_obj_set_style_bg_color(child, lv_color_white(), 0);
+            lv_obj_set_style_bg_opa(child, LV_OPA_COVER, 0);
+            lv_obj_set_style_text_color(child, blue, 0);
+            lv_obj_set_style_text_font(child, ui_font_cn(18), 0);
+            lv_obj_set_style_radius(child, 6, 0);
+            lv_obj_set_style_pad_hor(child, 34, 0);
+            lv_obj_set_style_pad_ver(child, 14, 0);
+        }
+    }
+
+    s_rain_close_timer = lv_timer_create(rain_close_timer_cb, 8000, NULL);
+    if (s_rain_close_timer) {
+        lv_timer_set_repeat_count(s_rain_close_timer, 1);
+    }
+    ESP_LOGI(TAG, "Rain modal shown for floor %d", s_rain_floor_id);
+}
+
 static void on_fire_alarm_event(void *user_data)
 {
     (void)user_data;
     show_fire_modal();
+}
+
+static void on_rain_alarm_event(void *user_data)
+{
+    (void)user_data;
+    show_rain_modal();
 }
 
 /* ---- Polling: check device model for fire status every 500ms ---- */
@@ -250,6 +380,7 @@ void smart_home_alarm_ui_init(void)
     }
     s_initialized = true;
     ui_event_subscribe(UI_EVENT_FIRE_ALARM, on_fire_alarm_event, NULL);
+    ui_event_subscribe(UI_EVENT_RAIN_ALARM, on_rain_alarm_event, NULL);
 
     /* Start polling timer: checks device model every 500ms (<=500ms requirement) */
     s_poll_timer = lv_timer_create(poll_fire_status, 500, NULL);
@@ -268,4 +399,13 @@ void smart_home_alarm_ui_set_fire(uint8_t floor_id, bool active)
 
     s_fire_active = true;
     ui_event_publish(UI_EVENT_FIRE_ALARM);
+}
+
+void smart_home_alarm_ui_set_rain(uint8_t floor_id, bool active)
+{
+    s_rain_floor_id = floor_id;
+    s_rain_active = active;
+    if (active) {
+        ui_event_publish(UI_EVENT_RAIN_ALARM);
+    }
 }

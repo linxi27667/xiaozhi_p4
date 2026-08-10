@@ -87,12 +87,22 @@ extern "C" void smart_home_alarm_on_rain_status(uint8_t floor_id, bool active)
         return;
     }
 
+    smart_home_alarm_ui_set_rain(floor_id, active);
+
     if (active) {
         post_rule_event(SH_EVENT_RAIN_ALARM, floor_id, 1, "Rain detected");
         mqtt_send_command(2, IOT_CMD_SET_SERVO, 8, 0);
         mqtt_send_command(3, IOT_CMD_SET_SERVO, 8, 0);
         mqtt_send_command(3, IOT_CMD_SET_SERVO, 6, 180);
         mqtt_send_command(3, IOT_CMD_SET_SERVO, 7, 0);
+
+        Application::GetInstance().Schedule([]() {
+            auto &app = Application::GetInstance();
+            app.Alert("\xE9\x9B\xA8\xE5\xA4\xA9\xE6\x94\xB6\xE8\xA1\xA3",
+                      "\xE4\xB8\x8B\xE9\x9B\xA8\xE4\xBA\x86\xEF\xBC\x8C\xE5\xB7\xB2\xE7\xBB\x8F\xE5\xB8\xAE\xE4\xBD\xA0\xE6\x94\xB6\xE5\xA5\xBD\xE8\xA1\xA3\xE6\x9C\x8D\xE5\x95\xA6",
+                      "cloud_rain");
+            app.WakeWordInvoke("rain_alarm");
+        });
     } else {
         mqtt_send_command(2, IOT_CMD_SET_SERVO, 8, 180);
         /* 3F hanger stays collected until an explicit user command reopens it. */
