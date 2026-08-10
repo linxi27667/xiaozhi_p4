@@ -265,9 +265,8 @@ static void Sensor_ADC_Task(void* arg) {
             g_rain_exceed_count = 0;
             if (g_device_flags.rain_status == RAIN_STATUS_RAINING) {
                 g_device_flags.rain_status = RAIN_STATUS_DRY;
-                ESP_LOGI(TAG, "[RAIN] Dry %ld mV > %d mV - extending clothes rack",
+                ESP_LOGI(TAG, "[RAIN] Dry %ld mV > %d mV - clothes rack remains collected",
                          rain_mv, RAIN_THRESHOLD_LIGHT);
-                g_device_flags.servo[2] = SERVO_180;
             }
         }
 

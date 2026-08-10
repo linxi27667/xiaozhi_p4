@@ -95,7 +95,7 @@ extern "C" void smart_home_alarm_on_rain_status(uint8_t floor_id, bool active)
         mqtt_send_command(3, IOT_CMD_SET_SERVO, 7, 0);
     } else {
         mqtt_send_command(2, IOT_CMD_SET_SERVO, 8, 180);
-        mqtt_send_command(3, IOT_CMD_SET_SERVO, 8, 180);
+        /* 3F hanger stays collected until an explicit user command reopens it. */
     }
 }
 
